@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Email Alert — Flow (3 kroki)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #F2EAD8;
+      font-family: 'DM Sans', sans-serif;
+      color: #2C1F14;
+      min-height: 100vh;
+      padding: 40px 24px 60px;
+    }
+
+    /* ── PAGE TITLE ── */
+    .page-title {
+      text-align: center;
+      font-family: 'Playfair Display', serif;
+      font-size: 28px;
+      font-weight: 700;
+      color: #2C1F14;
+      margin-bottom: 8px;
+      letter-spacing: -0.3px;
+    }
+    .page-subtitle {
+      text-align: center;
+      font-size: 14px;
+      color: #6B5744;
+      margin-bottom: 48px;
+    }
+
+    /* ── FLOW WRAPPER ── */
+    .flow-wrapper {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 0;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+    }
+
+    /* ── STEP COLUMN ── */
+    .step-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .step-label {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: #6B5744;
+      margin-bottom: 12px;
+    }
+
+    /* ── ARROW ── */
+    .arrow-col {
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      margin-top: 56px; /* aligns vertically with modal mid */
+      flex-shrink: 0;
+      align-self: flex-start;
+      margin-top: 180px;
+    }
+    .arrow-col span {
+      font-size: 28px;
+      color: #6B5744;
+      line-height: 1;
+    }
+
+    /* ── OVERLAY SIMULATION ── */
+    .overlay-sim {
+      width: 420px;
+      height: 580px;
+      border-radius: 20px;
+      background: linear-gradient(160deg, #C9BC9E 0%, #B8A98A 50%, #A89272 100%);
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(44,31,20,0.2);
+      /* game passport BG hint */
+    }
+
+    /* fake game passport content behind overlay */
+    .overlay-sim::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(180deg, #C4B598 0%, #B8A989 100%);
+      /* subtle columns hint */
+    }
+
+    /* fake content stripes */
+    .bg-stripes {
+      position: absolute;
+      inset: 0;
+      padding: 14px;
+      opacity: 0.35;
+    }
+    .bg-stripe {
+      height: 12px;
+      background: #8A7562;
+      border-radius: 3px;
+      margin-bottom: 8px;
+    }
+    .bg-stripe.short { width: 60%; }
+    .bg-stripe.med   { width: 80%; }
+    .bg-stripe.long  { width: 100%; }
+    .bg-stripe.img   { height: 72px; width: 56px; background: #7A6550; border-radius: 4px; float: left; margin-right: 10px; }
+
+    /* dim layer */
+    .dim-layer {
+      position: absolute;
+      inset: 0;
+      background: rgba(44, 31, 20, 0.52);
+      backdrop-filter: blur(3px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 20px;
+    }
+
+    /* ── MODAL CARD ── */
+    .modal {
+      background: #EDE5D4;
+      border-radius: 16px;
+      width: 368px;
+      box-shadow: 0 24px 64px rgba(44,31,20,0.28);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* modal header */
+    .modal-header {
+      padding: 22px 24px 16px;
+      border-bottom: 1px solid #D4C4AE;
+      position: relative;
+    }
+    .modal-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: #2C1F14;
+      margin-bottom: 3px;
+    }
+    .modal-title.success {
+      color: #3D5C3A;
+    }
+    .modal-subtitle {
+      font-size: 12px;
+      color: #6B5744;
+      font-weight: 500;
+    }
+    .close-btn {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #D4C4AE;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: #6B5744;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 600;
+    }
+
+    /* modal body */
+    .modal-body {
+      padding: 20px 24px 22px;
+    }
+
+    /* ── STATE 1 SPECIFICS ── */
+    .price-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #3D5C3A;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 20px;
+      margin-bottom: 16px;
+      letter-spacing: 0.2px;
+    }
+
+    .form-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #2C1F14;
+      margin-bottom: 7px;
+      display: block;
+      letter-spacing: 0.1px;
+    }
+
+    .price-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      border: 1.5px solid #D4C4AE;
+      border-radius: 10px;
+      background: #F5EFE4;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+    .price-input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      padding: 12px 12px;
+      font-size: 24px;
+      font-weight: 700;
+      font-family: 'Playfair Display', serif;
+      color: #2C1F14;
+      outline: none;
+      width: 100%;
+    }
+    .price-suffix {
+      padding: 0 14px;
+      font-size: 18px;
+      font-weight: 600;
+      color: #6B5744;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    /* slider hint */
+    .slider-hint {
+      margin-bottom: 16px;
+    }
+    .slider-track-wrap {
+      position: relative;
+      height: 20px;
+      display: flex;
+      align-items: center;
+    }
+    .slider-track {
+      width: 100%;
+      height: 5px;
+      border-radius: 3px;
+      background: #D4C4AE;
+      position: relative;
+    }
+    .slider-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: 31%; /* (90-50)/(220-50) = ~23.5%, visually adjust */
+      background: #3D5C3A;
+      border-radius: 3px;
+    }
+    .slider-thumb {
+      position: absolute;
+      left: 31%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #3D5C3A;
+      border: 2.5px solid #F5EFE4;
+      box-shadow: 0 2px 6px rgba(61,92,58,0.4);
+    }
+    .slider-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #6B5744;
+      margin-top: 4px;
+    }
+
+    .form-field {
+      margin-bottom: 14px;
+    }
+    .email-input {
+      width: 100%;
+      border: 1.5px solid #D4C4AE;
+      border-radius: 10px;
+      background: #F5EFE4;
+      padding: 10px 12px;
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      color: #2C1F14;
+      outline: none;
+    }
+    .email-input::placeholder { color: #A0907E; }
+
+    .checkbox-row {
+      display: flex;
+      gap: 9px;
+      align-items: flex-start;
+      margin-bottom: 14px;
+    }
+    .checkbox-fake {
+      width: 16px;
+      height: 16px;
+      border: 1.5px solid #D4C4AE;
+      border-radius: 4px;
+      background: #F5EFE4;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .checkbox-label {
+      font-size: 11.5px;
+      color: #6B5744;
+      line-height: 1.45;
+    }
+
+    .privacy-note {
+      font-size: 10.5px;
+      color: #8A7562;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-bottom: 16px;
+    }
+
+    .btn-primary {
+      display: block;
+      width: 100%;
+      padding: 13px;
+      background: #3D5C3A;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: 'DM Sans', sans-serif;
+      text-align: center;
+      cursor: pointer;
+      letter-spacing: 0.2px;
+    }
+
+    /* ── STATE 2 SPECIFICS ── */
+    .email-icon-wrap {
+      text-align: center;
+      margin: 8px 0 14px;
+    }
+    .email-icon {
+      font-size: 56px;
+      line-height: 1;
+    }
+
+    .s2-message {
+      text-align: center;
+      font-size: 13px;
+      color: #6B5744;
+      margin-bottom: 6px;
+      line-height: 1.5;
+    }
+    .s2-email-bold {
+      text-align: center;
+      font-size: 14px;
+      font-weight: 700;
+      color: #2C1F14;
+      margin-bottom: 10px;
+    }
+    .s2-explanation {
+      text-align: center;
+      font-size: 12px;
+      color: #6B5744;
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+    .s2-spam {
+      text-align: center;
+      font-size: 11.5px;
+      color: #8A7562;
+      margin-bottom: 4px;
+    }
+    .s2-resend {
+      text-align: center;
+      font-size: 11.5px;
+      color: #3D5C3A;
+      font-weight: 600;
+      text-decoration: underline;
+      cursor: pointer;
+      margin-bottom: 16px;
+    }
+    .divider {
+      border: none;
+      border-top: 1px solid #D4C4AE;
+      margin: 14px 0;
+    }
+
+    .btn-ghost {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      background: transparent;
+      color: #6B5744;
+      border: 1.5px solid #D4C4AE;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      font-family: 'DM Sans', sans-serif;
+      text-align: center;
+      cursor: pointer;
+      margin-bottom: 8px;
+    }
+    .btn-outline {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      background: transparent;
+      color: #3D5C3A;
+      border: 1.5px solid #3D5C3A;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: 'DM Sans', sans-serif;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    /* ── STATE 3 SPECIFICS ── */
+    .checkmark-wrap {
+      display: flex;
+      justify-content: center;
+      margin: 10px 0 16px;
+    }
+    .checkmark-circle {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: #3D5C3A;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 16px rgba(61,92,58,0.35);
+    }
+    .checkmark-circle::after {
+      content: '';
+      display: block;
+      width: 28px;
+      height: 16px;
+      border-left: 3.5px solid #fff;
+      border-bottom: 3.5px solid #fff;
+      transform: rotate(-45deg) translateY(-3px);
+    }
+
+    .summary-card {
+      background: #DDD0BC;
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-bottom: 14px;
+      position: relative;
+    }
+    .summary-card-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: #2C1F14;
+      margin-bottom: 4px;
+    }
+    .summary-card-desc {
+      font-size: 12px;
+      color: #6B5744;
+      line-height: 1.4;
+      margin-bottom: 6px;
+    }
+    .summary-card-store {
+      font-size: 11px;
+      color: #8A7562;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .badge-active {
+      display: inline-block;
+      background: #3D5C3A;
+      color: #fff;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 20px;
+    }
+
+    .suggest-label {
+      font-size: 11.5px;
+      color: #6B5744;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    .game-chips {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .game-chip {
+      background: #DDD0BC;
+      border: 1px solid #C4B59E;
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 11px;
+      font-weight: 500;
+      color: #2C1F14;
+    }
+
+    .ghost-link {
+      display: block;
+      text-align: center;
+      font-size: 11.5px;
+      color: #6B5744;
+      text-decoration: underline;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <h1 class="page-title">Email Alert — Flow (3 kroki)</h1>
+  <p class="page-subtitle">Agregator Cen Planszówek · RODO/PKE 2024 · Double opt-in</p>
+
+  <div class="flow-wrapper">
+
+    <!-- ══════════════════ KROK 1 ══════════════════ -->
+    <div class="step-col">
+      <div class="step-label">Krok 1</div>
+      <div class="overlay-sim">
+        <!-- fake passport bg -->
+        <div class="bg-stripes">
+          <div class="bg-stripe img"></div>
+          <div class="bg-stripe short" style="margin-bottom:6px;"></div>
+          <div class="bg-stripe med" style="clear:both;margin-top:4px;"></div>
+          <div class="bg-stripe long"></div>
+          <div class="bg-stripe short"></div>
+          <div class="bg-stripe med" style="margin-top:14px;"></div>
+          <div class="bg-stripe long"></div>
+          <div class="bg-stripe med"></div>
+          <div class="bg-stripe short"></div>
+        </div>
+        <div class="dim-layer">
+          <div class="modal">
+            <div class="modal-header">
+              <div class="modal-title">🔔 Alert cenowy</div>
+              <div class="modal-subtitle">Wingspan · AlePlanszowki</div>
+              <button class="close-btn">✕</button>
+            </div>
+            <div class="modal-body">
+              <div class="price-chip">✦ Obecna cena: 99 zł</div>
+
+              <div class="form-field">
+                <label class="form-label">Powiadom mnie gdy cena spadnie poniżej:</label>
+                <div class="price-input-wrap">
+                  <input class="price-input" type="text" value="90" readonly />
+                  <span class="price-suffix">zł</span>
+                </div>
+                <div class="slider-hint">
+                  <div class="slider-track-wrap">
+                    <div class="slider-track">
+                      <div class="slider-fill"></div>
+                      <div class="slider-thumb"></div>
+                    </div>
+                  </div>
+                  <div class="slider-labels">
+                    <span>50 zł</span>
+                    <span>90 zł</span>
+                    <span>220 zł</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-field">
+                <label class="form-label">Twój e-mail</label>
+                <input class="email-input" type="email" placeholder="jan@example.com" readonly />
+              </div>
+
+              <div class="checkbox-row">
+                <div class="checkbox-fake"></div>
+                <span class="checkbox-label">Chcę też dostawać powiadomienia o dużych spadkach cen dla tej gry <strong>(Type B alert)</strong></span>
+              </div>
+
+              <div class="privacy-note">
+                🔒 Nie tworzymy konta. E-mail używany tylko do tego alertu.
+              </div>
+
+              <button class="btn-primary">Wyślij potwierdzenie →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- arrow -->
+    <div class="arrow-col"><span>→</span></div>
+
+    <!-- ══════════════════ KROK 2 ══════════════════ -->
+    <div class="step-col">
+      <div class="step-label">Krok 2</div>
+      <div class="overlay-sim">
+        <div class="bg-stripes">
+          <div class="bg-stripe img"></div>
+          <div class="bg-stripe short" style="margin-bottom:6px;"></div>
+          <div class="bg-stripe med" style="clear:both;margin-top:4px;"></div>
+          <div class="bg-stripe long"></div>
+          <div class="bg-stripe short"></div>
+          <div class="bg-stripe med" style="margin-top:14px;"></div>
+          <div class="bg-stripe long"></div>
+          <div class="bg-stripe med"></div>
+          <div class="bg-stripe short"></div>
+        </div>
+        <div class="dim-layer">
+          <div class="modal">
+            <div class="modal-header">
+              <div class="modal-title">📬 Sprawdź skrzynkę</div>
+              <div class="modal-subtitle">Potwierdzenie wymagane (RODO/PKE)</div>
+              <button class="close-btn">✕</button>
+            </div>
+            <div class="modal-body">
+              <div class="email-icon-wrap">
+                <span class="email-icon">📨</span>
+              </div>
+
+              <p class="s2-message">Wysłaliśmy link potwierdzający na adres:</p>
+              <p class="s2-email-bold">jan@example.com</p>
+              <p class="s2-explanation">Kliknij link w e-mailu aby aktywować alert.<br/>Link ważny <strong>24 godziny</strong>.</p>
+
+              <p class="s2-spam">Nie widzisz e-maila? Sprawdź folder SPAM lub</p>
+              <p class="s2-resend">wyślij ponownie</p>
+
+              <hr class="divider" />
+
+              <button class="btn-ghost">Zmień e-mail</button>
+              <button class="btn-outline">Zamknij</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- arrow -->
+    <div class="arrow-col"><span>→</span></div>
+
+    <!-- ══════════════════ KROK 3 ══════════════════ -->
+    <div class="step-col">
+      <div class="step-label">Krok 3</div>
+      <div class="overlay-sim">
+        <div class="bg-stripes">
+          <div class="bg-stripe img"></div>
+          <div class="bg-stripe short" style="margin-bottom:6px;"></div>
+          <div class="bg-stripe med" style="clear:both;margin-top:4px;"></div>
+          <div class="bg-stripe long"></div>
+          <div class="bg-stripe short"></div>
+          <div class="bg-stripe med" style="margin-top:14px;"></div>
+          <div class="bg-stripe long"></div>
+          <div class="bg-stripe med"></div>
+          <div class="bg-stripe short"></div>
+        </div>
+        <div class="dim-layer">
+          <div class="modal">
+            <div class="modal-header">
+              <div class="modal-title success">✅ Alert aktywny!</div>
+              <div class="modal-subtitle">Potwierdzono · double opt-in</div>
+            </div>
+            <div class="modal-body">
+              <div class="checkmark-wrap">
+                <div class="checkmark-circle"></div>
+              </div>
+
+              <div class="summary-card">
+                <div class="summary-card-title">Wingspan</div>
+                <div class="summary-card-desc">Powiadomisz się gdy cena spadnie poniżej <strong>90 zł</strong></div>
+                <div class="summary-card-store">
+                  AlePlanszowki · aktywny
+                  <span class="badge-active">AKTYWNY</span>
+                </div>
+              </div>
+
+              <p class="suggest-label">Chcesz śledzić też inne gry?</p>
+              <div class="game-chips">
+                <span class="game-chip">+ Brass: Birmingham</span>
+                <span class="game-chip">+ Azul</span>
+              </div>
+
+              <button class="btn-primary">Wróć do gry →</button>
+              <a class="ghost-link">Zarządzaj alertami (sprawdź e-mail)</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /flow-wrapper -->
+
+</body>
+</html>

@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1280" />
+  <title>Wingspan — Game Passport · Agregator Cen Planszówek</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,800;1,400&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── Reset & base ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background-color: #F2EAD8;
+      color: #2C1F14;
+      min-height: 100vh;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    /* ─── Browser chrome frame ─── */
+    .browser-chrome {
+      width: 1280px;
+      margin: 24px auto;
+      border-radius: 12px;
+      box-shadow: 0 8px 48px rgba(44,31,20,0.18), 0 2px 8px rgba(44,31,20,0.08);
+      overflow: hidden;
+      border: 1px solid #C8B89A;
+    }
+    .browser-topbar {
+      background: #E8E0D4;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid #CFC5B3;
+    }
+    .browser-dots { display: flex; gap: 7px; }
+    .browser-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+    }
+    .dot-red   { background: #E8665A; }
+    .dot-amber { background: #F0BE4B; }
+    .dot-green { background: #62C554; }
+    .browser-address {
+      flex: 1;
+      background: #F5F0EA;
+      border: 1px solid #CFC5B3;
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      color: #6B5744;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .browser-address span { color: #3D5C3A; font-weight: 500; }
+    .browser-body {
+      background: #F2EAD8;
+      overflow: hidden;
+    }
+
+    /* ─── HEADER ─── */
+    .site-header {
+      background: #EDE5D4;
+      border-bottom: 1px solid #D4C4AE;
+      padding: 0 40px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+    .header-logo {
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .logo-name {
+      font-family: 'Playfair Display', serif;
+      font-weight: 800;
+      font-size: 20px;
+      color: #3D5C3A;
+      white-space: nowrap;
+      letter-spacing: -0.3px;
+      line-height: 1.1;
+    }
+    .logo-tagline {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 10px;
+      color: #6B5744;
+      font-weight: 500;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      margin-top: 1px;
+    }
+    .header-search {
+      flex: 1;
+      max-width: 440px;
+      margin: 0 auto;
+      position: relative;
+    }
+    .search-input {
+      width: 100%;
+      background: #F5F0EA;
+      border: 1.5px solid #D4C4AE;
+      border-radius: 24px;
+      padding: 9px 18px 9px 42px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      color: #2C1F14;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-input::placeholder { color: #A89480; }
+    .search-input:focus {
+      border-color: #3D5C3A;
+      box-shadow: 0 0 0 3px rgba(61,92,58,0.12);
+    }
+    .search-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #A89480;
+      font-size: 16px;
+      pointer-events: none;
+    }
+    .header-actions {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-menu {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 4px;
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: transparent;
+      border: 1.5px solid #D4C4AE;
+      cursor: pointer;
+      transition: background 0.18s, border-color 0.18s;
+      flex-shrink: 0;
+    }
+    .btn-menu:hover { background: #E4DAC8; border-color: #B8A88E; }
+    .btn-menu span {
+      display: block;
+      width: 16px;
+      height: 2px;
+      background: #2C1F14;
+      border-radius: 2px;
+    }
+    .btn-flipper {
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      padding: 8px 18px;
+      border: 2px solid #3D5C3A;
+      border-radius: 24px;
+      background: transparent;
+      color: #3D5C3A;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      transition: background 0.18s, color 0.18s;
+      white-space: nowrap;
+    }
+    .btn-flipper:hover {
+      background: #3D5C3A;
+      color: #fff;
+    }
+
+    /* ─── BREADCRUMB BAR ─── */
+    .breadcrumb-bar {
+      background: #EDE5D4;
+      border-bottom: 1px solid #D4C4AE;
+      padding: 8px 40px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #6B5744;
+    }
+    .breadcrumb-bar a {
+      color: #3D5C3A;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .breadcrumb-bar a:hover { text-decoration: underline; }
+    .breadcrumb-sep { color: #A89480; font-size: 11px; }
+    .breadcrumb-current { color: #2C1F14; font-weight: 600; }
+
+    /* ─── MAIN CONTENT ─── */
+    .content-area {
+      padding: 36px 40px 64px;
+      max-width: 1280px;
+    }
+
+    /* ─── ANIMATIONS ─── */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .hero-left {
+      animation: fadeInUp 0.55s ease both;
+      animation-delay: 0.05s;
+    }
+    .hero-right {
+      animation: fadeInUp 0.55s ease both;
+      animation-delay: 0.18s;
+    }
+
+    /* ─── SECTION 1: HERO ─── */
+    .hero {
+      display: grid;
+      grid-template-columns: 38% 62%;
+      gap: 40px;
+      margin-bottom: 36px;
+    }
+
+    /* Left column */
+    .hero-left { }
+    .game-cover {
+      width: 100%;
+      aspect-ratio: 3/4;
+      border-radius: 14px;
+      background: linear-gradient(160deg, #7B92A8 0%, #4E6A80 40%, #324E62 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      border: 2px solid #D4C4AE;
+      box-shadow: 0 4px 24px rgba(44,31,20,0.14), 0 1px 4px rgba(44,31,20,0.08);
+      position: relative;
+      overflow: hidden;
+    }
+    .game-cover::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.10) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .cover-bird {
+      font-size: 72px;
+      line-height: 1;
+      filter: drop-shadow(0 2px 8px rgba(0,0,0,0.3));
+    }
+    .cover-label {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 22px;
+      color: rgba(255,255,255,0.9);
+      letter-spacing: 0.5px;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    }
+    .cover-year {
+      font-size: 12px;
+      color: rgba(255,255,255,0.55);
+      font-weight: 500;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .store-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .store-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      background: #DDD0BC;
+      border: 1.5px solid #C5B49A;
+      color: #3D5C3A;
+    }
+    .store-chip .chip-check {
+      color: #3D5C3A;
+      font-size: 13px;
+    }
+
+    /* Right column */
+    .hero-right { display: flex; flex-direction: column; gap: 16px; padding-top: 4px; padding-right: 48px; }
+
+    .game-category {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      color: #6B5744;
+      font-weight: 500;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+    .game-title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 800;
+      font-size: 52px;
+      color: #2C1F14;
+      line-height: 1.08;
+      letter-spacing: -1px;
+    }
+
+    /* BGG rating row */
+    .bgg-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .bgg-rating {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #2C1F14;
+    }
+    .bgg-star { font-size: 15px; }
+    .bgg-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      background: #DDD0BC;
+      border: 1px solid #C5B49A;
+      color: #6B5744;
+    }
+    .bgg-chip.highlight {
+      background: #3D5C3A;
+      color: #fff;
+      border-color: #3D5C3A;
+    }
+
+    /* Metadata grid */
+    .meta-grid {
+      display: flex;
+      gap: 0;
+      background: #DDD0BC;
+      border-radius: 12px;
+      border: 1px solid #C5B49A;
+      overflow: hidden;
+    }
+    .meta-block {
+      flex: 1;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      border-right: 1px solid #C5B49A;
+    }
+    .meta-block:last-child { border-right: none; }
+    .meta-icon { font-size: 16px; line-height: 1; }
+    .meta-label {
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #6B5744;
+      margin-top: 1px;
+    }
+    .meta-value {
+      font-size: 14px;
+      font-weight: 700;
+      color: #2C1F14;
+      line-height: 1.2;
+    }
+
+    /* Description */
+    .game-description {
+      font-size: 15px;
+      color: #3D2E1E;
+      line-height: 1.65;
+      font-style: italic;
+      font-family: 'Playfair Display', serif;
+      font-weight: 400;
+      border-left: 3px solid #D4C4AE;
+      padding-left: 16px;
+    }
+
+    /* Best price callout */
+    .best-price-box {
+      background: #3D5C3A;
+      border-radius: 12px;
+      padding: 18px 22px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .best-price-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: rgba(255,255,255,0.7);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+    .best-price-value {
+      font-family: 'Playfair Display', serif;
+      font-size: 28px;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.1;
+    }
+    .best-price-store {
+      font-size: 13px;
+      color: rgba(255,255,255,0.75);
+      margin-top: 2px;
+    }
+    .btn-see-offer {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255,255,255,0.18);
+      border: 2px solid rgba(255,255,255,0.5);
+      color: #fff;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 10px 20px;
+      border-radius: 24px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.18s, border-color 0.18s;
+      text-decoration: none;
+    }
+    .btn-see-offer:hover {
+      background: rgba(255,255,255,0.28);
+      border-color: rgba(255,255,255,0.8);
+    }
+
+    /* Email alert */
+    .alert-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .alert-label {
+      font-size: 13px;
+      color: #6B5744;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .alert-input {
+      width: 110px;
+      background: #F5F0EA;
+      border: 1.5px solid #D4C4AE;
+      border-radius: 20px;
+      padding: 7px 14px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      color: #2C1F14;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .alert-input::placeholder { color: #A89480; }
+    .alert-input:focus { border-color: #3D5C3A; }
+    .btn-alert {
+      display: inline-flex;
+      align-items: center;
+      padding: 7px 16px;
+      border: 1.5px solid #3D5C3A;
+      border-radius: 20px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      color: #3D5C3A;
+      background: transparent;
+      cursor: pointer;
+      transition: background 0.18s, color 0.18s;
+      white-space: nowrap;
+    }
+    .btn-alert:hover { background: #3D5C3A; color: #fff; }
+
+    /* ─── SECTION 2: DLC WARNING BANNER ─── */
+    .dlc-banner {
+      background: linear-gradient(135deg, #F5E6C8 0%, #EDD89C 100%);
+      border: 1.5px solid #C07B18;
+      border-left: 5px solid #C07B18;
+      border-radius: 10px;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 36px;
+    }
+    .dlc-icon { font-size: 20px; flex-shrink: 0; }
+    .dlc-text {
+      flex: 1;
+      font-size: 14px;
+      color: #3D2A08;
+      line-height: 1.5;
+    }
+    .dlc-text strong { font-weight: 700; }
+    .dlc-link {
+      font-weight: 600;
+      color: #7A4A08;
+      font-size: 13px;
+      white-space: nowrap;
+      text-decoration: none;
+      border: 1.5px solid #C07B18;
+      padding: 6px 14px;
+      border-radius: 20px;
+      transition: background 0.18s, color 0.18s;
+    }
+    .dlc-link:hover { background: #C07B18; color: #fff; }
+
+    /* ─── SECTION HEADINGS ─── */
+    .section-heading {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 28px;
+      color: #2C1F14;
+      margin-bottom: 16px;
+      letter-spacing: -0.3px;
+    }
+    .section-heading + .section-subtitle {
+      margin-top: -10px;
+      margin-bottom: 16px;
+    }
+    .section-subtitle {
+      font-size: 13px;
+      color: #6B5744;
+      font-weight: 500;
+    }
+    .section-block {
+      margin-bottom: 40px;
+    }
+
+    /* ─── SECTION 3: PRICE TABLE ─── */
+    .price-table {
+      background: #DDD0BC;
+      border: 1px solid #C5B49A;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .price-table table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .price-table thead th {
+      background: #CFC0A8;
+      padding: 12px 20px;
+      text-align: left;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: #6B5744;
+      border-bottom: 1px solid #C5B49A;
+    }
+    .price-table thead th:last-child { text-align: right; }
+    .price-table tbody tr {
+      border-bottom: 1px solid #C5B49A;
+      transition: background 0.18s;
+    }
+    .price-table tbody tr:last-child { border-bottom: none; }
+    .price-table tbody tr:hover { background: rgba(61,92,58,0.07); }
+    .price-table tbody tr.row-best {
+      border-left: 4px solid #3D5C3A;
+      background: rgba(61,92,58,0.05);
+    }
+    .price-table tbody tr.row-best:hover { background: rgba(61,92,58,0.10); }
+    .price-table tbody td {
+      padding: 16px 20px;
+      vertical-align: middle;
+    }
+    .price-table tbody tr.row-best td:first-child { padding-left: 16px; }
+
+    .store-name {
+      font-weight: 700;
+      font-size: 14px;
+      color: #2C1F14;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .best-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: #3D5C3A;
+      color: #fff;
+      border-radius: 8px;
+      padding: 2px 8px;
+    }
+
+    .price-main { font-size: 18px; font-weight: 800; color: #2C1F14; }
+    .price-orig { font-size: 13px; color: #A89480; text-decoration: line-through; margin-left: 4px; }
+    .price-discount {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 8px;
+      margin-left: 6px;
+      color: #fff;
+    }
+    .disc-mid  { background: #C07B18; } /* 40-70% */
+    .disc-low  { background: #3D5C3A; } /* <40% */
+    .disc-high { background: #C42B2B; } /* >70% */
+
+    .avail-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #3D5C3A;
+    }
+    .avail-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #3D5C3A;
+      flex-shrink: 0;
+    }
+
+    .change-time {
+      font-size: 12px;
+      color: #A89480;
+    }
+
+    .btn-offer {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1.5px solid #3D5C3A;
+      color: #3D5C3A;
+      background: transparent;
+      cursor: pointer;
+      transition: background 0.18s, color 0.18s;
+      text-decoration: none;
+      white-space: nowrap;
+      float: right;
+    }
+    .btn-offer:hover { background: #3D5C3A; color: #fff; }
+    .btn-offer.primary {
+      background: #3D5C3A;
+      color: #fff;
+    }
+    .btn-offer.primary:hover { background: #2E4529; border-color: #2E4529; }
+
+    /* ─── SECTION 4: PRICE HISTORY CHART ─── */
+    .chart-card {
+      background: #DDD0BC;
+      border: 1px solid #C5B49A;
+      border-radius: 14px;
+      padding: 24px 28px 20px;
+    }
+    .chart-area {
+      width: 100%;
+      overflow: visible;
+    }
+
+    /* Chart line draw animation */
+    @keyframes drawLine {
+      from { stroke-dashoffset: 1000; }
+      to   { stroke-dashoffset: 0; }
+    }
+    .chart-line-ale {
+      stroke-dasharray: 1000;
+      stroke-dashoffset: 1000;
+      animation: drawLine 1.4s ease 0.3s forwards;
+    }
+    .chart-line-trolle {
+      stroke-dasharray: 1000;
+      stroke-dashoffset: 1000;
+      animation: drawLine 1.4s ease 0.5s forwards;
+    }
+
+    .chart-legend {
+      display: flex;
+      justify-content: center;
+      gap: 28px;
+      margin-top: 14px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #3D2E1E;
+    }
+    .legend-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .chart-note {
+      text-align: center;
+      font-size: 12px;
+      color: #6B5744;
+      margin-top: 10px;
+      font-style: italic;
+    }
+
+    /* ─── FULL DESCRIPTION ─── */
+    .full-description {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .full-description p {
+      font-size: 15px;
+      color: #3D2E1E;
+      line-height: 1.75;
+    }
+
+    /* ─── SECTION 5: BGG INFO ─── */
+    .bgg-card {
+      background: #DDD0BC;
+      border: 1px solid #C5B49A;
+      border-radius: 14px;
+      padding: 22px 26px;
+      display: flex;
+      align-items: flex-start;
+      gap: 32px;
+    }
+    .bgg-card-icon {
+      width: 52px;
+      height: 52px;
+      background: #3D5C3A;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      flex-shrink: 0;
+    }
+    .bgg-info-block { flex: 1; }
+    .bgg-info-title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 18px;
+      color: #2C1F14;
+      margin-bottom: 12px;
+    }
+    .bgg-info-grid {
+      display: flex;
+      gap: 32px;
+      flex-wrap: wrap;
+    }
+    .bgg-info-item { }
+    .bgg-info-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: #6B5744;
+      margin-bottom: 2px;
+    }
+    .bgg-info-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: #2C1F14;
+    }
+    .bgg-card-actions { display: flex; align-items: center; }
+    .btn-bgg-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border: 1.5px solid #3D5C3A;
+      border-radius: 20px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      color: #3D5C3A;
+      background: transparent;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.18s, color 0.18s;
+      white-space: nowrap;
+    }
+    .btn-bgg-link:hover { background: #3D5C3A; color: #fff; }
+
+    /* ─── Divider ─── */
+    .section-divider {
+      border: none;
+      border-top: 1px solid #D4C4AE;
+      margin: 40px 0;
+    }
+  </style>
+</head>
+<body>
+
+<div class="browser-chrome">
+
+  <!-- Browser top bar -->
+  <div class="browser-topbar">
+    <div class="browser-dots">
+      <div class="browser-dot dot-red"></div>
+      <div class="browser-dot dot-amber"></div>
+      <div class="browser-dot dot-green"></div>
+    </div>
+    <div class="browser-address">
+      🔒 <span>agregatorcen.pl</span>/gra/wingspan
+    </div>
+  </div>
+
+  <div class="browser-body">
+
+    <!-- HEADER -->
+    <header class="site-header">
+      <div class="header-logo">
+        <span class="logo-name">🎲 Agregator Cen</span>
+        <span class="logo-tagline">Najlepsze okazje na planszówki</span>
+      </div>
+      <div class="header-search">
+        <span class="search-icon">🔍</span>
+        <input class="search-input" type="text" placeholder="Szukaj gry..." />
+      </div>
+      <div class="header-actions">
+        <button class="btn-flipper">⚡ Flipper Mode</button>
+        <button class="btn-menu" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </header>
+
+    <!-- BREADCRUMB BAR -->
+    <div class="breadcrumb-bar">
+      <a href="#">← Wróć do okazji</a>
+      <span class="breadcrumb-sep">/</span>
+      <span class="breadcrumb-current">Wingspan</span>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div class="content-area">
+
+      <!-- ══════════════════════════════════════════════
+           SECTION 1 — HERO
+      ══════════════════════════════════════════════ -->
+      <div class="hero">
+
+        <!-- Left: Cover + store chips -->
+        <div class="hero-left">
+          <div class="game-cover">
+            <div class="cover-bird">🦜</div>
+            <div class="cover-label">Wingspan</div>
+            <div class="cover-year">2019</div>
+          </div>
+          <div class="store-chips">
+            <div class="store-chip"><span class="chip-check">✓</span> AlePlanszowki</div>
+            <div class="store-chip"><span class="chip-check">✓</span> 3Trolle</div>
+          </div>
+        </div>
+
+        <!-- Right: Game info -->
+        <div class="hero-right">
+          <div class="game-category">Silnik kart · Euro</div>
+
+          <h1 class="game-title">Wingspan</h1>
+
+          <!-- BGG row -->
+          <div class="bgg-row">
+            <span class="bgg-rating"><span class="bgg-star">⭐</span> 8.1 / 10</span>
+            <span class="bgg-chip highlight">BGG #14</span>
+          </div>
+
+          <!-- Metadata grid -->
+          <div class="meta-grid">
+            <div class="meta-block">
+              <div class="meta-icon">👥</div>
+              <div class="meta-label">Gracze</div>
+              <div class="meta-value">1–5</div>
+            </div>
+            <div class="meta-block">
+              <div class="meta-icon">⏱</div>
+              <div class="meta-label">Czas gry</div>
+              <div class="meta-value">40–70 min</div>
+            </div>
+            <div class="meta-block">
+              <div class="meta-icon">🎯</div>
+              <div class="meta-label">Trudność</div>
+              <div class="meta-value">2.9 / 5</div>
+            </div>
+            <div class="meta-block">
+              <div class="meta-icon">📅</div>
+              <div class="meta-label">Rok</div>
+              <div class="meta-value">2019</div>
+            </div>
+          </div>
+
+          <!-- Description -->
+          <p class="game-description">
+            Wingspan to gra karciana o zbieraniu ptaków i budowaniu silnika akcji. Każdy ptak rozszerza Twoje możliwości w jednym z trzech środowisk.
+          </p>
+
+          <!-- Best price callout -->
+          <div class="best-price-box">
+            <div>
+              <div class="best-price-label">Najlepsza cena</div>
+              <div class="best-price-value">99 zł</div>
+              <div class="best-price-store">w AlePlanszowki</div>
+            </div>
+            <a href="#" class="btn-see-offer">Zobacz ofertę →</a>
+          </div>
+
+          <!-- Email alert -->
+          <div class="alert-row">
+            <span class="alert-label">🔔 Powiadom mnie gdy cena spadnie poniżej</span>
+            <input class="alert-input" type="text" placeholder="120 zł" />
+            <button class="btn-alert">Ustaw alert</button>
+          </div>
+        </div>
+
+      </div><!-- /hero -->
+
+
+      <!-- ══════════════════════════════════════════════
+           SECTION 2 — DLC WARNING BANNER
+      ══════════════════════════════════════════════ -->
+      <div class="dlc-banner">
+        <div class="dlc-icon">⚠</div>
+        <div class="dlc-text">
+          <strong>Uwaga:</strong> Wingspan: Europejskie ptaki wymaga tej gry podstawowej. Upewnij się, że posiadasz oryginalne Wingspan przed zakupem rozszerzenia.
+        </div>
+        <a href="#" class="dlc-link">Zobacz Europejskie ptaki →</a>
+      </div>
+
+
+      <!-- ══════════════════════════════════════════════
+           SECTION 2b — FULL DESCRIPTION
+      ══════════════════════════════════════════════ -->
+      <div class="section-block">
+        <h2 class="section-heading">O grze</h2>
+        <div class="full-description">
+          <p>Wingspan to wielokrotnie nagradzana gra karciana autorstwa Elizabeth Hargrave, w której wcielasz się w badacza ptaków starającego się przyciągnąć jak najbardziej różnorodne gatunki do swojego rezerwatu. Każdy z ponad 170 starannie zilustrowanych ptaków posiada unikalne zdolności, które łączą się w coraz potężniejszy silnik akcji — im więcej ptaków zagram, tym sprawniej działa mój ekosystem.</p>
+          <p>Rozgrywka toczy się przez cztery rundy w trzech środowiskach: lasach, polach i mokradłach. Zbierasz pożywienie, składasz jaja i szukasz nowych ptaków — każda akcja może wyzwalać kaskadę efektów już zagranych kart. Gra jest przystępna dla nowych graczy, lecz oferuje wystarczającą głębię strategiczną, by wielokrotnie do niej wracać.</p>
+          <p>Wingspan to idealna propozycja dla rodzin poszukujących czegoś więcej niż losowe planszówki, dla par lubiących spokojną rywalizację oraz dla doświadczonych graczy szukających eleganckiego projektu. Piękne ilustracje i ciekawostki ornitologiczne na kartach sprawiają, że każda partia to również mała lekcja przyrody.</p>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════
+           SECTION 3 — PRICE COMPARISON TABLE
+      ══════════════════════════════════════════════ -->
+      <div class="section-block">
+        <h2 class="section-heading">Porównanie cen</h2>
+
+        <div class="price-table">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:220px">Sklep</th>
+                <th style="width:220px">Cena</th>
+                <th style="width:160px">Dostępność</th>
+                <th style="width:160px">Ostatnia zmiana</th>
+                <th>Akcja</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Row 1: cheapest -->
+              <tr class="row-best">
+                <td>
+                  <div class="store-name">
+                    AlePlanszowki
+                    <span class="best-badge">Najtaniej</span>
+                  </div>
+                </td>
+                <td>
+                  <span class="price-main">99 zł</span>
+                  <span class="price-orig">220 zł</span>
+                  <span class="price-discount disc-mid">−55%</span>
+                </td>
+                <td><div class="avail-badge"><div class="avail-dot"></div> Dostępny</div></td>
+                <td><span class="change-time">2h temu</span></td>
+                <td style="text-align:right">
+                  <a href="#" class="btn-offer primary">Zobacz ofertę →</a>
+                </td>
+              </tr>
+              <!-- Row 2 -->
+              <tr>
+                <td>
+                  <div class="store-name">3Trolle</div>
+                </td>
+                <td>
+                  <span class="price-main">149 zł</span>
+                  <span class="price-orig">220 zł</span>
+                  <span class="price-discount disc-low">−32%</span>
+                </td>
+                <td><div class="avail-badge"><div class="avail-dot"></div> Dostępny</div></td>
+                <td><span class="change-time">6h temu</span></td>
+                <td style="text-align:right">
+                  <a href="#" class="btn-offer">Zobacz ofertę →</a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div><!-- /section 3 -->
+
+
+      <!-- ══════════════════════════════════════════════
+           SECTION 4 — PRICE HISTORY CHART
+      ══════════════════════════════════════════════ -->
+      <div class="section-block">
+        <h2 class="section-heading">Historia cen</h2>
+        <p class="section-subtitle">Ostatnie 6 miesięcy</p>
+
+        <div class="chart-card">
+          <!--
+            SVG chart:
+            ViewBox: 0 0 860 260
+            Plotting area: x: 60–820, y: 20–220
+            Y range: 60–240 zł  →  200px height
+            price_to_y(p) = 220 - (p - 60) / (240 - 60) * 200
+              = 220 - (p-60)/0.9
+            X positions for months Sty–Cze (6 months):
+              Sty=60, Lut=204, Mar=348, Kwi=492, Maj=636, Cze=780
+
+            AlePlanszowki line: starts 210, stays high until May, drops to 99 in June
+              Sty(60,220-166.7=53.3→~53)  Lut(204,~53)  Mar(348,~53)
+              Kwi(492,210→~53)  Maj(636,165→~116.7)  Cze(780,99→~210.3→need recalc)
+
+            price_to_y(p) = 220 - (p-60)/0.9
+              210 → 220-166.7 = 53.3
+              165 → 220-116.7 = 103.3
+              149 → 220-98.9  = 121.1
+              99  → 220-43.3  = 176.7
+              220 → 220-177.8 = 42.2
+              185 → 220-138.9 = 81.1
+              175 → 220-127.8 = 92.2
+              160 → 220-111.1 = 108.9
+              130 → 220-77.8  = 142.2
+
+            AlePlanszowki (green): 210,210,210,175,155,99
+              Sty:60,53  Lut:204,53  Mar:348,53  Kwi:492,92  Maj:636,109  Cze:780,177
+
+            3Trolle (terracotta): 215,215,185,175,170,149
+              Sty:60,47  Lut:204,47  Mar:348,81  Kwi:492,92  Maj:636,97  Cze:780,121
+          -->
+          <svg class="chart-area" viewBox="0 0 860 280" xmlns="http://www.w3.org/2000/svg" font-family="DM Sans, sans-serif">
+
+            <!-- Grid lines (light) -->
+            <!-- Y gridlines at 240, 200, 160, 120, 80, 60 zł -->
+            <line x1="60" y1="42"  x2="820" y2="42"  stroke="#D4C4AE" stroke-width="1" stroke-opacity="0.4"/>
+            <line x1="60" y1="86"  x2="820" y2="86"  stroke="#D4C4AE" stroke-width="1" stroke-opacity="0.4"/>
+            <line x1="60" y1="131" x2="820" y2="131" stroke="#D4C4AE" stroke-width="1" stroke-opacity="0.4"/>
+            <line x1="60" y1="175" x2="820" y2="175" stroke="#D4C4AE" stroke-width="1" stroke-opacity="0.4"/>
+            <line x1="60" y1="220" x2="820" y2="220" stroke="#D4C4AE" stroke-width="1" stroke-opacity="0.4"/>
+
+            <!-- Vertical grid lines -->
+            <line x1="60"  y1="20" x2="60"  y2="220" stroke="#D4C4AE" stroke-width="1" stroke-opacity="0.4"/>
+            <line x1="204" y1="20" x2="204" y2="220" stroke="#D4C4AE" stroke-width="0.8" stroke-opacity="0.25"/>
+            <line x1="348" y1="20" x2="348" y2="220" stroke="#D4C4AE" stroke-width="0.8" stroke-opacity="0.25"/>
+            <line x1="492" y1="20" x2="492" y2="220" stroke="#D4C4AE" stroke-width="0.8" stroke-opacity="0.25"/>
+            <line x1="636" y1="20" x2="636" y2="220" stroke="#D4C4AE" stroke-width="0.8" stroke-opacity="0.25"/>
+            <line x1="780" y1="20" x2="780" y2="220" stroke="#D4C4AE" stroke-width="0.8" stroke-opacity="0.25"/>
+
+            <!-- Y-axis labels -->
+            <text x="52" y="46"  text-anchor="end" font-size="11" fill="#6B5744">240 zł</text>
+            <text x="52" y="90"  text-anchor="end" font-size="11" fill="#6B5744">200 zł</text>
+            <text x="52" y="135" text-anchor="end" font-size="11" fill="#6B5744">160 zł</text>
+            <text x="52" y="179" text-anchor="end" font-size="11" fill="#6B5744">120 zł</text>
+            <text x="52" y="224" text-anchor="end" font-size="11" fill="#6B5744">80 zł</text>
+
+            <!-- X-axis labels (months) -->
+            <text x="60"  y="238" text-anchor="middle" font-size="12" fill="#6B5744" font-weight="500">Sty</text>
+            <text x="204" y="238" text-anchor="middle" font-size="12" fill="#6B5744" font-weight="500">Lut</text>
+            <text x="348" y="238" text-anchor="middle" font-size="12" fill="#6B5744" font-weight="500">Mar</text>
+            <text x="492" y="238" text-anchor="middle" font-size="12" fill="#6B5744" font-weight="500">Kwi</text>
+            <text x="636" y="238" text-anchor="middle" font-size="12" fill="#6B5744" font-weight="500">Maj</text>
+            <text x="780" y="238" text-anchor="middle" font-size="12" fill="#6B5744" font-weight="500">Cze</text>
+
+            <!-- Shaded area under AlePlanszowki line (subtle) -->
+            <polygon
+              points="60,53 204,53 348,53 492,92 636,109 780,177 780,220 60,220"
+              fill="rgba(61,92,58,0.06)"
+            />
+
+            <!-- 3Trolle line (terracotta) -->
+            <polyline
+              class="chart-line-trolle"
+              points="60,47 204,47 348,81 492,92 636,97 780,121"
+              fill="none"
+              stroke="#C4622D"
+              stroke-width="2.5"
+              stroke-linejoin="round"
+              stroke-linecap="round"
+            />
+
+            <!-- AlePlanszowki line (forest green) -->
+            <polyline
+              class="chart-line-ale"
+              points="60,53 204,53 348,53 492,92 636,109 780,177"
+              fill="none"
+              stroke="#3D5C3A"
+              stroke-width="2.5"
+              stroke-linejoin="round"
+              stroke-linecap="round"
+            />
+
+            <!-- End dots with "TERAZ" labels -->
+            <!-- AlePlanszowki end dot -->
+            <circle cx="780" cy="177" r="6" fill="#3D5C3A" stroke="#DDD0BC" stroke-width="2.5"/>
+            <!-- Price label next to dot -->
+            <rect x="790" y="165" width="48" height="18" rx="5" fill="#3D5C3A"/>
+            <text x="814" y="178" text-anchor="middle" font-size="10" fill="#fff" font-weight="700">TERAZ</text>
+            <text x="814" y="193" text-anchor="middle" font-size="11" fill="#3D5C3A" font-weight="700">99 zł</text>
+
+            <!-- 3Trolle end dot -->
+            <circle cx="780" cy="121" r="6" fill="#C4622D" stroke="#DDD0BC" stroke-width="2.5"/>
+            <rect x="790" y="109" width="48" height="18" rx="5" fill="#C4622D"/>
+            <text x="814" y="122" text-anchor="middle" font-size="10" fill="#fff" font-weight="700">TERAZ</text>
+            <text x="814" y="137" text-anchor="middle" font-size="11" fill="#C4622D" font-weight="700">149 zł</text>
+
+            <!-- Data point dots AlePlanszowki -->
+            <circle cx="60"  cy="53"  r="3.5" fill="#3D5C3A" opacity="0.5"/>
+            <circle cx="204" cy="53"  r="3.5" fill="#3D5C3A" opacity="0.5"/>
+            <circle cx="348" cy="53"  r="3.5" fill="#3D5C3A" opacity="0.5"/>
+            <circle cx="492" cy="92"  r="3.5" fill="#3D5C3A" opacity="0.5"/>
+            <circle cx="636" cy="109" r="3.5" fill="#3D5C3A" opacity="0.5"/>
+
+            <!-- Data point dots 3Trolle -->
+            <circle cx="60"  cy="47"  r="3.5" fill="#C4622D" opacity="0.5"/>
+            <circle cx="204" cy="47"  r="3.5" fill="#C4622D" opacity="0.5"/>
+            <circle cx="348" cy="81"  r="3.5" fill="#C4622D" opacity="0.5"/>
+            <circle cx="492" cy="92"  r="3.5" fill="#C4622D" opacity="0.5"/>
+            <circle cx="636" cy="97"  r="3.5" fill="#C4622D" opacity="0.5"/>
+
+          </svg>
+
+          <!-- Legend -->
+          <div class="chart-legend">
+            <div class="legend-item">
+              <div class="legend-dot" style="background:#3D5C3A"></div>
+              AlePlanszowki
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background:#C4622D"></div>
+              3Trolle
+            </div>
+          </div>
+
+          <p class="chart-note">Najniższa cena historyczna: 89 zł (3Trolle, Marzec)</p>
+        </div>
+      </div><!-- /section 4 -->
+
+
+
+      <!-- ══════════════════════════════════════════════
+           SECTION 5 — BGG INFO
+      ══════════════════════════════════════════════ -->
+      <div class="section-block">
+        <div class="bgg-card">
+          <div class="bgg-card-icon">♟</div>
+          <div class="bgg-info-block">
+            <div class="bgg-info-title">O grze na BoardGameGeek</div>
+            <div class="bgg-info-grid">
+              <div class="bgg-info-item">
+                <div class="bgg-info-label">Projektant</div>
+                <div class="bgg-info-value">Elizabeth Hargrave</div>
+              </div>
+              <div class="bgg-info-item">
+                <div class="bgg-info-label">Wydawca</div>
+                <div class="bgg-info-value">Stonemaier Games</div>
+              </div>
+              <div class="bgg-info-item">
+                <div class="bgg-info-label">BGG ID</div>
+                <div class="bgg-info-value">#266192</div>
+              </div>
+              <div class="bgg-info-item">
+                <div class="bgg-info-label">Ocena BGG</div>
+                <div class="bgg-info-value">⭐ 8.1 / 10</div>
+              </div>
+            </div>
+          </div>
+          <div class="bgg-card-actions">
+            <a href="#" class="btn-bgg-link">Otwórz na BGG →</a>
+          </div>
+        </div>
+      </div><!-- /section 5 -->
+
+    </div><!-- /content-area -->
+
+  </div><!-- /browser-body -->
+</div><!-- /browser-chrome -->
+
+</body>
+</html>

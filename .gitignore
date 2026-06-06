@@ -1,0 +1,10 @@
+# Claude Code — lokalne ustawienia i tooling (każdy instaluje sobie sam)
+.claude/
+
+# BMad — personalna konfiguracja użytkownika
+_bmad/config.user.toml
+_bmad/custom/config.user.toml
+
+# Pliki robocze z sesji UX (drafty, nie finalne)
+_bmad-output/**/. working/
+_bmad-output/**/.working/

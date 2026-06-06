@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1280" />
+  <title>Agregator Cen Planszówek — Flipper Mode</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── Reset & base ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background-color: #F2EAD8;
+      color: #2C1F14;
+      min-height: 100vh;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    /* ─── Browser chrome frame ─── */
+    .browser-chrome {
+      width: 1280px;
+      margin: 24px auto;
+      border-radius: 12px;
+      box-shadow: 0 8px 48px rgba(44,31,20,0.18), 0 2px 8px rgba(44,31,20,0.08);
+      overflow: hidden;
+      border: 1px solid #C8B89A;
+    }
+    .browser-topbar {
+      background: #E8E0D4;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid #CFC5B3;
+    }
+    .browser-dots { display: flex; gap: 7px; }
+    .browser-dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot-red   { background: #E8665A; }
+    .dot-amber { background: #F0BE4B; }
+    .dot-green { background: #62C554; }
+    .browser-address {
+      flex: 1;
+      background: #F5F0EA;
+      border: 1px solid #CFC5B3;
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      color: #6B5744;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .browser-address span { color: #3D5C3A; font-weight: 500; }
+    .browser-body { background: #F2EAD8; overflow: hidden; }
+
+    /* ─── HEADER ─── */
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #EDE5D4;
+      border-bottom: 1px solid #D4C4AE;
+      padding: 0 40px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+    .header-logo {
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .logo-name {
+      font-family: 'Playfair Display', serif;
+      font-weight: 800;
+      font-size: 20px;
+      color: #3D5C3A;
+      white-space: nowrap;
+      letter-spacing: -0.3px;
+      line-height: 1.1;
+    }
+    .logo-tagline {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 10px;
+      color: #6B5744;
+      font-weight: 500;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      margin-top: 1px;
+    }
+    .header-search {
+      flex: 1;
+      max-width: 440px;
+      margin: 0 auto;
+      position: relative;
+    }
+    .search-input {
+      width: 100%;
+      background: #F5F0EA;
+      border: 1.5px solid #D4C4AE;
+      border-radius: 24px;
+      padding: 9px 18px 9px 42px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      color: #2C1F14;
+      outline: none;
+    }
+    .search-input::placeholder { color: #A89480; }
+    .search-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #A89480;
+      font-size: 16px;
+      pointer-events: none;
+    }
+    .header-actions {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-menu {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 4px;
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: transparent;
+      border: 1.5px solid #D4C4AE;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .btn-menu span {
+      display: block;
+      width: 16px;
+      height: 2px;
+      background: #2C1F14;
+      border-radius: 2px;
+    }
+    /* Flipper button — FILLED/active state (we are IN Flipper Mode) */
+    .btn-flipper {
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      padding: 8px 18px;
+      border: 2px solid #3D5C3A;
+      border-radius: 24px;
+      background: #3D5C3A;
+      color: #fff;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+    }
+
+    /* ─── MODE BANNER ─── */
+    .mode-banner {
+      background: #3D5C3A;
+      padding: 14px 40px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .mode-banner-left {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+    }
+    .mode-banner-title {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 22px;
+      color: #fff;
+      line-height: 1.15;
+    }
+    .mode-banner-subtitle {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      color: rgba(255,255,255,0.65);
+      font-weight: 500;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+    }
+    .mode-banner-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+    .warning-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(192,123,24,0.22);
+      border: 1px solid rgba(192,123,24,0.55);
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 11.5px;
+      font-weight: 500;
+      color: #F5C96A;
+      white-space: nowrap;
+    }
+    .btn-exit-flipper {
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 600;
+      font-size: 12px;
+      padding: 7px 16px;
+      border: 1.5px solid rgba(255,255,255,0.6);
+      border-radius: 20px;
+      background: transparent;
+      color: #fff;
+      cursor: pointer;
+      white-space: nowrap;
+      letter-spacing: 0.2px;
+    }
+
+    /* ─── CONTENT AREA ─── */
+    .content-area {
+      padding: 28px 40px 52px;
+    }
+
+    /* ─── SECTION HEADING ─── */
+    .section-heading {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-size: 26px;
+      color: #2C1F14;
+      line-height: 1.1;
+      margin-bottom: 4px;
+    }
+    .section-subtitle {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      color: #6B5744;
+      font-weight: 400;
+      margin-bottom: 20px;
+    }
+    .section-subtitle strong {
+      color: #2C1F14;
+      font-weight: 600;
+    }
+
+    /* ─── FLIPPER TABLE ─── */
+    .flipper-table-wrap {
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid #D4C4AE;
+      box-shadow: 0 2px 12px rgba(44,31,20,0.07);
+    }
+    table.flipper-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13.5px;
+    }
+    /* Header row */
+    table.flipper-table thead tr {
+      background: #EDE5D4;
+      border-bottom: 2px solid #D4C4AE;
+    }
+    table.flipper-table thead th {
+      padding: 10px 14px;
+      text-align: left;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #6B5744;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      white-space: nowrap;
+    }
+    table.flipper-table thead th:nth-child(3),
+    table.flipper-table thead th:nth-child(4),
+    table.flipper-table thead th:nth-child(5),
+    table.flipper-table thead th:nth-child(6) {
+      text-align: center;
+    }
+    table.flipper-table thead th:last-child {
+      text-align: center;
+    }
+
+    /* Body rows — alternating */
+    table.flipper-table tbody tr:nth-child(odd)  { background: #DDD0BC; }
+    table.flipper-table tbody tr:nth-child(even) { background: #E5DAC8; }
+    table.flipper-table tbody tr:hover { background: rgba(61,92,58,0.09); }
+
+    /* Best opportunity: left green border (Margin Proxy > 50%) */
+    table.flipper-table tbody tr.top-pick {
+      border-left: 3px solid #3D5C3A;
+    }
+    table.flipper-table tbody tr:not(.top-pick) {
+      border-left: 3px solid transparent;
+    }
+
+    table.flipper-table tbody td {
+      padding: 12px 14px;
+      vertical-align: middle;
+      border-bottom: 1px solid rgba(212,196,174,0.5);
+      color: #2C1F14;
+    }
+    table.flipper-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* Col: Gra */
+    .game-cell { display: flex; flex-direction: column; gap: 4px; min-width: 180px; }
+    .game-title {
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 700;
+      font-size: 13.5px;
+      color: #2C1F14;
+      line-height: 1.2;
+    }
+    .store-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      width: fit-content;
+    }
+    .store-3trolle {
+      background: rgba(61,92,58,0.12);
+      color: #2E4A2C;
+      border: 1px solid rgba(61,92,58,0.25);
+    }
+    .store-ale {
+      background: rgba(192,123,24,0.12);
+      color: #7A4E00;
+      border: 1px solid rgba(192,123,24,0.28);
+    }
+
+    /* Col: Cena */
+    .price-cell { white-space: nowrap; }
+    .price-current {
+      font-weight: 700;
+      font-size: 15px;
+      color: #2C1F14;
+      display: block;
+    }
+    .price-original {
+      font-size: 11.5px;
+      color: #A89480;
+      text-decoration: line-through;
+    }
+
+    /* Col: Rabat — badge */
+    td.col-rabat { text-align: center; }
+    .discount-badge {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 12px;
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+    }
+    .badge-red   { background: rgba(196,43,43,0.12); color: #C42B2B; border: 1px solid rgba(196,43,43,0.3); }
+    .badge-amber { background: rgba(192,123,24,0.12); color: #C07B18; border: 1px solid rgba(192,123,24,0.3); }
+    .badge-green { background: rgba(61,92,58,0.12);  color: #3D5C3A;  border: 1px solid rgba(61,92,58,0.3); }
+
+    /* Col: Śr. hist. */
+    td.col-hist { text-align: center; }
+    .hist-price {
+      font-size: 13px;
+      color: #6B5744;
+      font-weight: 500;
+    }
+
+    /* Col: Margin Proxy */
+    td.col-margin { text-align: center; }
+    .margin-val {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .margin-arrow { font-size: 13px; }
+    .margin-green { color: #2E6B2B; }
+    .margin-amber { color: #C07B18; }
+    .margin-red   { color: #C42B2B; }
+
+    /* Col: Trend sparkline */
+    td.col-trend { text-align: center; }
+    .sparkline-wrap {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Col: Akcja */
+    td.col-akcja { text-align: center; }
+    .btn-kup {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 7px 16px;
+      background: #3D5C3A;
+      color: #fff;
+      border: none;
+      border-radius: 18px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.2px;
+      white-space: nowrap;
+      transition: background 0.18s;
+    }
+    .btn-kup:hover { background: #2E4A2C; }
+
+    /* ─── MARGIN PROXY EXPLAINER ─── */
+    .explainer-card {
+      margin-top: 16px;
+      background: #DDD0BC;
+      border: 1px solid #D4C4AE;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .explainer-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 18px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .explainer-icon { font-size: 14px; color: #6B5744; }
+    .explainer-label {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      color: #3D5C3A;
+      flex: 1;
+    }
+    .explainer-chevron { font-size: 12px; color: #6B5744; }
+    .explainer-body {
+      padding: 0 18px 14px;
+      border-top: 1px solid #D4C4AE;
+    }
+    .explainer-formula {
+      display: inline-block;
+      margin: 12px 0 8px;
+      padding: 8px 16px;
+      background: #EDE5D4;
+      border-radius: 6px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      color: #2C1F14;
+      font-style: italic;
+    }
+    .explainer-note {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      color: #6B5744;
+      line-height: 1.55;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ════════════════════════════════════
+     Browser Chrome Frame
+════════════════════════════════════ -->
+<div class="browser-chrome">
+
+  <!-- Browser top bar -->
+  <div class="browser-topbar">
+    <div class="browser-dots">
+      <div class="browser-dot dot-red"></div>
+      <div class="browser-dot dot-amber"></div>
+      <div class="browser-dot dot-green"></div>
+    </div>
+    <div class="browser-address">
+      🔒 <span>agregator-cen.pl</span>/flipper
+    </div>
+  </div>
+
+  <!-- ── Website body ── -->
+  <div class="browser-body">
+
+    <!-- ════════ HEADER ════════ -->
+    <header class="site-header">
+
+      <!-- Logo -->
+      <div class="header-logo">
+        <div class="logo-name">🎲 Agregator Cen</div>
+        <div class="logo-tagline">Ceny planszówek w jednym miejscu</div>
+      </div>
+
+      <!-- Search -->
+      <div class="header-search">
+        <span class="search-icon">🔍</span>
+        <input class="search-input" type="text" placeholder="Szukaj gry, wydawcy…" />
+      </div>
+
+      <!-- Actions -->
+      <div class="header-actions">
+        <button class="btn-flipper">⚡ Flipper Mode</button>
+        <button class="btn-menu" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+
+    </header>
+
+    <!-- ════════ MODE BANNER ════════ -->
+    <div class="mode-banner">
+      <div class="mode-banner-left">
+        <div class="mode-banner-title">⚡ Flipper Mode</div>
+        <div class="mode-banner-subtitle">Widok transakcyjny · sortowanie po potencjale zysku</div>
+      </div>
+      <div class="mode-banner-right">
+        <span class="warning-chip">⚠ Margin Proxy to szacunek — zawsze weryfikuj ceny Allegro</span>
+        <button class="btn-exit-flipper">Wyjdź z Flipper Mode</button>
+      </div>
+    </div>
+
+    <!-- ════════ CONTENT ════════ -->
+    <div class="content-area">
+
+      <h2 class="section-heading">Okazje flipperskie</h2>
+      <p class="section-subtitle">
+        <strong>27 gier z potencjałem</strong> · dane z ostatniego cyklu scrapowania
+        <span style="color:#A89480;">(2h temu)</span>
+      </p>
+
+      <!-- ── TABLE WRAPPER ── -->
+      <div class="flipper-table-wrap">
+        <table class="flipper-table">
+          <thead>
+            <tr>
+              <th>Gra</th>
+              <th>Cena</th>
+              <th style="text-align:center;">Rabat</th>
+              <th style="text-align:center;">Śr. hist.</th>
+              <th style="text-align:center;">Margin Proxy</th>
+              <th style="text-align:center;">Trend</th>
+              <th style="text-align:center;">Akcja</th>
+            </tr>
+          </thead>
+          <tbody>
+
+            <!-- Row 1: Brass: Birmingham | −75% | +224% green | sparkline falling steeply -->
+            <tr class="top-pick">
+              <td>
+                <div class="game-cell">
+                  <span class="game-title">Brass: Birmingham</span>
+                  <span class="store-chip store-3trolle">🎲 3Trolle</span>
+                </div>
+              </td>
+              <td class="price-cell">
+                <span class="price-current">74 zł</span>
+                <span class="price-original">299 zł</span>
+              </td>
+              <td class="col-rabat">
+                <span class="discount-badge badge-red">−75%</span>
+              </td>
+              <td class="col-hist"><span class="hist-price">~240 zł</span></td>
+              <td class="col-margin">
+                <span class="margin-val margin-green">
+                  <span>+224%</span>
+                  <span class="margin-arrow">↑</span>
+                </span>
+              </td>
+              <td class="col-trend">
+                <!-- sparkline: steep fall (price dropping = good for flipper) -->
+                <div class="sparkline-wrap">
+                  <svg width="62" height="26" viewBox="0 0 62 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <polyline points="2,3 20,7 40,14 60,23" stroke="#3D5C3A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <circle cx="2"  cy="3"  r="2" fill="#3D5C3A"/>
+                    <circle cx="60" cy="23" r="2" fill="#3D5C3A"/>
+                  </svg>
+                </div>
+              </td>
+              <td class="col-akcja"><button class="btn-kup">Kup →</button></td>
+            </tr>
+
+            <!-- Row 2: Wingspan | −55% | +87% green | sparkline falling -->
+            <tr class="top-pick">
+              <td>
+                <div class="game-cell">
+                  <span class="game-title">Wingspan</span>
+                  <span class="store-chip store-ale">🛒 AlePlanszowki</span>
+                </div>
+              </td>
+              <td class="price-cell">
+                <span class="price-current">99 zł</span>
+                <span class="price-original">220 zł</span>
+              </td>
+              <td class="col-rabat">
+                <span class="discount-badge badge-amber">−55%</span>
+              </td>
+              <td class="col-hist"><span class="hist-price">~185 zł</span></td>
+              <td class="col-margin">
+                <span class="margin-val margin-green">
+                  <span>+87%</span>
+                  <span class="margin-arrow">↑</span>
+                </span>
+              </td>
+              <td class="col-trend">
+                <!-- sparkline: falling -->
+                <div class="sparkline-wrap">
+                  <svg width="62" height="26" viewBox="0 0 62 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <polyline points="2,4 22,10 42,16 60,22" stroke="#3D5C3A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <circle cx="2"  cy="4"  r="2" fill="#3D5C3A"/>
+                    <circle cx="60" cy="22" r="2" fill="#3D5C3A"/>
+                  </svg>
+                </div>
+              </td>
+              <td class="col-akcja"><button class="btn-kup">Kup →</button></td>
+            </tr>
+
+            <!-- Row 3: Scythe | −57% | +70% green | sparkline falling -->
+            <tr class="top-pick">
+              <td>
+                <div class="game-cell">
+                  <span class="game-title">Scythe</span>
+                  <span class="store-chip store-3trolle">🎲 3Trolle</span>
+                </div>
+              </td>
+              <td class="price-cell">
+                <span class="price-current">129 zł</span>
+                <span class="price-original">299 zł</span>
+              </td>
+              <td class="col-rabat">
+                <span class="discount-badge badge-amber">−57%</span>
+              </td>
+              <td class="col-hist"><span class="hist-price">~220 zł</span></td>
+              <td class="col-margin">
+                <span class="margin-val margin-green">
+                  <span>+70%</span>
+                  <span class="margin-arrow">↑</span>
+                </span>
+              </td>
+              <td class="col-trend">
+                <!-- sparkline: falling -->
+                <div class="sparkline-wrap">
+                  <svg width="62" height="26" viewBox="0 0 62 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <polyline points="2,5 24,11 44,17 60,21" stroke="#3D5C3A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <circle cx="2"  cy="5"  r="2" fill="#3D5C3A"/>
+                    <circle cx="60" cy="21" r="2" fill="#3D5C3A"/>
+                  </svg>
+                </div>
+              </td>
+              <td class="col-akcja"><button class="btn-kup">Kup →</button></td>
+            </tr>
+
+            <!-- Row 4: Pandemic Legacy S1 | −43% | +23% amber | sparkline flat-ish -->
+            <tr>
+              <td>
+                <div class="game-cell">
+                  <span class="game-title">Pandemic Legacy S1</span>
+                  <span class="store-chip store-ale">🛒 AlePlanszowki</span>
+                </div>
+              </td>
+              <td class="price-cell">
+                <span class="price-current">159 zł</span>
+                <span class="price-original">280 zł</span>
+              </td>
+              <td class="col-rabat">
+                <span class="discount-badge badge-amber">−43%</span>
+              </td>
+              <td class="col-hist"><span class="hist-price">~195 zł</span></td>
+              <td class="col-margin">
+                <span class="margin-val margin-amber">
+                  <span>+23%</span>
+                  <span class="margin-arrow">→</span>
+                </span>
+              </td>
+              <td class="col-trend">
+                <!-- sparkline: flat-ish -->
+                <div class="sparkline-wrap">
+                  <svg width="62" height="26" viewBox="0 0 62 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <polyline points="2,13 20,11 40,14 60,12" stroke="#C07B18" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <circle cx="2"  cy="13" r="2" fill="#C07B18"/>
+                    <circle cx="60" cy="12" r="2" fill="#C07B18"/>
+                  </svg>
+                </div>
+              </td>
+              <td class="col-akcja"><button class="btn-kup">Kup →</button></td>
+            </tr>
+
+            <!-- Row 5: Azul | −45% | +18% amber | sparkline slightly falling -->
+            <tr>
+              <td>
+                <div class="game-cell">
+                  <span class="game-title">Azul</span>
+                  <span class="store-chip store-3trolle">🎲 3Trolle</span>
+                </div>
+              </td>
+              <td class="price-cell">
+                <span class="price-current">110 zł</span>
+                <span class="price-original">200 zł</span>
+              </td>
+              <td class="col-rabat">
+                <span class="discount-badge badge-amber">−45%</span>
+              </td>
+              <td class="col-hist"><span class="hist-price">~130 zł</span></td>
+              <td class="col-margin">
+                <span class="margin-val margin-amber">
+                  <span>+18%</span>
+                  <span class="margin-arrow">→</span>
+                </span>
+              </td>
+              <td class="col-trend">
+                <!-- sparkline: slightly falling -->
+                <div class="sparkline-wrap">
+                  <svg width="62" height="26" viewBox="0 0 62 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <polyline points="2,9 22,12 42,15 60,18" stroke="#C07B18" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <circle cx="2"  cy="9"  r="2" fill="#C07B18"/>
+                    <circle cx="60" cy="18" r="2" fill="#C07B18"/>
+                  </svg>
+                </div>
+              </td>
+              <td class="col-akcja"><button class="btn-kup">Kup →</button></td>
+            </tr>
+
+            <!-- Row 6: Terraforming Mars | −44% | +15% amber | sparkline flat -->
+            <tr>
+              <td>
+                <div class="game-cell">
+                  <span class="game-title">Terraforming Mars</span>
+                  <span class="store-chip store-ale">🛒 AlePlanszowki</span>
+                </div>
+              </td>
+              <td class="price-cell">
+                <span class="price-current">139 zł</span>
+                <span class="price-original">249 zł</span>
+              </td>
+              <td class="col-rabat">
+                <span class="discount-badge badge-amber">−44%</span>
+              </td>
+              <td class="col-hist"><span class="hist-price">~160 zł</span></td>
+              <td class="col-margin">
+                <span class="margin-val margin-amber">
+                  <span>+15%</span>
+                  <span class="margin-arrow">→</span>
+                </span>
+              </td>
+              <td class="col-trend">
+                <!-- sparkline: flat -->
+                <div class="sparkline-wrap">
+                  <svg width="62" height="26" viewBox="0 0 62 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <polyline points="2,13 22,12 42,13 60,12" stroke="#C07B18" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <circle cx="2"  cy="13" r="2" fill="#C07B18"/>
+                    <circle cx="60" cy="12" r="2" fill="#C07B18"/>
+                  </svg>
+                </div>
+              </td>
+              <td class="col-akcja"><button class="btn-kup">Kup →</button></td>
+            </tr>
+
+            <!-- Row 7: Catan | −38% | +10% amber | sparkline slight rise -->
+            <tr>
+              <td>
+                <div class="game-cell">
+                  <span class="game-title">Catan</span>
+                  <span class="store-chip store-3trolle">🎲 3Trolle</span>
+                </div>
+              </td>
+              <td class="price-cell">
+                <span class="price-current">89 zł</span>
+                <span class="price-original">144 zł</span>
+              </td>
+              <td class="col-rabat">
+                <span class="discount-badge badge-green">−38%</span>
+              </td>
+              <td class="col-hist"><span class="hist-price">~98 zł</span></td>
+              <td class="col-margin">
+                <span class="margin-val margin-amber">
+                  <span>+10%</span>
+                  <span class="margin-arrow">→</span>
+                </span>
+              </td>
+              <td class="col-trend">
+                <!-- sparkline: slight rise (amber — modest, still ok) -->
+                <div class="sparkline-wrap">
+                  <svg width="62" height="26" viewBox="0 0 62 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <polyline points="2,18 22,16 42,13 60,10" stroke="#C07B18" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <circle cx="2"  cy="18" r="2" fill="#C07B18"/>
+                    <circle cx="60" cy="10" r="2" fill="#C07B18"/>
+                  </svg>
+                </div>
+              </td>
+              <td class="col-akcja"><button class="btn-kup">Kup →</button></td>
+            </tr>
+
+            <!-- Row 8: Splendor | −32% | +5% red | sparkline rising -->
+            <tr>
+              <td>
+                <div class="game-cell">
+                  <span class="game-title">Splendor</span>
+                  <span class="store-chip store-ale">🛒 AlePlanszowki</span>
+                </div>
+              </td>
+              <td class="price-cell">
+                <span class="price-current">95 zł</span>
+                <span class="price-original">139 zł</span>
+              </td>
+              <td class="col-rabat">
+                <span class="discount-badge badge-green">−32%</span>
+              </td>
+              <td class="col-hist"><span class="hist-price">~100 zł</span></td>
+              <td class="col-margin">
+                <span class="margin-val margin-red">
+                  <span>+5%</span>
+                  <span class="margin-arrow">↓</span>
+                </span>
+              </td>
+              <td class="col-trend">
+                <!-- sparkline: rising price = bad for flipper -->
+                <div class="sparkline-wrap">
+                  <svg width="62" height="26" viewBox="0 0 62 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <polyline points="2,22 22,18 42,12 60,5" stroke="#C42B2B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    <circle cx="2"  cy="22" r="2" fill="#C42B2B"/>
+                    <circle cx="60" cy="5"  r="2" fill="#C42B2B"/>
+                  </svg>
+                </div>
+              </td>
+              <td class="col-akcja"><button class="btn-kup">Kup →</button></td>
+            </tr>
+
+          </tbody>
+        </table>
+      </div><!-- /flipper-table-wrap -->
+
+      <!-- ── MARGIN PROXY EXPLAINER ── -->
+      <div class="explainer-card">
+        <div class="explainer-header">
+          <span class="explainer-icon">ℹ</span>
+          <span class="explainer-label">Jak działa Margin Proxy?</span>
+          <span class="explainer-chevron">▲</span>
+        </div>
+        <div class="explainer-body">
+          <div class="explainer-formula">
+            (Średnia historyczna − Cena bieżąca) / Cena bieżąca × 100%
+          </div>
+          <p class="explainer-note">
+            Dane Allegro/OLX niedostępne w MVP — Margin Proxy bazuje na historii cen w naszej bazie.<br/>
+            Wysoki wynik oznacza, że cena bieżąca jest znacznie niższa od historycznej średniej — potencjalnie dobra okazja do zakupu pod odsprzedaż. Zawsze weryfikuj aktualne ceny wtórne przed zakupem.
+          </p>
+        </div>
+      </div>
+
+    </div><!-- /content-area -->
+
+  </div><!-- /browser-body -->
+</div><!-- /browser-chrome -->
+
+</body>
+</html>

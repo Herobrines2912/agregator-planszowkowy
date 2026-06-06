@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1280" />
+  <title>Agregator Cen Planszówek — Mockup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── Reset & base ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background-color: #F2EAD8;
+      color: #2C1F14;
+      min-height: 100vh;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    /* ─── Browser chrome frame ─── */
+    .browser-chrome {
+      width: 1280px;
+      margin: 24px auto;
+      border-radius: 12px;
+      box-shadow: 0 8px 48px rgba(44,31,20,0.18), 0 2px 8px rgba(44,31,20,0.08);
+      overflow: hidden;
+      border: 1px solid #C8B89A;
+    }
+    .browser-topbar {
+      background: #E8E0D4;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid #CFC5B3;
+    }
+    .browser-dots { display: flex; gap: 7px; }
+    .browser-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+    }
+    .dot-red   { background: #E8665A; }
+    .dot-amber { background: #F0BE4B; }
+    .dot-green { background: #62C554; }
+    .browser-address {
+      flex: 1;
+      background: #F5F0EA;
+      border: 1px solid #CFC5B3;
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      color: #6B5744;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .browser-address span { color: #3D5C3A; font-weight: 500; }
+    .browser-body {
+      background: #F2EAD8;
+      overflow: hidden;
+    }
+
+    /* ─── HEADER ─── */
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #EDE5D4;
+      border-bottom: 1px solid #D4C4AE;
+      padding: 0 40px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+    .header-logo {
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .logo-name {
+      font-family: 'Playfair Display', serif;
+      font-weight: 800;
+      font-size: 20px;
+      color: #3D5C3A;
+      white-space: nowrap;
+      letter-spacing: -0.3px;
+      line-height: 1.1;
+    }
+    .logo-tagline {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 10px;
+      color: #6B5744;
+      font-weight: 500;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+      margin-top: 1px;
+    }
+    .header-search {
+      flex: 1;
+      max-width: 440px;
+      margin: 0 auto;
+      position: relative;
+    }
+    .search-input {
+      width: 100%;
+      background: #F5F0EA;
+      border: 1.5px solid #D4C4AE;
+      border-radius: 24px;
+      padding: 9px 18px 9px 42px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 14px;
+      color: #2C1F14;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-input::placeholder { color: #A89480; }
+    .search-input:focus {
+      border-color: #3D5C3A;
+      box-shadow: 0 0 0 3px rgba(61,92,58,0.12);
+    }
+    .search-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #A89480;
+      font-size: 16px;
+      pointer-events: none;
+    }
+    .header-actions {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-menu {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 4px;
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: transparent;
+      border: 1.5px solid #D4C4AE;
+      cursor: pointer;
+      transition: background 0.18s, border-color 0.18s;
+      flex-shrink: 0;
+    }
+    .btn-menu:hover { background: #E4DAC8; border-color: #B8A88E; }
+    .btn-menu span {
+      display: block;
+      width: 16px;
+      height: 2px;
+      background: #2C1F14;
+      border-radius: 2px;
+      transition: background 0.18s;
+    }
+    .btn-flipper {
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      padding: 8px 18px;
+      border: 2px solid #3D5C3A;
+      border-radius: 24px;
+      background: transparent;
+      color: #3D5C3A;
+      cursor: pointer;
+      letter-spacing: 0.3px;
+      transition: background 0.18s, color 0.18s;
+      white-space: nowrap;
+    }
+    .btn-flipper:hover {
+      background: #3D5C3A;
+      color: #fff;
+    }
+
+    /* ─── CONTENT AREA ─── */
+    .content-area {
+      padding: 28px 40px 48px;
+    }
+
+    /* ─── FILTER STRIP ─── */
+    .filter-strip {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 28px;
+      flex-wrap: wrap;
+    }
+    .filter-meta {
+      font-size: 12px;
+      color: #6B5744;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .btn-filtry {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 16px;
+      border-radius: 20px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1.5px solid #3D5C3A;
+      background: transparent;
+      color: #3D5C3A;
+      transition: background 0.18s, color 0.18s;
+      white-space: nowrap;
+    }
+    .btn-filtry:hover { background: #3D5C3A; color: #fff; }
+    .btn-filtry .filter-count {
+      background: #3D5C3A;
+      color: #fff;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 1px 6px;
+      line-height: 1.4;
+    }
+    .filter-divider {
+      width: 1px;
+      height: 20px;
+      background: #D4C4AE;
+      flex-shrink: 0;
+    }
+    .active-tags {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .active-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 10px 5px 12px;
+      border-radius: 20px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      background: #3D5C3A;
+      color: #fff;
+      border: 1.5px solid #3D5C3A;
+      cursor: pointer;
+    }
+    .active-tag .tag-remove {
+      opacity: 0.65;
+      font-size: 13px;
+      line-height: 1;
+      font-weight: 400;
+    }
+    .active-tag:hover .tag-remove { opacity: 1; }
+    .btn-clear {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      color: #A89480;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px 6px;
+      text-decoration: underline;
+      white-space: nowrap;
+    }
+    .btn-clear:hover { color: #6B5744; }
+    .filter-spacer { flex: 1; }
+    /* View toggle */
+    .view-toggle {
+      display: flex;
+      align-items: center;
+      background: #EDE5D4;
+      border: 1.5px solid #D4C4AE;
+      border-radius: 20px;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .view-btn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 13px;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      color: #6B5744;
+      transition: background 0.15s, color 0.15s;
+    }
+    .view-btn.active {
+      background: #3D5C3A;
+      color: #fff;
+      border-radius: 18px;
+    }
+    .view-btn:hover:not(.active) { color: #2C1F14; }
+    .filter-sort {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .sort-select {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      color: #2C1F14;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      outline: none;
+      padding: 6px 4px;
+    }
+    .sort-label {
+      font-size: 13px;
+      color: #6B5744;
+      margin-right: 4px;
+    }
+
+    /* ─── SECTION HEADING ─── */
+    .section-heading {
+      font-family: 'Playfair Display', serif;
+      font-size: 28px;
+      font-weight: 800;
+      color: #2C1F14;
+      margin-bottom: 24px;
+      letter-spacing: -0.3px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ─── CARD GRID ─── */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 22px;
+    }
+
+    /* ─── DEAL CARD ─── */
+    .deal-card {
+      background: #DDD0BC;
+      border-radius: 12px;
+      overflow: visible;
+      box-shadow: 0 2px 8px rgba(44,31,20,0.08), 0 1px 2px rgba(44,31,20,0.05);
+      transition: transform 0.22s ease, box-shadow 0.22s ease;
+      cursor: pointer;
+      position: relative;
+      animation: cardFadeIn 0.5s ease both;
+    }
+    .deal-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 28px rgba(44,31,20,0.16), 0 2px 6px rgba(44,31,20,0.08);
+    }
+    .deal-card:hover .hot-sticker {
+      animation: hotWiggle 0.4s ease infinite alternate;
+    }
+
+    /* Staggered animation delays */
+    .deal-card:nth-child(1) { animation-delay: 0.05s; }
+    .deal-card:nth-child(2) { animation-delay: 0.12s; }
+    .deal-card:nth-child(3) { animation-delay: 0.19s; }
+    .deal-card:nth-child(4) { animation-delay: 0.26s; }
+    .deal-card:nth-child(5) { animation-delay: 0.33s; }
+    .deal-card:nth-child(6) { animation-delay: 0.40s; }
+    .deal-card:nth-child(7) { animation-delay: 0.47s; }
+    .deal-card:nth-child(8) { animation-delay: 0.54s; }
+
+    @keyframes cardFadeIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes hotWiggle {
+      from { transform: rotate(-5deg) scale(1.04); }
+      to   { transform: rotate(-3deg) scale(1.07); }
+    }
+
+    /* Card inner wrapper (clips image) */
+    .card-inner {
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .card-image-wrap {
+      position: relative;
+      width: 100%;
+      height: 148px;
+      overflow: visible;
+    }
+    .card-image {
+      width: 100%;
+      height: 148px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 42px;
+      border-radius: 12px 12px 0 0;
+      position: relative;
+      overflow: hidden;
+    }
+    /* Subtle grain texture overlay */
+    .card-image::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        45deg,
+        rgba(255,255,255,0.03) 0px,
+        rgba(255,255,255,0.03) 1px,
+        transparent 1px,
+        transparent 6px
+      );
+    }
+    /* Color variants for image placeholders */
+    .img-olive   { background: linear-gradient(135deg, #7A8B6F 0%, #5E6E55 100%); }
+    .img-brown   { background: linear-gradient(135deg, #8B6E52 0%, #6E5240 100%); }
+    .img-rose    { background: linear-gradient(135deg, #A67B6B 0%, #8A5F54 100%); }
+    .img-slate   { background: linear-gradient(135deg, #6E7E8B 0%, #52606E 100%); }
+    .img-moss    { background: linear-gradient(135deg, #6B7F5A 0%, #506040 100%); }
+    .img-sand    { background: linear-gradient(135deg, #9E8A6A 0%, #7E6A4E 100%); }
+    .img-plum    { background: linear-gradient(135deg, #7B6178 0%, #5E4860 100%); }
+    .img-teal    { background: linear-gradient(135deg, #527B7A 0%, #3E6060 100%); }
+
+    .card-emoji { font-size: 44px; z-index: 1; position: relative; }
+
+    /* HOT sticker */
+    .hot-sticker {
+      position: absolute;
+      top: 12px;
+      left: 10px;
+      z-index: 10;
+      background: #C4622D;
+      color: #fff;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 700;
+      font-size: 11px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      padding: 4px 9px;
+      border-radius: 4px;
+      transform: rotate(-4deg);
+      box-shadow: 2px 3px 8px rgba(196,98,45,0.45);
+      transition: transform 0.18s ease;
+    }
+
+    /* Discount badge */
+    .discount-badge {
+      position: absolute;
+      top: 8px;
+      right: 10px;
+      z-index: 5;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      padding: 4px 9px;
+      border-radius: 6px;
+      color: #fff;
+      line-height: 1;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+    }
+    .badge-green  { background: #3D5C3A; }
+    .badge-amber  { background: #C07B18; }
+    .badge-red    { background: #C42B2B; }
+
+    /* Card body */
+    .card-body {
+      padding: 14px 16px 16px;
+    }
+    .card-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: #2C1F14;
+      line-height: 1.25;
+      margin-bottom: 3px;
+    }
+    .card-subtitle {
+      font-size: 12px;
+      color: #6B5744;
+      margin-bottom: 12px;
+      font-weight: 500;
+    }
+
+    .card-price-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .price-current {
+      font-family: 'DM Sans', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: #2C1F14;
+      letter-spacing: -0.4px;
+    }
+    .price-original {
+      font-size: 13px;
+      color: #A89480;
+      text-decoration: line-through;
+      font-weight: 500;
+    }
+
+    .card-store {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .store-info {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .store-logo {
+      width: 22px;
+      height: 22px;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .store-logo-3t  { background: #3D5C3A; }
+    .store-logo-ale { background: #C4622D; }
+    .store-name {
+      font-size: 12px;
+      color: #6B5744;
+      font-weight: 600;
+    }
+
+    .btn-offer {
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 700;
+      font-size: 12px;
+      padding: 7px 14px;
+      background: #3D5C3A;
+      color: #fff;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      letter-spacing: 0.2px;
+      transition: background 0.18s ease;
+      white-space: nowrap;
+    }
+    .btn-offer:hover { background: #2E4A2C; }
+
+    /* Divider line between subtitle and price */
+    .card-divider {
+      height: 1px;
+      background: #D4C4AE;
+      margin-bottom: 12px;
+    }
+
+    /* ─── Footer area ─── */
+    .site-footer {
+      margin-top: 48px;
+      padding: 24px 40px;
+      border-top: 1px solid #D4C4AE;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .footer-logo {
+      font-family: 'Playfair Display', serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: #3D5C3A;
+    }
+    .footer-copy {
+      font-size: 12px;
+      color: #A89480;
+    }
+    .footer-links {
+      display: flex;
+      gap: 20px;
+    }
+    .footer-link {
+      font-size: 12px;
+      color: #6B5744;
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.15s;
+    }
+    .footer-link:hover { color: #3D5C3A; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- BROWSER CHROME FRAME                                    -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="browser-chrome">
+
+  <!-- Browser top bar -->
+  <div class="browser-topbar">
+    <div class="browser-dots">
+      <div class="browser-dot dot-red"></div>
+      <div class="browser-dot dot-amber"></div>
+      <div class="browser-dot dot-green"></div>
+    </div>
+    <div class="browser-address">
+      🔒 <span>agregator-cen.pl</span> / gorące-okazje
+    </div>
+  </div>
+
+  <!-- Browser body (the actual app) -->
+  <div class="browser-body">
+
+    <!-- ════════════════════════════════════════════════════ -->
+    <!-- 1. SLIM STICKY HEADER                               -->
+    <!-- ════════════════════════════════════════════════════ -->
+    <header class="site-header">
+      <!-- Logo -->
+      <div class="header-logo">
+        <div class="logo-name">🎲 Agregator Cen</div>
+        <div class="logo-tagline">Najlepsze okazje na planszówki</div>
+      </div>
+
+      <!-- Search -->
+      <div class="header-search">
+        <span class="search-icon">🔍</span>
+        <input class="search-input" type="text" placeholder="Szukaj gry..." />
+      </div>
+
+      <!-- Actions -->
+      <div class="header-actions">
+        <button class="btn-flipper">⚡ Flipper Mode</button>
+        <button class="btn-menu" title="Menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ════════════════════════════════════════════════════ -->
+    <!-- CONTENT AREA                                        -->
+    <!-- ════════════════════════════════════════════════════ -->
+    <main class="content-area">
+
+      <!-- 2. FILTER BAR -->
+      <div class="filter-strip">
+        <button class="btn-filtry">⚙ Filtry <span class="filter-count">2</span></button>
+        <div class="filter-divider"></div>
+        <div class="active-tags">
+          <span class="active-tag">≥40% taniej <span class="tag-remove">×</span></span>
+          <span class="active-tag">2–4 graczy <span class="tag-remove">×</span></span>
+          <button class="btn-clear">Wyczyść</button>
+        </div>
+        <span class="filter-meta">— 23 okazje</span>
+        <div class="filter-spacer"></div>
+        <div class="view-toggle">
+          <button class="view-btn active">🃏 Karty</button>
+          <button class="view-btn">≡ Lista</button>
+        </div>
+        <div class="filter-sort">
+          <span class="sort-label">Sortuj:</span>
+          <select class="sort-select">
+            <option>Rabat ↓</option>
+            <option>Cena rosnąco</option>
+            <option>Cena malejąco</option>
+            <option>Popularność</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 3. HOT DEALS SECTION -->
+      <h2 class="section-heading">🔥 Gorące okazje</h2>
+
+      <!-- CARD GRID -->
+      <div class="card-grid">
+
+        <!-- ── Card 1: Catan — -38% — HOT — green badge ── -->
+        <div class="deal-card">
+          <div class="card-inner">
+            <div class="card-image-wrap">
+              <div class="card-image img-olive">
+                <span class="card-emoji">🏝️</span>
+              </div>
+              <div class="hot-sticker">🔥 HOT</div>
+              <div class="discount-badge badge-green">−38%</div>
+            </div>
+            <div class="card-body">
+              <div class="card-title">Catan</div>
+              <div class="card-subtitle">Strategia · 3–4 graczy · 60 min</div>
+              <div class="card-divider"></div>
+              <div class="card-price-row">
+                <span class="price-current">89 zł</span>
+                <span class="price-original">144 zł</span>
+              </div>
+              <div class="card-store">
+                <div class="store-info">
+                  <div class="store-logo store-logo-3t">3T</div>
+                  <span class="store-name">3Trolle</span>
+                </div>
+                <button class="btn-offer">Zobacz ofertę →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Card 2: Wingspan — -55% — HOT — amber badge ── -->
+        <div class="deal-card">
+          <div class="card-inner">
+            <div class="card-image-wrap">
+              <div class="card-image img-slate">
+                <span class="card-emoji">🦜</span>
+              </div>
+              <div class="hot-sticker">🔥 HOT</div>
+              <div class="discount-badge badge-amber">−55%</div>
+            </div>
+            <div class="card-body">
+              <div class="card-title">Wingspan</div>
+              <div class="card-subtitle">Silnik kart · 1–5 graczy · 40–70 min</div>
+              <div class="card-divider"></div>
+              <div class="card-price-row">
+                <span class="price-current">99 zł</span>
+                <span class="price-original">220 zł</span>
+              </div>
+              <div class="card-store">
+                <div class="store-info">
+                  <div class="store-logo store-logo-ale">AP</div>
+                  <span class="store-name">AlePlanszowki</span>
+                </div>
+                <button class="btn-offer">Zobacz ofertę →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Card 3: Brass: Birmingham — -75% — HOT — red badge ── -->
+        <div class="deal-card">
+          <div class="card-inner">
+            <div class="card-image-wrap">
+              <div class="card-image img-brown">
+                <span class="card-emoji">🏭</span>
+              </div>
+              <div class="hot-sticker">🔥 HOT</div>
+              <div class="discount-badge badge-red">−75%</div>
+            </div>
+            <div class="card-body">
+              <div class="card-title">Brass: Birmingham</div>
+              <div class="card-subtitle">Euro · 2–4 graczy · 120 min</div>
+              <div class="card-divider"></div>
+              <div class="card-price-row">
+                <span class="price-current">74 zł</span>
+                <span class="price-original">299 zł</span>
+              </div>
+              <div class="card-store">
+                <div class="store-info">
+                  <div class="store-logo store-logo-3t">3T</div>
+                  <span class="store-name">3Trolle</span>
+                </div>
+                <button class="btn-offer">Zobacz ofertę →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Card 4: Patchwork — -32% — no HOT — green badge ── -->
+        <div class="deal-card">
+          <div class="card-inner">
+            <div class="card-image-wrap">
+              <div class="card-image img-rose">
+                <span class="card-emoji">🧩</span>
+              </div>
+              <div class="discount-badge badge-green">−32%</div>
+            </div>
+            <div class="card-body">
+              <div class="card-title">Patchwork</div>
+              <div class="card-subtitle">Puzzle / abstrakt · 2 graczy · 30 min</div>
+              <div class="card-divider"></div>
+              <div class="card-price-row">
+                <span class="price-current">68 zł</span>
+                <span class="price-original">100 zł</span>
+              </div>
+              <div class="card-store">
+                <div class="store-info">
+                  <div class="store-logo store-logo-ale">AP</div>
+                  <span class="store-name">AlePlanszowki</span>
+                </div>
+                <button class="btn-offer">Zobacz ofertę →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Card 5: Azul — -45% — HOT — amber badge ── -->
+        <div class="deal-card">
+          <div class="card-inner">
+            <div class="card-image-wrap">
+              <div class="card-image img-teal">
+                <span class="card-emoji">🟦</span>
+              </div>
+              <div class="hot-sticker">🔥 HOT</div>
+              <div class="discount-badge badge-amber">−45%</div>
+            </div>
+            <div class="card-body">
+              <div class="card-title">Azul</div>
+              <div class="card-subtitle">Abstrakt · 2–4 graczy · 45 min</div>
+              <div class="card-divider"></div>
+              <div class="card-price-row">
+                <span class="price-current">110 zł</span>
+                <span class="price-original">200 zł</span>
+              </div>
+              <div class="card-store">
+                <div class="store-info">
+                  <div class="store-logo store-logo-3t">3T</div>
+                  <span class="store-name">3Trolle</span>
+                </div>
+                <button class="btn-offer">Zobacz ofertę →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Card 6: Ticket to Ride — -28% — no HOT — green badge ── -->
+        <div class="deal-card">
+          <div class="card-inner">
+            <div class="card-image-wrap">
+              <div class="card-image img-moss">
+                <span class="card-emoji">🚂</span>
+              </div>
+              <div class="discount-badge badge-green">−28%</div>
+            </div>
+            <div class="card-body">
+              <div class="card-title">Ticket to Ride</div>
+              <div class="card-subtitle">Rodzinne · 2–5 graczy · 30–90 min</div>
+              <div class="card-divider"></div>
+              <div class="card-price-row">
+                <span class="price-current">144 zł</span>
+                <span class="price-original">199 zł</span>
+              </div>
+              <div class="card-store">
+                <div class="store-info">
+                  <div class="store-logo store-logo-ale">AP</div>
+                  <span class="store-name">AlePlanszowki</span>
+                </div>
+                <button class="btn-offer">Zobacz ofertę →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Card 7: Pandemic — -61% — no HOT — amber badge ── -->
+        <div class="deal-card">
+          <div class="card-inner">
+            <div class="card-image-wrap">
+              <div class="card-image img-plum">
+                <span class="card-emoji">🦠</span>
+              </div>
+              <div class="discount-badge badge-amber">−61%</div>
+            </div>
+            <div class="card-body">
+              <div class="card-title">Pandemic</div>
+              <div class="card-subtitle">Kooperacja · 2–4 graczy · 45 min</div>
+              <div class="card-divider"></div>
+              <div class="card-price-row">
+                <span class="price-current">89 zł</span>
+                <span class="price-original">229 zł</span>
+              </div>
+              <div class="card-store">
+                <div class="store-info">
+                  <div class="store-logo store-logo-3t">3T</div>
+                  <span class="store-name">3Trolle</span>
+                </div>
+                <button class="btn-offer">Zobacz ofertę →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Card 8: Terraforming Mars — -44% — no HOT — amber badge ── -->
+        <div class="deal-card">
+          <div class="card-inner">
+            <div class="card-image-wrap">
+              <div class="card-image img-sand">
+                <span class="card-emoji">🪐</span>
+              </div>
+              <div class="discount-badge badge-amber">−44%</div>
+            </div>
+            <div class="card-body">
+              <div class="card-title">Terraforming Mars</div>
+              <div class="card-subtitle">Silnik kart · 1–5 graczy · 120 min</div>
+              <div class="card-divider"></div>
+              <div class="card-price-row">
+                <span class="price-current">139 zł</span>
+                <span class="price-original">249 zł</span>
+              </div>
+              <div class="card-store">
+                <div class="store-info">
+                  <div class="store-logo store-logo-ale">AP</div>
+                  <span class="store-name">AlePlanszowki</span>
+                </div>
+                <button class="btn-offer">Zobacz ofertę →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /card-grid -->
+    </main><!-- /content-area -->
+
+    <!-- FOOTER -->
+    <footer class="site-footer">
+      <div class="footer-logo">🎲 Agregator Cen</div>
+      <div class="footer-copy">© 2026 · Dane aktualizowane co 6h</div>
+      <nav class="footer-links">
+        <a class="footer-link" href="#">O projekcie</a>
+        <a class="footer-link" href="#">API</a>
+        <a class="footer-link" href="#">Kontakt</a>
+      </nav>
+    </footer>
+
+  </div><!-- /browser-body -->
+</div><!-- /browser-chrome -->
+
+</body>
+</html>
