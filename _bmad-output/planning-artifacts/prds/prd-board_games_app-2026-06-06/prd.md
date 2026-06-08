@@ -2,7 +2,7 @@
 title: Agregator Cen Planszówek
 status: final
 created: 2026-06-06
-updated: 2026-06-06
+updated: 2026-06-08
 ---
 
 # PRD: Agregator Cen Planszówek
@@ -288,7 +288,7 @@ The application generates and serves `/sitemap.xml` indexing all Game Passport U
 - All Games with at least one active Product listing appear in the sitemap.
 
 #### FR-20: Incremental Static Regeneration for Game Passports
-Game Passport pages are rendered with ISR; pages are statically served and revalidated on a schedule aligned to the Scrape Cycle frequency (max staleness: 2× Scrape Cycle duration). `[ASSUMPTION: A-5 — Next.js 14 App Router ISR; revalidation period defaults to 1 hour.]`
+Game Passport pages are rendered with ISR; pages are statically served and revalidated on a schedule aligned to the Scrape Cycle frequency (max staleness: 2× Scrape Cycle duration). `[ASSUMPTION: A-5 — Next.js 16 App Router ISR; revalidation period defaults to 1 hour.]`
 
 **Consequences (testable):**
 - Game Passport page for a cached game returns a response in < 500 ms.
@@ -368,7 +368,7 @@ When a Game is first linked to a BGG ID, the system fetches and caches BGG metad
 - BGG API enrichment with registered Bearer Token
 - RODO-compliant Double Opt-In for all email subscriptions
 - Operator scraper health alerts
-- Docker Compose deployment on Hetzner VPS (~€5/month)
+- GitHub Actions + Neon free + Vercel Hobby deployment (€0/month)
 
 ### 6.2 Out of Scope for MVP
 
@@ -422,7 +422,7 @@ When a Game is first linked to a BGG ID, the system fetches and caches BGG metad
 
 ### 8.3 Cost
 
-- **C-9:** Infrastructure operating cost target for MVP ≤ €10 / month (Hetzner CX21 ~€4.50 + Vercel Hobby free + Brevo free tier).
+- **C-9:** Infrastructure operating cost target for MVP €0 / month (GitHub Actions + Neon free + Vercel Hobby free + Brevo free tier).
 - **C-10:** No external paid services (residential proxies, managed databases, commercial anti-bot tools) are used in MVP.
 
 ---
@@ -485,6 +485,6 @@ No authenticated surfaces in v1.
 - **A-2** (§4.5 FR-12): Double Opt-In confirmation token expires after 48 hours. Resend flow is out of scope for MVP.
 - **A-3** (§4.5 FR-13): "Unsubscribe all" is out of scope for MVP; each alert is managed individually.
 - **A-4** (§4.6): Preorder data is inferred from Store product page signals (e.g., "preorder" label or specific availability status in HTML). Signal reliability must be verified per-Store before FR-14 implementation.
-- **A-5** (§4.8 FR-20): Next.js 14 App Router ISR is used; revalidation period defaults to 1 hour.
+- **A-5** (§4.8 FR-20): Next.js 16 App Router ISR is used; revalidation period defaults to 1 hour.
 - **A-6** (§4.9): BGG API non-commercial Bearer Token is registered and available before Sprint 1 implementation begins.
 - **A-7** (§4.9): 3Trolle and AlePlanszowki PrestaShop HTML is compatible with a shared scraper module; per-store CSS selector configuration is required but no structural rewrite.

@@ -6,7 +6,7 @@ Polskie sklepy planszówkowe regularnie organizują flash-sale, które giną w s
 
 **Agregator Cen Planszówek** śledzi ceny w polskich sklepach, wzbogaca każdą grę o dane z BoardGameGeek i prezentuje okazje przez soczewki stworzone dla społeczności: feed gorących okazji, historię cen z wykresem, filtry specyficzne dla domeny i Flipper Mode dla kupujących do odsprzedaży.
 
-Projekt open-source, hobbistyczny — zbudowany przez entuzjastę planszówek, dla entuzjastów planszówek.
+Projekt open-source, hobbistyczny — zbudowany przez entuzjastów planszówek, dla entuzjastów planszówek.
 
 ---
 
@@ -16,7 +16,7 @@ Projekt open-source, hobbistyczny — zbudowany przez entuzjastę planszówek, d
 Publiczna strona główna bez logowania. Aktualne promocje posortowane według procentu zniżki, odświeżane po każdym cyklu scrapowania. Widok kart i widok listy.
 
 ### Paszport planszówki
-Dedykowana strona każdej gry (`/gra/{slug}`) łączy:
+Dedykowana strona każdej gry (`/games/{slug}`) łączy:
 - Metadane BGG (mechaniki, liczba graczy, czas gry, złożoność)
 - Porównanie cen ze wszystkich zintegrowanych sklepów
 - Wykres historii cen
@@ -43,6 +43,25 @@ Preordery i nowości ze sklepów z alertem "powiadom gdy dostępne".
 
 ---
 
+## Stack techniczny
+
+| Warstwa | Technologia |
+|---|---|
+| Frontend / SSR | Next.js 16 App Router + TypeScript |
+| Stylowanie | Tailwind CSS 4.x |
+| Baza danych | Neon PostgreSQL (free tier) + Drizzle ORM 0.45 |
+| Scraper | Python 3.11 + Scrapy 2.16 + uv |
+| Walidacja (web) | Zod |
+| Walidacja (scraper) | Pydantic v2 |
+| Email | Brevo (free tier, EU serwery) |
+| CI / cron | GitHub Actions |
+| Hosting | Vercel (free tier) |
+| Koszt infrastruktury | €0 / miesiąc |
+
+Monorepo: `/web` (Next.js) + `/scraper` (Python). Drizzle `schema.ts` jako wspólny kontrakt między modułami.
+
+---
+
 ## Zintegrowane sklepy
 
 | Sklep | Status |
@@ -56,7 +75,7 @@ Preordery i nowości ze sklepów z alertem "powiadom gdy dostępne".
 
 ## Dokumentacja projektu
 
-Projekt przeszedł pełny proces planowania BMad Method. Artefakty dostępne w repozytorium:
+Projekt przeszedł pełny proces planowania BMad Method:
 
 | Dokument | Ścieżka |
 |---|---|
@@ -64,6 +83,7 @@ Projekt przeszedł pełny proces planowania BMad Method. Artefakty dostępne w r
 | Technical Research | `_bmad-output/planning-artifacts/research/` |
 | PRD | `_bmad-output/planning-artifacts/prds/` |
 | UX Design | `_bmad-output/planning-artifacts/ux-designs/` |
+| Architektura | `_bmad-output/planning-artifacts/architecture.md` |
 
 ---
 
@@ -74,8 +94,8 @@ Projekt przeszedł pełny proces planowania BMad Method. Artefakty dostępne w r
 ✅ Technical Research
 ✅ PRD
 ✅ UX Design
-🔜 Architektura
-⬜ Epiki i Stories
+✅ Architektura
+🔜 Epiki i Stories
 ⬜ Implementacja
 ```
 
@@ -92,7 +112,7 @@ Projekt przeszedł pełny proces planowania BMad Method. Artefakty dostępne w r
 
 ## Wkład w projekt
 
-Projekt jest we wczesnej fazie planowania. Jeśli chcesz pomóc lub masz pytania — otwórz Issue.
+Projekt jest w fazie przygotowania do implementacji. Jeśli chcesz pomóc lub masz pytania — otwórz Issue.
 
 ---
 
