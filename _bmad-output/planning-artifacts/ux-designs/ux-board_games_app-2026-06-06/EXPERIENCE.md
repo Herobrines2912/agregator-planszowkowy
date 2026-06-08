@@ -23,15 +23,15 @@ updated: 2026-06-07
 
 ### Surfaces
 
-| Surface | Path | Description |
-|---|---|---|
-| Hot Deals Feed (card view) | `/` | Homepage, default view — 4-column card grid |
-| Hot Deals Feed (list view) | `/` (toggle state) | Same route, list view state — toggled via Karty/Lista control |
-| Game Passport | `/gra/[slug]` | Per-game detail page — cover, metadata, price table, history chart |
-| Flipper Mode | `/flipper` | Transactional resale view — dense table sorted by Margin Proxy. [NOTE: Architectural decision — Flipper Mode is a dedicated route, not a view toggle. This overrides PRD FR-16's "view toggle" language. `/flipper` is confirmed as the canonical path.] |
-| Email Alert Modal | Overlay on `/gra/[slug]` | No dedicated route — modal state over Game Passport |
-| Alert Confirmation Landing | `/alerty/potwierdz/{token}` | [NOTE FOR UX: confirmation landing page not yet designed — reached via email link after Step 2. Should display Step 3 success state or equivalent standalone page. Design TBD.] |
-| Search Results | `/szukaj?q=` | [NOTE FOR UX: not yet mocked — structure TBD] |
+| Surface                    | Path                        | Description                                                                                                                                                                                                                                              |
+| -------------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hot Deals Feed (card view) | `/`                         | Homepage, default view — 4-column card grid                                                                                                                                                                                                              |
+| Hot Deals Feed (list view) | `/` (toggle state)          | Same route, list view state — toggled via Karty/Lista control                                                                                                                                                                                            |
+| Game Passport              | `/gra/[slug]`               | Per-game detail page — cover, metadata, price table, history chart                                                                                                                                                                                       |
+| Flipper Mode               | `/flipper`                  | Transactional resale view — dense table sorted by Margin Proxy. [NOTE: Architectural decision — Flipper Mode is a dedicated route, not a view toggle. This overrides PRD FR-16's "view toggle" language. `/flipper` is confirmed as the canonical path.] |
+| Email Alert Modal          | Overlay on `/gra/[slug]`    | No dedicated route — modal state over Game Passport                                                                                                                                                                                                      |
+| Alert Confirmation Landing | `/alerty/potwierdz/{token}` | [NOTE FOR UX: confirmation landing page not yet designed — reached via email link after Step 2. Should display Step 3 success state or equivalent standalone page. Design TBD.]                                                                          |
+| Search Results             | `/szukaj?q=`                | [NOTE FOR UX: not yet mocked — structure TBD]                                                                                                                                                                                                            |
 
 ### Navigation Structure
 
@@ -54,18 +54,22 @@ updated: 2026-06-07
 **Register:** Warm, knowledgeable, community peer — as if a trusted fellow hobbyist built this. Never corporate. Never salesy. Information-dense but not clinical.
 
 **Price formatting:**
+
 - Prices always end with "zł" suffix: `99 zł`, `74 zł`
 - Never use "PLN", never use the "zł" prefix, never use currency symbol
 
 **Discount formatting:**
+
 - Always: `−38%` (minus sign + number + percent, no space)
 - Never: `38% OFF`, `RABAT 38%`, `38% taniej` (in badge context), `SUPER OKAZJA!!!`
 
 **Availability:**
+
 - In stock: `✓ Dostępny` (with green dot indicator)
 - Out of stock: `Niedostępny` badge (grayed out row)
 
 **CTA button language** — imperative, specific, never generic:
+
 - Primary store link: `Zobacz ofertę →`
 - Compact store link (list view): `Zobacz →`
 - Flipper buy: `Kup →`
@@ -79,15 +83,18 @@ updated: 2026-06-07
 **Never use:** `Kliknij tutaj`, `Dowiedz się więcej`, `Sprawdź` as a standalone CTA without context.
 
 **Empty states:** Warm, not clinical. Acknowledge the situation, offer the next step.
+
 - No filter results: `Brak okazji spełniających filtry — spróbuj rozszerzyć kryteria` + `Wyczyść filtry` button
 - Game not found: warm 404 message [NOTE FOR UX: copy not yet written]
 - No price history yet: `Dane historyczne pojawią się po pierwszym cyklu scrapowania`
 
 **Error states:** Empathetic. Explain what happened, offer next step.
+
 - Stale scraper data (>12h): amber banner in feed: `Dane mogą być nieaktualne — ostatnia aktualizacja X temu`
 - Store unavailable: row grayed out in price table with `Niedostępny` badge
 
 **Timestamps:**
+
 - Recent (< 24h): relative — `2h temu`, `wczoraj`
 - Historical / chart labels: absolute — `Sty`, `Lut`, `Mar` (abbreviated Polish month names)
 - Data freshness note in footer: `Dane aktualizowane co 6h`
@@ -149,6 +156,7 @@ updated: 2026-06-07
 **Trigger:** Price threshold input row in Game Passport hero — user enters threshold in "Powiadom mnie gdy cena spadnie poniżej" field, then clicks "Ustaw alert" button. Modal opens over the Game Passport with a `rgba(44,31,20,0.5)` + `backdrop-filter: blur(3px)` dim layer.
 
 **Step 1 — Form:**
+
 - Shows current game and store in modal subtitle
 - Current price chip visible for reference
 - Price threshold: large Playfair Display numeric input + "zł" suffix label + range slider below (visual slider, range: 50 zł to current retail price, thumb default at ~90% of current price)
@@ -158,6 +166,7 @@ updated: 2026-06-07
 - CTA: "Wyślij potwierdzenie →" — sends double opt-in email, transitions to Step 2
 
 **Step 2 — Pending (double opt-in required per RODO/PKE 2024):**
+
 - Large email icon (56px)
 - Confirms email address sent to
 - States: link valid 48 godzin (48 hours)
@@ -166,7 +175,8 @@ updated: 2026-06-07
 - Two secondary actions: "Zmień e-mail" (goes back to Step 1 with email field focused) and "Zamknij" (dismisses modal without active alert)
 
 **Step 3 — Success (after email confirmation link clicked):**
-- Green modal title "✅ Alert aktywny!" 
+
+- Green modal title "✅ Alert aktywny!"
 - Green checkmark circle (64px)
 - Summary card showing: game name, threshold, store, AKTYWNY badge
 - Suggestion chips for related games ("+ Brass: Birmingham", "+ Azul") — clicking a chip opens that game's passport
@@ -179,6 +189,44 @@ updated: 2026-06-07
 
 ### Price History Chart
 
+**Layout overview:**
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Historia cen                [ 1T ] [ 2T ] [ 1M ] [ 3M ] [6M]│
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  150 zł ┤                                                    │
+│  120 zł ┤    ╭──────╮          ╭──╮                          │
+│   90 zł ┤────╯      ╰──────────╯  ╰───── ● TERAZ 95 zł      │
+│          └──────────────────────────────────────────────────  │
+│          Sty      Lut      Mar      Kwi      Maj      Cze    │
+│                                                              │
+│  ● AlePlanszowki  ● 3Trolle                                  │
+│  Najniższa cena historyczna: 89 zł (3Trolle, Marzec)         │
+└──────────────────────────────────────────────────────────────┘
+  Min w zakresie: 89 zł    Śr. w zakresie: 110 zł    Akt: 95 zł
+```
+
+**Time range selector (górny prawy róg sekcji "Historia cen"):**
+
+- Przyciski: `1T` / `2T` / `1M` / `3M` / `6M` — inline, right-aligned w nagłówku sekcji
+- Aktywny przycisk: `background: #3D5C3A`, `color: #fff`, border-radius 6px, DM Sans 12px 600w
+- Nieaktywny dostępny: `background: transparent`, `border: 1px solid #D4C4AE`, `color: #6B5744`, hover: border `#3D5C3A`, text `#3D5C3A`
+- Niedostępny (za mało danych): `color: #A89480`, `border: 1px solid #E0D5C5`, kursor `not-allowed`, tooltip po najechaniu: "Dostępne za X dni"
+- Padding: 4px 10px, border-radius 6px, gap między przyciskami 6px
+- Unlock threshold: 1T ≥ 7 dni, 2T ≥ 14, 1M ≥ 30, 3M ≥ 90, 6M ≥ 180 dni danych dla tej gry
+- Domyślnie wybrany: najszerszy dostępny zakres
+
+**Zachowanie przy zmianie zakresu:**
+
+- Przełączenie zakresu re-renderuje SVG z nowym zestawem punktów (bez reload strony)
+- Linie animują się ponownie (`stroke-dashoffset` draw, 0.8s ease) przy każdej zmianie zakresu
+- X-axis labels dostosowują się do zakresu: 1T/2T → `Pon Wt Śr Czw Pt Sob Nd` (dni tygodnia); 1M → daty dzienne `1 Cze`, `8 Cze`…; 3M/6M → skrócone nazwy miesięcy `Sty`, `Lut`…
+- Statystyki pod wykresem (Min / Śr. / Akt.) aktualizują się do wybranego zakresu
+
+**Właściwości SVG:**
+
 - SVG line chart, no external JS charting library
 - ViewBox: `0 0 860 280`, plotting area: x 60–820, y 20–220
 - Lines animate on page load via `stroke-dashoffset` draw animation: `strokeDashArray: 1000`, `strokeDashOffset: 1000→0`, duration 1.4s ease, AlePlanszowki line at 0.3s delay, 3Trolle line at 0.5s delay
@@ -186,11 +234,21 @@ updated: 2026-06-07
 - End-point badge: small rect with `rx=5`, "TERAZ" label + current price below, styled in store's color
 - Shaded area under the lower-priced line: `fill: rgba(61,92,58,0.06)`
 - Data point dots: `r=3.5`, store color, `opacity: 0.5` on historical points; `r=6` with white stroke on current endpoint
-- Grid lines: horizontal at price intervals, vertical at month markers, stroke `#D4C4AE`, low opacity
+- Grid lines: horizontal at price intervals, vertical at time markers, stroke `#D4C4AE`, low opacity
 - Y-axis labels: `#6B5744`, font-size 11px, text-anchor end
-- X-axis labels: abbreviated Polish month names, font-size 12px, weight 500
+- X-axis labels: adaptive per selected range (see above), font-size 12px, weight 500
 - Historical low note: below chart, centered, italic, `#6B5744` — e.g., "Najniższa cena historyczna: 89 zł (3Trolle, Marzec)"
 - Legend: centered below chart, dot + store name for each line
+
+**Statystyki pod wykresem:**
+
+Trzy wartości wyświetlane poniżej wykresu, aktualizowane do wybranego zakresu:
+
+- `Min w zakresie: 89 zł` — najniższa zanotowana cena w wybranym oknie, z datą po najechaniu (tooltip)
+- `Śr. w zakresie: 110 zł` — średnia arytmetyczna wszystkich cen w oknie
+- `Akt: 95 zł` — zawsze aktualna cena (nie filtrowana przez zakres)
+
+Font: DM Sans 12px, label uppercase 500w `#6B5744`, value 700w `#2C1F14`. Separator: `·` w kolorze `#D4C4AE`.
 
 ---
 
@@ -202,29 +260,29 @@ updated: 2026-06-07
 
 ### Empty States
 
-| Trigger | Message | Action offered |
-|---|---|---|
-| No deals matching active filters | `Brak okazji spełniających filtry — spróbuj rozszerzyć kryteria` | "Wyczyść filtry" button |
-| Game slug not found | Warm 404 message [NOTE FOR UX: copy not yet written] | Link back to feed |
-| No price history data | `Dane historyczne pojawią się po pierwszym cyklu scrapowania` | None — informational only |
-| No Flipper Mode data | [NOTE FOR UX: not yet designed] | TBD |
+| Trigger                          | Message                                                          | Action offered            |
+| -------------------------------- | ---------------------------------------------------------------- | ------------------------- |
+| No deals matching active filters | `Brak okazji spełniających filtry — spróbuj rozszerzyć kryteria` | "Wyczyść filtry" button   |
+| Game slug not found              | Warm 404 message [NOTE FOR UX: copy not yet written]             | Link back to feed         |
+| No price history data            | `Dane historyczne pojawią się po pierwszym cyklu scrapowania`    | None — informational only |
+| No Flipper Mode data             | [NOTE FOR UX: not yet designed]                                  | TBD                       |
 
 ### Error States
 
-| Trigger | Treatment |
-|---|---|
-| Scraper data stale (> 12h) | Amber banner in feed: `Dane mogą być nieaktualne — ostatnia aktualizacja X temu` |
-| Store product page unavailable | Row in price table grayed out, `Niedostępny` badge replaces availability indicator |
-| Email send failure (alert modal) | [NOTE FOR UX: error state for Step 1 → Step 2 transition not yet designed] |
+| Trigger                          | Treatment                                                                          |
+| -------------------------------- | ---------------------------------------------------------------------------------- |
+| Scraper data stale (> 12h)       | Amber banner in feed: `Dane mogą być nieaktualne — ostatnia aktualizacja X temu`   |
+| Store product page unavailable   | Row in price table grayed out, `Niedostępny` badge replaces availability indicator |
+| Email send failure (alert modal) | [NOTE FOR UX: error state for Step 1 → Step 2 transition not yet designed]         |
 
 ### Success States
 
-| Trigger | Treatment |
-|---|---|
-| Alert set and confirmed | Green modal Step 3 with AKTYWNY badge and summary |
-| Filter applied | Active filter chip appears immediately in filter strip |
-| View toggled | Active view button fills green, previous view button clears |
-| Flipper Mode activated | Header button fills green, mode banner appears |
+| Trigger                 | Treatment                                                   |
+| ----------------------- | ----------------------------------------------------------- |
+| Alert set and confirmed | Green modal Step 3 with AKTYWNY badge and summary           |
+| Filter applied          | Active filter chip appears immediately in filter strip      |
+| View toggled            | Active view button fills green, previous view button clears |
+| Flipper Mode activated  | Header button fills green, mode banner appears              |
 
 ---
 
@@ -234,18 +292,18 @@ updated: 2026-06-07
 
 All timing uses `ease` easing unless noted. No `linear` timing on visible transitions.
 
-| Animation | Trigger | Duration | Effect |
-|---|---|---|---|
-| Card fade-in | Page load | 0.5s, staggered +70ms per card | `opacity: 0→1`, `translateY: 16px→0` |
-| List row fade-in | Page load / filter change | 0.35s, staggered +50ms per row | `opacity: 0→1`, `translateY: 10px→0` |
-| Card hover lift | Mouse enter card | 220ms | `translateY(-3px)`, shadow deepens |
-| List row hover lift | Mouse enter row | 150ms | `translateY(-1px)`, shadow appears |
-| HOT sticker wiggle | Parent card hover (while hovered) | 0.4s, `infinite alternate` | `rotate(-5deg) scale(1.04)` ↔ `rotate(-3deg) scale(1.07)` |
-| Chart line draw | Page load (Game Passport) | 1.4s, AlePlanszowki at 0.3s, 3Trolle at 0.5s | `stroke-dashoffset: 1000→0` |
-| Filter chip activation | Filter toggle | 180ms | `background-color` transition |
-| Button hover fill | Mouse enter any button | 180ms | `background`, `color` transition |
-| Page hero fade-in (Passport) | Page load | 0.55s, left col at 0.05s, right col at 0.18s | `opacity: 0→1`, `translateY: 18px→0` |
-| Modal appear | Trigger (Ustaw alert) | [ASSUMPTION: fade + scale `0.95→1.0`, 200ms ease] | opacity + subtle scale |
+| Animation                    | Trigger                           | Duration                                          | Effect                                                    |
+| ---------------------------- | --------------------------------- | ------------------------------------------------- | --------------------------------------------------------- |
+| Card fade-in                 | Page load                         | 0.5s, staggered +70ms per card                    | `opacity: 0→1`, `translateY: 16px→0`                      |
+| List row fade-in             | Page load / filter change         | 0.35s, staggered +50ms per row                    | `opacity: 0→1`, `translateY: 10px→0`                      |
+| Card hover lift              | Mouse enter card                  | 220ms                                             | `translateY(-3px)`, shadow deepens                        |
+| List row hover lift          | Mouse enter row                   | 150ms                                             | `translateY(-1px)`, shadow appears                        |
+| HOT sticker wiggle           | Parent card hover (while hovered) | 0.4s, `infinite alternate`                        | `rotate(-5deg) scale(1.04)` ↔ `rotate(-3deg) scale(1.07)` |
+| Chart line draw              | Page load (Game Passport)         | 1.4s, AlePlanszowki at 0.3s, 3Trolle at 0.5s      | `stroke-dashoffset: 1000→0`                               |
+| Filter chip activation       | Filter toggle                     | 180ms                                             | `background-color` transition                             |
+| Button hover fill            | Mouse enter any button            | 180ms                                             | `background`, `color` transition                          |
+| Page hero fade-in (Passport) | Page load                         | 0.55s, left col at 0.05s, right col at 0.18s      | `opacity: 0→1`, `translateY: 18px→0`                      |
+| Modal appear                 | Trigger (Ustaw alert)             | [ASSUMPTION: fade + scale `0.95→1.0`, 200ms ease] | opacity + subtle scale                                    |
 
 ### Focus & Accessibility
 
@@ -332,11 +390,11 @@ All timing uses `ease` easing unless noted. No `linear` timing on visible transi
 
 **Responsive targets (MVP — behavior, not redesign):**
 
-| Breakpoint | Target | Notes |
-|---|---|---|
-| 1280px | Desktop | Full design as mocked |
-| 768px | Tablet | [NOTE FOR UX: layout adaptations not yet mocked] |
-| 375px | Mobile | [NOTE FOR UX: layout adaptations not yet mocked] |
+| Breakpoint | Target  | Notes                                            |
+| ---------- | ------- | ------------------------------------------------ |
+| 1280px     | Desktop | Full design as mocked                            |
+| 768px      | Tablet  | [NOTE FOR UX: layout adaptations not yet mocked] |
+| 375px      | Mobile  | [NOTE FOR UX: layout adaptations not yet mocked] |
 
 **Expected mobile layout changes (Phase 2 detail):**
 
