@@ -190,6 +190,7 @@ The development team has a fully initialized monorepo, connected external servic
 
 **FRs covered:** none directly — enables all subsequent epics
 **Key deliverables:**
+
 - Monorepo init (`create-next-app` + `uv` + Scrapy), public GitHub repo
 - Neon PostgreSQL setup + Drizzle `schema.ts` (source of truth for both runtimes)
 - GitHub Secrets + Vercel env vars
@@ -209,6 +210,7 @@ Price data flows automatically into the database: scrapers run daily, products a
 **FRs covered:** FR-21, FR-22, FR-23, FR-24
 **NFRs:** NFR-2, NFR-4, NFR-5, NFR-6, NFR-7, NFR-8
 **Key deliverables:**
+
 - `ThreeTrolleSpider` + `AlePlanszowkiSpider` (Scrapy)
 - Pydantic validation pipeline + `parse_price()` utility
 - Deduplication pipeline: EAN→GameUPC (if Spike 2 passes) + fuzzy name→BGG Search + operator queue
@@ -228,6 +230,7 @@ Users can browse current board game deals from Polish stores on the homepage, fi
 **NFRs:** NFR-1
 **UX-DRs:** UX-DR1 through UX-DR7, UX-DR13, UX-DR14, UX-DR15, UX-DR16, UX-DR17, UX-DR18
 **Key deliverables:**
+
 - `DealCard.tsx` (card view, 4-column grid, cardFadeIn animation, HOT sticker, discount badge)
 - `FilterBar.tsx` (Client Component, URL params state, active tags, result count, view toggle)
 - List row view (`fadeInUp` animation, hover lift)
@@ -249,6 +252,7 @@ Users can access a dedicated page for any game showing BGG metadata, cross-store
 **NFRs:** NFR-3
 **UX-DRs:** UX-DR11, UX-DR12, UX-DR17, UX-DR18, UX-DR19
 **Key deliverables:**
+
 - `app/games/[slug]/page.tsx` (Server Component, ISR on-demand)
 - `GamePassport.tsx` component (BGG metadata grid, hero layout 38%/62%)
 - Price comparison table (`PriceTable`) — sorted by price, out-of-stock last, "Najtaniej" badge
@@ -271,6 +275,7 @@ Users can see the full price history for any game, validate that a deal is genui
 **FRs covered:** FR-3, FR-4, FR-18, FR-19, FR-20 (SEO aspects)
 **UX-DRs:** UX-DR8
 **Key deliverables:**
+
 - `PriceHistoryChart.tsx` — pure inline SVG (no library), ViewBox 0 0 860 280
   - Time range selector (1T/2T/1M/3M/6M) with unlock thresholds (7/14/30/90/180 days)
   - AlePlanszowki line `#3D5C3A` + 3Trolle line `#C4622D`
@@ -294,6 +299,7 @@ Users can subscribe to price alerts for specific games using only their email ad
 **FRs covered:** FR-10, FR-11, FR-12, FR-13
 **UX-DRs:** UX-DR9
 **Key deliverables:**
+
 - `AlertSubscribeForm.tsx` (3-state modal: Form → Pending → Success)
   - Price threshold input + range slider (50 zł to current retail price)
   - Type B checkbox (default enabled), age checkbox (16+, not stored)
@@ -319,6 +325,7 @@ Resale-minded buyers can evaluate flip opportunities from a dedicated `/flipper`
 **FRs covered:** FR-16, FR-17
 **UX-DRs:** UX-DR3 (soft badge variant), UX-DR10
 **Key deliverables:**
+
 - **Story 1 — Empty state & data guardrail first:** `FlipperTable.tsx` empty state when < 5 data points globally. Explicit message: "Dane historyczne zbierane od X dni. Margin Proxy dostępny za Y dni." Prevents bad first impression at launch.
 - `app/flipper/page.tsx` (Server Component, sorted by Margin Proxy descending)
 - `FlipperTable.tsx` — columns: Gra|Cena|Rabat|Śr. hist.|Margin Proxy|Trend|Akcja
@@ -340,6 +347,7 @@ Users can discover games available for preorder and new releases, and subscribe 
 
 **FRs covered:** FR-14, FR-15
 **Key deliverables:**
+
 - **Story 1 — Spike gate:** Evaluate preorder signal audit results from Epic 1 Spike 3. If signal reliable → proceed. If unreliable → redefine epic scope (e.g., "new releases last 30 days" without preorder signal) or defer to Phase 1.5.
 - `app/upcoming/page.tsx` (Upcoming / Preorders section)
 - `upcoming.ts` query (sorted by release date, unknown dates last)
@@ -354,22 +362,22 @@ The development team has a fully initialized monorepo, connected external servic
 
 **Parallel schedule:** After Story 1.1, Dev A and Dev B work in parallel with zero file conflicts.
 
-| Story | Dev | Zależność |
-|---|---|---|
-| 1.1 | Dev A | — |
-| 1.2 | Dev A | po 1.1 |
-| 1.3 | Dev B | po 1.1 |
-| 1.4 | Dev A | po 1.1 |
-| 1.5 | Dev B | po 1.1 |
-| 1.6 | Dev B | po 1.5 |
-| 1.7 | Dev A | po 1.1 |
-| 1.2b | Dev B | po 1.2 |
+| Story | Dev   | Zależność |
+| ----- | ----- | --------- |
+| 1.1   | Dev A | —         |
+| 1.2   | Dev A | po 1.1    |
+| 1.3   | Dev B | po 1.1    |
+| 1.4   | Dev A | po 1.1    |
+| 1.5   | Dev B | po 1.1    |
+| 1.6   | Dev B | po 1.5    |
+| 1.7   | Dev A | po 1.1    |
+| 1.2b  | Dev B | po 1.2    |
 
 ---
 
 ### Story 1.1: Monorepo Initialization
 
-**Dev: Dev A (Web)** *(Dev B reviewuje PR)*
+**Dev: Dev A (Web)** _(Dev B reviewuje PR)_
 
 As a **developer**,
 I want the project monorepo initialized with Next.js web app, Python scraper directory, public GitHub repo, and project conventions documented,
@@ -406,7 +414,7 @@ So that both developers have a consistent, documented starting point and can bra
 
 ### Story 1.2: Database Schema & Neon PostgreSQL Setup
 
-**Dev: Dev A (Web)** — *pliki: `web/src/db/schema.ts`, `web/src/db/index.ts`, `db/migrations/`*
+**Dev: Dev A (Web)** — _pliki: `web/src/db/schema.ts`, `web/src/db/index.ts`, `db/migrations/`_
 
 As a **developer**,
 I want the complete Drizzle `schema.ts` created and Neon PostgreSQL connected with working migrations,
@@ -438,7 +446,7 @@ So that Dev B can immediately write matching Pydantic models and both devs share
 
 ### Story 1.3: CI/CD Workflow Foundation
 
-**Dev: Dev B (Scraper/Infra)** — *pliki: `.github/workflows/validate-workflows.yml`, `maintenance.yml`, `selector-health.yml`*
+**Dev: Dev B (Scraper/Infra)** — _pliki: `.github/workflows/validate-workflows.yml`, `maintenance.yml`, `selector-health.yml`_
 
 As a **developer**,
 I want CI/CD workflows for YAML timeout linting, weekly data retention, and a selector health skeleton,
@@ -465,8 +473,8 @@ So that code quality and RODO data retention compliance are enforced automatical
 
 ### Story 1.4: Design System Foundation
 
-**Dev: Dev A (Web)** — *pliki: `tailwind.config.ts`, `app/globals.css`, `app/layout.tsx`*
-*(równolegle z 1.3)*
+**Dev: Dev A (Web)** — _pliki: `tailwind.config.ts`, `app/globals.css`, `app/layout.tsx`_
+_(równolegle z 1.3)_
 
 As a **developer**,
 I want Tailwind CSS color tokens and typography configured from DESIGN.md,
@@ -497,8 +505,8 @@ So that all UI components can be built against a consistent visual language with
 
 ### Story 1.5: BGG API Access Validation (Spike)
 
-**Dev: Dev B (Scraper/Infra)** — *pliki: `scraper/utils/bgg_client.py`, `docs/spike-results/bgg-token.md`*
-*(równolegle z 1.4)*
+**Dev: Dev B (Scraper/Infra)** — _pliki: `scraper/utils/bgg_client.py`, `docs/spike-results/bgg-token.md`_
+_(równolegle z 1.4)_
 
 As a **developer**,
 I want the BGG non-commercial Bearer Token registered and validated with real API requests,
@@ -530,8 +538,8 @@ So that Epic 2 deduplication/enrichment and Epic 4 Game Passport can proceed wit
 
 ### Story 1.6: GameUPC Coverage Spike
 
-**Dev: Dev B (Scraper/Infra)** — *pliki: `docs/spike-results/gameUPC-coverage.md`*
-*(po 1.5)*
+**Dev: Dev B (Scraper/Infra)** — _pliki: `docs/spike-results/gameUPC-coverage.md`_
+_(po 1.5)_
 
 As a **developer**,
 I want GameUPC API tested against 20–30 Polish board game EANs,
@@ -555,8 +563,8 @@ So that the deduplication pipeline in Epic 2 uses the correct primary path witho
 
 ### Story 1.7: Store Preorder Signal Audit (Epic 8 Gate)
 
-**Dev: Dev A (Web)** — *pliki: `docs/spike-results/preorder-signal-audit.md`*
-*(równolegle z 1.5 i 1.6)*
+**Dev: Dev A (Web)** — _pliki: `docs/spike-results/preorder-signal-audit.md`_
+_(równolegle z 1.5 i 1.6)_
 
 As a **developer**,
 I want both Store HTML structures audited for preorder and availability signals,
@@ -581,8 +589,8 @@ So that Epic 8 scope is confirmed or redefined before any implementation begins.
 
 ### Story 1.2b: Pydantic Models Sync
 
-**Dev: Dev B (Scraper)** — *pliki: `scraper/scraper/items.py`*
-*(po Story 1.2)*
+**Dev: Dev B (Scraper)** — _pliki: `scraper/scraper/items.py`_
+_(po Story 1.2)_
 
 As a **developer**,
 I want Pydantic models in the scraper to exactly match the Drizzle `schema.ts`,
@@ -610,20 +618,20 @@ Price data flows automatically into the database: scrapers run daily, products a
 
 **Dev B owns this entire epic. Dev A can start Epic 3 Stories 3.1–3.2 (static shell + DealCard with mock data) in parallel — zero file conflicts.**
 
-| Story | Dev | Zależność | Pliki |
-|---|---|---|---|
-| 2.1 | Dev B | po 1.2b | `scraper/spiders/`, `utils/price_parser.py`, `pipelines/validation.py` |
-| 2.2 | Dev B | po 2.1 + 1.5 + 1.6 | `pipelines/deduplication.py` |
-| 2.3 | Dev B | po 2.1 | `pipelines/database.py` |
-| 2.4 | Dev B | po 2.2 + 1.5 | `utils/bgg_client.py` (kompletny) |
-| 2.5 | Dev B | po 2.3 + 2.4 | `.github/workflows/scraper.yml`, `utils/db_health.py`, `spiders/__manifest__.py` |
-| 2.6 | Dev B | po 2.1 | `tests/test_live_selectors.py`, `selector-health.yml` (kompletny) |
+| Story | Dev   | Zależność          | Pliki                                                                            |
+| ----- | ----- | ------------------ | -------------------------------------------------------------------------------- |
+| 2.1   | Dev B | po 1.2b            | `scraper/spiders/`, `utils/price_parser.py`, `pipelines/validation.py`           |
+| 2.2   | Dev B | po 2.1 + 1.5 + 1.6 | `pipelines/deduplication.py`                                                     |
+| 2.3   | Dev B | po 2.1             | `pipelines/database.py`                                                          |
+| 2.4   | Dev B | po 2.2 + 1.5       | `utils/bgg_client.py` (kompletny)                                                |
+| 2.5   | Dev B | po 2.3 + 2.4       | `.github/workflows/scraper.yml`, `utils/db_health.py`, `spiders/__manifest__.py` |
+| 2.6   | Dev B | po 2.1             | `tests/test_live_selectors.py`, `selector-health.yml` (kompletny)                |
 
 ---
 
 ### Story 2.1: Scrapy Spiders — ThreeTrolleSpider & AlePlanszowkiSpider
 
-**Dev: Dev B (Scraper)** — *pliki: `scraper/spiders/three_trolle.py`, `scraper/spiders/ale_planszowki.py`, `scraper/utils/price_parser.py`, `scraper/pipelines/validation.py`, `scraper/tests/test_three_trolle.py`, `scraper/tests/test_ale_planszowki.py`, `scraper/tests/test_price_parser.py`*
+**Dev: Dev B (Scraper)** — _pliki: `scraper/spiders/three_trolle.py`, `scraper/spiders/ale_planszowki.py`, `scraper/utils/price_parser.py`, `scraper/pipelines/validation.py`, `scraper/tests/test_three_trolle.py`, `scraper/tests/test_ale_planszowki.py`, `scraper/tests/test_price_parser.py`_
 
 As a **developer**,
 I want working Scrapy spiders for both v1 Stores that extract products and validate them with Pydantic,
@@ -658,8 +666,8 @@ So that the scraping pipeline has a reliable, tested data source before deduplic
 
 ### Story 2.2: Product Deduplication Pipeline
 
-**Dev: Dev B (Scraper)** — *pliki: `scraper/pipelines/deduplication.py`, `scraper/tests/test_deduplication.py`*
-*(po 2.1, po wynikach Spike 1.5 i 1.6)*
+**Dev: Dev B (Scraper)** — _pliki: `scraper/pipelines/deduplication.py`, `scraper/tests/test_deduplication.py`_
+_(po 2.1, po wynikach Spike 1.5 i 1.6)_
 
 As a **developer**,
 I want scraped products automatically linked to canonical Games via BGG ID,
@@ -692,8 +700,8 @@ So that the same board game across multiple stores is recognised as one entity a
 
 ### Story 2.3: Price History Recording & Database Pipeline
 
-**Dev: Dev B (Scraper)** — *pliki: `scraper/pipelines/database.py`, `scraper/tests/test_database_pipeline.py`*
-*(po 2.1)*
+**Dev: Dev B (Scraper)** — _pliki: `scraper/pipelines/database.py`, `scraper/tests/test_database_pipeline.py`_
+_(po 2.1)_
 
 As a **developer**,
 I want each Scrape Cycle to append price records and log the cycle result,
@@ -730,8 +738,8 @@ So that Price History grows with every run and operators can monitor scraper hea
 
 ### Story 2.4: BGG Data Enrichment Background Job
 
-**Dev: Dev B (Scraper)** — *pliki: `scraper/utils/bgg_client.py` (kompletny), `scraper/tests/test_bgg_client.py`*
-*(po 2.2 + 1.5)*
+**Dev: Dev B (Scraper)** — _pliki: `scraper/utils/bgg_client.py` (kompletny), `scraper/tests/test_bgg_client.py`_
+_(po 2.2 + 1.5)_
 
 As a **developer**,
 I want a background BGG enrichment job that fetches and caches metadata for all matched games,
@@ -768,8 +776,8 @@ So that Game Passports have complete BGG data within 24 hours of a game being ad
 
 ### Story 2.5: Scraper GitHub Actions Workflow
 
-**Dev: Dev B (Scraper/Infra)** — *pliki: `.github/workflows/scraper.yml`, `scraper/spiders/__manifest__.py`, `scraper/utils/db_health.py`*
-*(po 2.3 + 2.4)*
+**Dev: Dev B (Scraper/Infra)** — _pliki: `.github/workflows/scraper.yml`, `scraper/spiders/__manifest__.py`, `scraper/utils/db_health.py`_
+_(po 2.3 + 2.4)_
 
 As a **developer**,
 I want the complete scraper GitHub Actions workflow running on a daily cron,
@@ -803,8 +811,8 @@ So that the full pipeline (scrape → enrich → health check → revalidate) ru
 
 ### Story 2.6: Operator Monitoring & Selector Health Tests
 
-**Dev: Dev B (Scraper/Infra)** — *pliki: `scraper/tests/test_live_selectors.py`, `.github/workflows/selector-health.yml` (kompletny)*
-*(po 2.1)*
+**Dev: Dev B (Scraper/Infra)** — _pliki: `scraper/tests/test_live_selectors.py`, `.github/workflows/selector-health.yml` (kompletny)_
+_(po 2.1)_
 
 As a **developer**,
 I want daily live selector smoke tests and automated alerts for product count drops,
@@ -837,21 +845,21 @@ So that scraper breakage is caught within 24 hours and the operator is notified 
 
 Stories 3.1 i 3.2 nie wymagają danych z Epic 2 — Dev A może je zacząć już w trakcie Epic 2 (mock data).
 
-| Story | Dev | Zależność | Mock data OK? |
-|---|---|---|---|
-| 3.1 | Dev A | po 1.4 | ✅ tak |
-| 3.2 | Dev A | po 1.4 | ✅ tak |
-| 3.3 | Dev B | po Epic 2 | ❌ wymaga danych |
-| 3.4 | Dev A | po 3.1 | ✅ tak |
-| 3.5 | Dev A | po 3.2 | ✅ tak |
-| 3.6 | Dev A | po 3.3 | ❌ wymaga danych |
+| Story | Dev   | Zależność | Mock data OK?    |
+| ----- | ----- | --------- | ---------------- |
+| 3.1   | Dev A | po 1.4    | ✅ tak           |
+| 3.2   | Dev A | po 1.4    | ✅ tak           |
+| 3.3   | Dev B | po Epic 2 | ❌ wymaga danych |
+| 3.4   | Dev A | po 3.1    | ✅ tak           |
+| 3.5   | Dev A | po 3.2    | ✅ tak           |
+| 3.6   | Dev A | po 3.3    | ❌ wymaga danych |
 
 ---
 
 ### Story 3.1: Homepage Shell & Sticky Header
 
-**Dev: Dev A (Web)** — *pliki: `app/page.tsx` (shell), `components/SiteHeader.tsx`, `components/SiteFooter.tsx`*
-*(można zacząć podczas Epic 2)*
+**Dev: Dev A (Web)** — _pliki: `app/page.tsx` (shell), `components/SiteHeader.tsx`, `components/SiteFooter.tsx`_
+_(można zacząć podczas Epic 2)_
 
 As a **user**,
 I want to land on a page with a clear navigation header and consistent layout,
@@ -883,12 +891,20 @@ So that I can immediately orient myself and navigate to deals or Flipper Mode.
 **Then** it shows: logo mark, "Dane aktualizowane co 6h" freshness note, three tertiary links (O projekcie, API, Kontakt), copyright
 **And** uses semantic `<nav>` for footer links, `<header>` for sticky header, `<main>` for page content
 
+**Given** the search bar input in SiteHeader
+**When** user types into it or submits
+**Then** it is a non-functional placeholder in MVP — no search results, no navigation, no API call; the input renders with correct styling and `aria-label="Szukaj gry"` but does nothing on interaction (Gap #6 / Phase 2 feature)
+
+**Given** the hamburger button (38×38px) in SiteHeader
+**When** clicked on any viewport
+**Then** it is a non-functional placeholder in MVP — renders correctly with 3 lines, but opens nothing; content and behavior are deferred to Phase 2 (UX-07)
+
 ---
 
 ### Story 3.2: DealCard Component — Card View
 
-**Dev: Dev A (Web)** — *pliki: `components/DealCard.tsx`, `components/DealCard.test.tsx`, `lib/format.ts`, `lib/calc.ts`*
-*(można zacząć podczas Epic 2, mock data OK)*
+**Dev: Dev A (Web)** — _pliki: `components/DealCard.tsx`, `components/DealCard.test.tsx`, `lib/format.ts`, `lib/calc.ts`_
+_(można zacząć podczas Epic 2, mock data OK)_
 
 As a **user**,
 I want each deal card to immediately show me the discount, price, and store at a glance,
@@ -930,8 +946,8 @@ So that I can decide at a glance whether a deal is worth clicking into.
 
 ### Story 3.3: Hot Deals Feed Query & Real Data Connection
 
-**Dev: Dev B (Scraper/Infra)** — *pliki: `db/queries/hot-deals.ts`*
-*(wymaga danych z Epic 2 — Dev A integruje wynik w `app/page.tsx` bez osobnej historyjki)*
+**Dev: Dev B (Scraper/Infra)** — _pliki: `db/queries/hot-deals.ts`_
+_(wymaga danych z Epic 2 — Dev A integruje wynik w `app/page.tsx` bez osobnej historyjki)_
 
 As a **user**,
 I want the homepage to show me real deals from Polish stores refreshed after each scrape cycle,
@@ -960,12 +976,17 @@ So that I always see current pricing and the page never feels stale.
 **And** games with no BGG player count data are excluded from player filter results (FR-6)
 **And** games with no BGG type data show with "typ nieznany" label when type filter is active (FR-5)
 
+**Given** Dev A wires `getHotDeals()` into `app/page.tsx` (integration step — same story, no separate story)
+**When** `page.tsx` is reviewed
+**Then** it calls `getHotDeals(40, filtersFromSearchParams)` at the top of the Server Component, passes the resulting array to `DealGrid` / `DealList` (depending on `?view` param), and passes the count to `FilterBar` — no inline data transformation in `page.tsx` beyond passing props
+**And** if `getHotDeals()` returns an empty array, `page.tsx` renders the empty state ("Brak okazji — wróć później") directly in `DealGrid` — not a separate error boundary
+
 ---
 
 ### Story 3.4: FilterBar, View Toggle & Sort
 
-**Dev: Dev A (Web)** — *pliki: `components/FilterBar.tsx`, `components/FilterBar.test.tsx`*
-*(po 3.1, można budować z mock data)*
+**Dev: Dev A (Web)** — _pliki: `components/FilterBar.tsx`, `components/FilterBar.test.tsx`_
+_(po 3.1, można budować z mock data)_
 
 As a **user**,
 I want to filter deals by game type and player count, switch between card and list views, and sort results,
@@ -997,6 +1018,10 @@ So that I can quickly narrow down to deals relevant to my situation.
 **When** 0 filters active
 **Then** bubble is hidden; when ≥ 1 filter active, bubble shows count with green background
 
+**Given** user clicks the "Filtry (n)" button in MVP
+**When** no filter panel has been designed or mocked
+**Then** the button is rendered but non-functional (no panel opens, no dropdown appears) — it visually indicates active filter count only; filter state in MVP is applied only by direct URL param manipulation or programmatic deep links; a functional panel is Phase 2 (UX-04)
+
 **Given** `FilterBar.test.tsx`
 **When** run
 **Then** covers: URL param read/write on filter toggle, × remove behaviour, view toggle state, active count bubble display
@@ -1005,8 +1030,8 @@ So that I can quickly narrow down to deals relevant to my situation.
 
 ### Story 3.5: List Row View & Stagger Animations
 
-**Dev: Dev A (Web)** — *pliki: `components/ListRow.tsx`, `components/ListRow.test.tsx`, animacje w `app/globals.css`*
-*(po 3.2)*
+**Dev: Dev A (Web)** — _pliki: `components/ListRow.tsx`, `components/ListRow.test.tsx`, animacje w `app/globals.css`_
+_(po 3.2)_
 
 As a **user**,
 I want a compact list view when I want to scan many deals quickly without the visual weight of cards,
@@ -1043,8 +1068,8 @@ So that I can efficiently browse and compare more deals per screen.
 
 ### Story 3.6: Skeleton Loading, Empty States & Staleness Banner
 
-**Dev: Dev A (Web)** — *pliki: `components/DealCardSkeleton.tsx`, `components/ListRowSkeleton.tsx`, staleness logic w `app/page.tsx`*
-*(po 3.3)*
+**Dev: Dev A (Web)** — _pliki: `components/DealCardSkeleton.tsx`, `components/ListRowSkeleton.tsx`, staleness logic w `app/page.tsx`_
+_(po 3.3)_
 
 As a **user**,
 I want clear feedback when content is loading, filters return no results, or data might be stale,
@@ -1070,7 +1095,6 @@ So that I always understand the state of the page and what action I can take.
 **When** a DB connection error occurs
 **Then** `app/error.tsx` boundary catches it and renders a warm Polish error message with a "Spróbuj ponownie" link — not a generic Next.js error page
 
-
 ---
 
 ## Epic 4: Game Passport Core
@@ -1080,20 +1104,20 @@ So that I always understand the state of the page and what action I can take.
 
 **Podział:** Epic 4 to w całości Dev A. Dev B w tym czasie może zacząć budować `PriceHistoryCollector` — pipeline zapisujący `price_history` (needed for Epic 5) — zero konfliktu plików.
 
-| Story | Dev | Zależność |
-|---|---|---|
-| 4.1 | Dev A | po 3.1 |
-| 4.2 | Dev A | po 4.1 |
-| 4.3 | Dev A | po 4.5 |
-| 4.4 | Dev A | po 4.3 |
-| 4.5 | Dev B | po Epic 2 (dane w DB) |
-| 4.6 | Dev A | po 4.2 + 4.5 |
+| Story | Dev   | Zależność             |
+| ----- | ----- | --------------------- |
+| 4.1   | Dev A | po 3.1                |
+| 4.2   | Dev A | po 4.1                |
+| 4.3   | Dev A | po 4.5                |
+| 4.4   | Dev A | po 4.3                |
+| 4.5   | Dev B | po Epic 2 (dane w DB) |
+| 4.6   | Dev A | po 4.2 + 4.5          |
 
 ---
 
 ### Story 4.1: Game Passport Shell & Dynamic Routing
 
-**Dev: Dev A (Web)** — *pliki: `app/gra/[slug]/page.tsx`, `app/gra/[slug]/loading.tsx`, `app/gra/[slug]/not-found.tsx`*
+**Dev: Dev A (Web)** — _pliki: `app/gra/[slug]/page.tsx`, `app/gra/[slug]/loading.tsx`, `app/gra/[slug]/not-found.tsx`_
 
 As a **user**,
 I want clicking a game card or row to take me to a dedicated game page with a clear layout,
@@ -1132,7 +1156,7 @@ So that I can see all details about a specific game in one place.
 
 ### Story 4.2: GameMeta Panel — BGG Metadata Display
 
-**Dev: Dev A (Web)** — *pliki: `components/GameMeta.tsx`, `components/GameMeta.test.tsx`*
+**Dev: Dev A (Web)** — _pliki: `components/GameMeta.tsx`, `components/GameMeta.test.tsx`_
 
 As a **user**,
 I want to see key game information (publisher, players, playtime, BGG rating) alongside prices,
@@ -1170,7 +1194,7 @@ So that I can decide if a game is right for me without leaving the page.
 
 ### Story 4.3: PriceTable — Multi-Store Price Comparison
 
-**Dev: Dev A (Web)** — *pliki: `components/PriceTable.tsx`, `components/PriceTable.test.tsx`*
+**Dev: Dev A (Web)** — _pliki: `components/PriceTable.tsx`, `components/PriceTable.test.tsx`_
 
 As a **user**,
 I want to see all stores offering this game with their current prices in one table,
@@ -1211,7 +1235,7 @@ So that I can compare prices and choose where to buy.
 
 ### Story 4.4: Best Deal Banner
 
-**Dev: Dev A (Web)** — *pliki: `components/BestDealBanner.tsx`*
+**Dev: Dev A (Web)** — _pliki: `components/BestDealBanner.tsx`_
 
 As a **user**,
 I want to immediately see the best available deal at the top of the game page,
@@ -1240,8 +1264,8 @@ So that I can click through to buy without scanning the entire price table.
 
 ### Story 4.5: Game Passport DB Queries
 
-**Dev: Dev B (Scraper/Infra)** — *pliki: `db/queries/game-passport.ts`*
-*(wymaga danych z Epic 2)*
+**Dev: Dev B (Scraper/Infra)** — _pliki: `db/queries/game-passport.ts`_
+_(wymaga danych z Epic 2)_
 
 As a **developer**,
 I want a single query module for the Game Passport page that fetches all needed data efficiently,
@@ -1273,8 +1297,8 @@ So that the page makes minimal round-trips to the database.
 
 ### Story 4.6: DLC Dependency Warning
 
-**Dev: Dev A (Web)** — *pliki: `components/DlcWarning.tsx`*
-*(po 4.2 + 4.5 — wymaga `base_game` danych z query Dev B)*
+**Dev: Dev A (Web)** — _pliki: `components/DlcWarning.tsx`_
+_(po 4.2 + 4.5 — wymaga `base_game` danych z query Dev B)_
 
 As a **user**,
 I want to see a clear warning when a game is an expansion that requires a base game,
@@ -1295,6 +1319,11 @@ So that I don't accidentally buy an expansion without knowing I need the base ga
 **When** rendered
 **Then** `DlcWarning` is not rendered at all
 
+**Given** a Game Passport page for an expansion whose resolvable base game exists in BGG but has no scraped Products (`current_min_price = null`)
+**When** rendered
+**Then** `DlcWarning` banner is still shown with the base game name and "Zobacz grę bazową →" link, but the price line is replaced with: "Brak ofert w sklepach — sprawdź BGG →" linking to the base game's BGG page (FR-9: "shows name and BGG link with note")
+**And** `DlcWarning` receives `base_game: { name, slug, current_min_price: null, bgg_id }` — component handles null price without crashing
+
 **Given** `getGameBySlug()` query (Story 4.5, Dev B)
 **When** game is an expansion with resolvable parent
 **Then** query returns `base_game: { name, slug, current_min_price }` — `DlcWarning` receives this as props, no second round-trip
@@ -1310,21 +1339,21 @@ So that I don't accidentally buy an expansion without knowing I need the base ga
 
 Story 5.2 można zacząć z mock data równolegle z 5.1. Story 5.3 wymaga gotowego 5.1 (Dev B).
 
-| Story | Dev | Zależność | Mock data OK? |
-|---|---|---|---|
-| 5.1 | Dev B | po 4.5 | ❌ potrzebne dane |
-| 5.2 | Dev A | po 4.1 | ✅ tak |
-| 5.3 | Dev A | po 5.1 + 5.2 | ❌ wymaga danych |
-| 5.4 | Dev A | po 4.1 | ✅ tak |
-| 5.5 | Dev A | po 4.1 | ✅ tak |
-| 5.6 | Dev A | po 4.1 | ✅ tak |
+| Story | Dev   | Zależność    | Mock data OK?     |
+| ----- | ----- | ------------ | ----------------- |
+| 5.1   | Dev B | po 4.5       | ❌ potrzebne dane |
+| 5.2   | Dev A | po 4.1       | ✅ tak            |
+| 5.3   | Dev A | po 5.1 + 5.2 | ❌ wymaga danych  |
+| 5.4   | Dev A | po 4.1       | ✅ tak            |
+| 5.5   | Dev A | po 4.1       | ✅ tak            |
+| 5.6   | Dev A | po 4.1       | ✅ tak            |
 
 ---
 
 ### Story 5.1: Price History DB Query
 
-**Dev: Dev B (Scraper/Infra)** — *pliki: `db/queries/price-history.ts`, `app/api/price-history/route.ts`*
-*(wymaga `price_history` wypełnionego przez Dev B podczas Epic 4)*
+**Dev: Dev B (Scraper/Infra)** — _pliki: `db/queries/price-history.ts`, `app/api/price-history/route.ts`_
+_(wymaga `price_history` wypełnionego przez Dev B podczas Epic 4)_
 
 As a **developer**,
 I want a query that returns price history data shaped for the chart component,
@@ -1332,16 +1361,16 @@ So that the chart renders cleanly without data-massaging logic scattered in comp
 
 **Acceptance Criteria:**
 
-**Given** `getPriceHistory(gameId: number, range: '1M' | '3M' | '6M' | '1Y' | 'ALL')`
+**Given** `getPriceHistory(gameId: number, range: '1T' | '2T' | '1M' | '3M' | '6M')`
 **When** called
 **Then** it returns an array of `{ date: string, storeId: number, storeName: string, price: string }` rows for the given game, filtered to the selected time window
 **And** rows are sorted by `scraped_at` ascending — oldest first, newest last
 **And** each `price` is a string (e.g. `"89.99"`) — Decimal → string in query, never float
 
-**Given** `range = '1M'`
+**Given** `range = '1T'`
 **When** called
-**Then** it filters `price_history.scraped_at >= NOW() - INTERVAL '30 days'`
-**And** `'3M'` → 90 days, `'6M'` → 180 days, `'1Y'` → 365 days, `'ALL'` → no date filter
+**Then** it filters `price_history.scraped_at >= NOW() - INTERVAL '7 days'`
+**And** `'2T'` → 14 days, `'1M'` → 30 days, `'3M'` → 90 days, `'6M'` → 180 days
 
 **Given** a game with no price history entries yet
 **When** called
@@ -1355,8 +1384,8 @@ So that the chart renders cleanly without data-massaging logic scattered in comp
 
 ### Story 5.2: PriceChart Component — Visual Shell
 
-**Dev: Dev A (Web)** — *pliki: `components/PriceChart.tsx`, `components/PriceChart.test.tsx`, `components/TimeRangeSelector.tsx`*
-*(można zacząć podczas Story 5.1, mock data OK)*
+**Dev: Dev A (Web)** — _pliki: `components/PriceChart.tsx`, `components/PriceChart.test.tsx`, `components/TimeRangeSelector.tsx`_
+_(można zacząć podczas Story 5.1, mock data OK)_
 
 As a **user**,
 I want to see a clear line chart of price changes over time with a time range selector,
@@ -1386,8 +1415,13 @@ So that I can understand if now is a good time to buy or if I should wait.
 
 **Given** `TimeRangeSelector` component
 **When** rendered
-**Then** it shows five pill buttons: 1M | 3M | 6M | 1R | WSZYSTKO — active pill fills `#3D5C3A` with white text, inactive transparent with border
+**Then** it shows five pill buttons: 1T | 2T | 1M | 3M | 6M — active pill fills `#3D5C3A` with white text, inactive transparent with border
 **And** it is a Client Component (handles click state)
+
+**Given** a range button whose unlock threshold has not been met
+**When** rendered
+**Then** the button is visually disabled: `color: #A89480`, `border: 1px solid #E0D5C5`, cursor `not-allowed`; on hover shows tooltip "Dostępne za X dni"
+**And** unlock thresholds: 1T requires ≥ 7 days of data, 2T ≥ 14 days, 1M ≥ 30 days, 3M ≥ 90 days, 6M ≥ 180 days
 
 **Given** the statistics section below the chart (FR-4)
 **When** rendered
@@ -1403,8 +1437,8 @@ So that I can understand if now is a good time to buy or if I should wait.
 
 ### Story 5.3: PriceChart Connected to Real Data
 
-**Dev: Dev A (Web)** — *pliki: `app/gra/[slug]/page.tsx` (dodanie sekcji wykresu), `components/PriceChart.tsx` (integracja)*
-*(wymaga 5.1 Dev B + 5.2 — `app/api/price-history/route.ts` jest gotowy z Story 5.1)*
+**Dev: Dev A (Web)** — _pliki: `app/gra/[slug]/page.tsx` (dodanie sekcji wykresu), `components/PriceChart.tsx` (integracja)_
+_(wymaga 5.1 Dev B + 5.2 — `app/api/price-history/route.ts` jest gotowy z Story 5.1)_
 
 As a **user**,
 I want the price chart to show real historical prices that update after each scrape cycle,
@@ -1416,9 +1450,9 @@ So that the price trends I see are accurate and current.
 **When** rendered as Server Component
 **Then** price history data is fetched server-side via `getPriceHistory(gameId, '3M')` (default range) and passed as props to `<PriceChart>`
 
-**Given** user selects "1R" in `TimeRangeSelector`
+**Given** user selects "6M" in `TimeRangeSelector`
 **When** fired
-**Then** `PriceChart` re-fetches data for the 1Y range — this is a Client Component interaction; data is fetched via `fetch('/api/price-history?gameId=X&range=1Y')`
+**Then** `PriceChart` re-fetches data for the 6-month range — this is a Client Component interaction; data is fetched via `fetch('/api/price-history?gameId=X&range=6M')`
 **And** `app/api/price-history/route.ts` handles the request, calls `getPriceHistory()`, returns JSON
 **And** loading state shows a skeleton/spinner inside the chart area — not the full page skeleton
 
@@ -1435,8 +1469,8 @@ So that the price trends I see are accurate and current.
 
 ### Story 5.4: SEO Meta Tags — Open Graph & Canonical
 
-**Dev: Dev A (Web)** — *pliki: `app/gra/[slug]/page.tsx` (metadata export), `app/page.tsx` (metadata export), `app/opengraph-image.tsx`*
-*(po 4.1, można zacząć z danymi z 4.5)*
+**Dev: Dev A (Web)** — _pliki: `app/gra/[slug]/page.tsx` (metadata export), `app/page.tsx` (metadata export), `app/opengraph-image.tsx`_
+_(po 4.1, można zacząć z danymi z 4.5)_
 
 As a **product owner**,
 I want game pages and the homepage to have correct Open Graph and canonical meta tags,
@@ -1468,8 +1502,8 @@ So that links shared on social media show rich previews and search engines index
 
 ### Story 5.5: JSON-LD Structured Data
 
-**Dev: Dev A (Web)** — *pliki: `components/GameJsonLd.tsx`, `components/OfferJsonLd.tsx`*
-*(po 4.1)*
+**Dev: Dev A (Web)** — _pliki: `components/GameJsonLd.tsx`, `components/OfferJsonLd.tsx`_
+_(po 4.1)_
 
 As a **product owner**,
 I want game pages to include structured data for search engines,
@@ -1501,8 +1535,8 @@ So that Google can show rich results (product prices, ratings) for our game page
 
 ### Story 5.6: Sitemap & robots.txt
 
-**Dev: Dev A (Web)** — *pliki: `app/sitemap.ts`, `app/robots.ts`*
-*(po 4.1 — można zacząć z mock data)*
+**Dev: Dev A (Web)** — _pliki: `app/sitemap.ts`, `app/robots.ts`_
+_(po 4.1 — można zacząć z mock data)_
 
 As a **product owner**,
 I want all game pages indexed in /sitemap.xml and robots.txt to guide crawlers correctly,
@@ -1536,15 +1570,15 @@ So that Google can discover and index all Game Passports without configuration g
 
 **Podział:** Epic 6 — dwa równoległe tory. Dev A: UI form (6.1 część) + confirmation flow (6.2, 6.3). Dev B: API/DB layer (6.1 część) + Brevo client + alert engine (6.4, 6.5, 6.6). Story 6.1 jest podzielona — oboje pracują jednocześnie na różnych plikach.
 
-| Story | Dev | Zależność |
-|---|---|---|
-| 6.1 | Dev A + Dev B | po 4.4 |
-| 6.2 | Dev A | po 6.1 |
-| 6.3 | Dev A | po 6.1 |
-| 6.4 | Dev B | (można zacząć podczas Epic 5) |
-| 6.5 | Dev B | po 6.4 |
-| 6.6 | Dev B | po 6.5 |
-| 6.7 | Dev B | po 6.5 |
+| Story | Dev           | Zależność                     |
+| ----- | ------------- | ----------------------------- |
+| 6.1   | Dev A + Dev B | po 4.4                        |
+| 6.2   | Dev A         | po 6.1                        |
+| 6.3   | Dev A         | po 6.1                        |
+| 6.4   | Dev B         | (można zacząć podczas Epic 5) |
+| 6.5   | Dev B         | po 6.4                        |
+| 6.6   | Dev B         | po 6.5                        |
+| 6.7   | Dev B         | po 6.5                        |
 
 **Tor Dev A** (6.1 AlertForm → 6.2 → 6.3) i **Tor Dev B** (6.1 API+DB równolegle, potem 6.4 → 6.5 → 6.6) — łączą się w 6.5 (alert engine wywołuje Brevo client).
 
@@ -1552,7 +1586,7 @@ So that Google can discover and index all Game Passports without configuration g
 
 ### Story 6.1: AlertForm & POST /api/alerts — Zapis Powiadomienia
 
-**Dev: Dev A + Dev B (równolegle)** — *Dev A: `components/AlertForm.tsx` | Dev B: `app/api/alerts/route.ts`, `db/queries/alerts.ts`*
+**Dev: Dev A + Dev B (równolegle)** — _Dev A: `components/AlertForm.tsx` | Dev B: `app/api/alerts/route.ts`, `db/queries/alerts.ts`_
 
 As a **user**,
 I want to set up a price alert for a specific game by entering my email and target price,
@@ -1596,7 +1630,7 @@ So that I'll be notified when the price drops to a level I'm willing to pay.
 
 ### Story 6.2: Double Opt-In Confirmation — GET /api/alerts/confirm
 
-**Dev: Dev A (Web)** — *pliki: `app/api/alerts/confirm/route.ts`, `app/alerts/confirmed/page.tsx`, `app/alerts/expired/page.tsx`*
+**Dev: Dev A (Web)** — _pliki: `app/api/alerts/confirm/route.ts`, `app/alerts/confirmed/page.tsx`, `app/alerts/expired/page.tsx`_
 
 As a **user**,
 I want clicking the confirmation link in my email to activate my price alert,
@@ -1605,11 +1639,11 @@ So that I'm sure I'll receive notifications and no one can activate alerts using
 **Acceptance Criteria:**
 
 **Given** `GET /api/alerts/confirm?token=<uuid>`
-**When** called with a valid, unexpired token (24h window from creation)
+**When** called with a valid, unexpired token (48h window from creation)
 **Then** it updates `price_alerts.status = 'active'`, writes `consent_log` row with `action = 'doi_confirmed'`, redirects to `/alerts/confirmed`
 
 **Given** `GET /api/alerts/confirm?token=<uuid>`
-**When** called with an expired token (> 24h) or token not found
+**When** called with an expired token (> 48h) or token not found
 **Then** it redirects to `/alerts/expired` — warm message "Link wygasł lub jest nieprawidłowy", "Wróć do strony gry i spróbuj ponownie" link — no error code exposed to user
 
 **Given** `/alerts/confirmed` page
@@ -1628,7 +1662,7 @@ So that I'm sure I'll receive notifications and no one can activate alerts using
 
 ### Story 6.3: Wyłączanie Powiadomień
 
-**Dev: Dev A (Web)** — *pliki: `app/api/alerts/unsubscribe/route.ts`, `app/alerts/unsubscribed/page.tsx`*
+**Dev: Dev A (Web)** — _pliki: `app/api/alerts/unsubscribe/route.ts`, `app/alerts/unsubscribed/page.tsx`_
 
 As a **user**,
 I want a one-click link in every alert email to turn off notifications,
@@ -1661,8 +1695,8 @@ So that I can stop receiving them at any time without needing to log in.
 
 ### Story 6.4: Brevo Client & Szablon Emaila DOI
 
-**Dev: Dev B (Scraper/Infra)** — *pliki: `scraper/brevo_client.py`, `scraper/templates/doi_email.html`*
-*(można zacząć podczas Epic 5)*
+**Dev: Dev B (Scraper/Infra)** — _pliki: `scraper/brevo_client.py`, `scraper/templates/doi_email.html`_
+_(można zacząć podczas Epic 5)_
 
 As a **developer**,
 I want a Brevo API client and a Double Opt-In email template,
@@ -1695,7 +1729,7 @@ So that the API route can trigger transactional emails without coupling web code
 
 ### Story 6.5: Alert Engine — Wykrywanie Spadku Ceny
 
-**Dev: Dev B (Scraper/Infra)** — *pliki: `scraper/alert_engine.py`, `.github/workflows/alert_engine.yml`*
+**Dev: Dev B (Scraper/Infra)** — _pliki: `scraper/alert_engine.py`, `.github/workflows/alert_engine.yml`_
 
 As a **user**,
 I want to be notified automatically when a price drops to or below my target,
@@ -1731,7 +1765,7 @@ So that I don't have to check the site manually every day.
 
 ### Story 6.6: Email o Spadku Ceny
 
-**Dev: Dev B (Scraper/Infra)** — *pliki: `scraper/templates/price_drop_email.html` + `send_price_drop_email()` w `brevo_client.py`*
+**Dev: Dev B (Scraper/Infra)** — _pliki: `scraper/templates/price_drop_email.html` + `send_price_drop_email()` w `brevo_client.py`_
 
 As a **user**,
 I want the price drop email to clearly show me the game, the new price, my target, and a direct buy link,
@@ -1764,8 +1798,8 @@ So that I can act immediately on the deal.
 
 ### Story 6.7: Type B Anomaly Detection
 
-**Dev: Dev B (Scraper/Infra)** — *pliki: `scraper/alert_engine.py` (rozszerzenie)*
-*(po 6.5)*
+**Dev: Dev B (Scraper/Infra)** — _pliki: `scraper/alert_engine.py` (rozszerzenie)_
+_(po 6.5)_
 
 As a **user**,
 I want to receive an alert when a game's price drops dramatically (50%/70%/80% below original),
@@ -1785,6 +1819,7 @@ So that I'm notified about exceptional deals even without setting a specific pri
 **Given** `price_alerts` schema
 **When** reviewed
 **Then** it has columns: `type_b_enabled BOOLEAN DEFAULT TRUE`, `last_type_b_notified_at TIMESTAMP NULL` — added via migration in this story
+**And** the corresponding columns are added to `schema.ts` in the same PR (L-1 rule: schema.ts and scraper/items.py must stay in sync — never add DB columns in Python without updating schema.ts)
 
 **Given** a game where `price_orig = NULL`
 **When** `run_type_b_alerts()` processes
@@ -1793,6 +1828,43 @@ So that I'm notified about exceptional deals even without setting a specific pri
 **Given** `run_alert_engine()` orchestrator function
 **When** reviewed
 **Then** it calls both `run_type_a_alerts()` (Story 6.5) and `run_type_b_alerts()` sequentially — single entry point for GitHub Actions
+
+---
+
+### Story 6.8: Brevo Webhook — hard_bounce i complaint Suppression
+
+**Dev: Dev A (Web/Next.js)** — _pliki: `app/api/webhooks/brevo/route.ts`_
+_(po 6.3)_
+
+As a **system**,
+I want to automatically suppress emails that Brevo reports as hard bounces or spam complaints,
+So that we stay RODO/PKE 2024 compliant and our sender reputation is protected.
+
+**Acceptance Criteria:**
+
+**Given** `POST /api/webhooks/brevo` with a valid HMAC-SHA256 signature in `X-Brevo-Signature` header
+**When** event type is `hard_bounce`
+**Then** route inserts a row into `email_suppressions` with `SHA-256(email)` and `reason = 'hard_bounce'` (if not already suppressed), returns `200 { ok: true }`
+
+**Given** `POST /api/webhooks/brevo` with a valid signature
+**When** event type is `complaint`
+**Then** route inserts a row into `email_suppressions` with `SHA-256(email)` and `reason = 'complaint'` (if not already suppressed), returns `200 { ok: true }`
+
+**Given** `POST /api/webhooks/brevo`
+**When** `X-Brevo-Signature` header is missing or does not match `HMAC-SHA256(body, BREVO_WEBHOOK_SECRET)` verified with `timingSafeEqual`
+**Then** route returns `401` — no DB writes performed
+
+**Given** `POST /api/webhooks/brevo` with a valid signature
+**When** event type is anything other than `hard_bounce` or `complaint` (e.g. `click`, `open`, `delivered`)
+**Then** route returns `200 { ok: true }` — no-op, no DB writes
+
+**Given** `BREVO_WEBHOOK_SECRET` env variable
+**When** missing at startup
+**Then** the route returns `500` on any request — fail loudly rather than silently accepting unsigned webhooks
+
+**Given** `app/api/webhooks/brevo/route.test.ts`
+**When** run
+**Then** covers: valid hard_bounce inserts suppression, valid complaint inserts suppression, bad signature returns 401, unknown event type returns 200 no-op, missing secret returns 500, duplicate suppression (already suppressed email) does not throw
 
 ---
 
@@ -1805,21 +1877,21 @@ So that I'm notified about exceptional deals even without setting a specific pri
 
 **Uwaga architektoniczna:** Na etapie Advanced Elicitation A-4 był oznaczony 🔴 — viability Flipper Mode zależy od dostępności proxy wartości rynkowej. Story 7.1 jest gate'em — dopiero po nim można budować 7.3/7.4.
 
-| Story | Dev | Zależność |
-|---|---|---|
-| 7.1 (spike) | Dev A + Dev B | po Epic 2 |
-| 7.2 | Dev A | po 3.1 |
-| 7.3 | Dev A | po 7.1 (decyzja) + 7.2 |
-| 7.4 | Dev B | po 7.1 (decyzja) + Epic 2 |
-| 7.5 | Dev A | po 7.3 + 7.4 |
-| 7.6 | Dev A | po 7.3 + 6.1 |
+| Story       | Dev           | Zależność                 |
+| ----------- | ------------- | ------------------------- |
+| 7.1 (spike) | Dev A + Dev B | po Epic 2                 |
+| 7.2         | Dev A         | po 3.1                    |
+| 7.3         | Dev A         | po 7.1 (decyzja) + 7.2    |
+| 7.4         | Dev B         | po 7.1 (decyzja) + Epic 2 |
+| 7.5         | Dev A         | po 7.3 + 7.4              |
+| 7.6         | Dev A         | po 7.3 + 6.1              |
 
 ---
 
 ### Story 7.1: Spike — Walidacja Danych dla Flipper Mode
 
 **Dev: Dev A + Dev B (spike — brak plików produkcyjnych)**
-*(wymaga danych z Epic 2 — musi być co najmniej kilka produktów w DB)*
+_(wymaga danych z Epic 2 — musi być co najmniej kilka produktów w DB)_
 
 As a **team**,
 I want to validate whether we have enough data to compute meaningful margin proxies before building the Flipper UI,
@@ -1847,8 +1919,8 @@ So that we don't build a page that shows "—" in every row at launch.
 
 ### Story 7.2: /flipper Route Shell & Empty State Guard
 
-**Dev: Dev A (Web)** — *pliki: `app/flipper/page.tsx`, `app/flipper/loading.tsx`*
-*(po 3.1 — można budować równolegle ze spike'iem 7.1)*
+**Dev: Dev A (Web)** — _pliki: `app/flipper/page.tsx`, `app/flipper/loading.tsx`_
+_(po 3.1 — można budować równolegle ze spike'iem 7.1)_
 
 As a **user**,
 I want the Flipper Mode page to have a clear layout that explains what it shows and handles the case when there's not enough data yet,
@@ -1877,8 +1949,8 @@ So that I'm never confused by a page full of dashes.
 
 ### Story 7.3: FlipperRow Component & Table Layout
 
-**Dev: Dev A (Web)** — *pliki: `components/FlipperRow.tsx`, `components/FlipperRow.test.tsx`, `components/FlipperTable.tsx`*
-*(po 7.1 PASSED + 7.2)*
+**Dev: Dev A (Web)** — _pliki: `components/FlipperRow.tsx`, `components/FlipperRow.test.tsx`, `components/FlipperTable.tsx`_
+_(po 7.1 PASSED + 7.2)_
 
 As a **reseller**,
 I want each row in Flipper Mode to show me buy price, market value proxy, margin %, and estimated profit at a glance,
@@ -1888,12 +1960,12 @@ So that I can quickly identify which games are worth buying for resale.
 
 **Given** `FlipperRow` with a game that has full flipper data
 **When** rendered
-**Then** it shows: rank number (#1, #2…), 40×40px thumbnail, game name (700w), "Kup za" lowest price (green), "Wartość proxy" historical max price (muted), margin % badge (color-coded: <20% grey, 20–40% amber, >40% green), "Zysk ~X zł" estimate, "Kup →" button linking to cheapest store
+**Then** it shows: rank number (#1, #2…), 40×40px thumbnail, game name (700w), "Kup za" lowest price (green), "Wartość proxy" historical max price (muted), margin % badge (color-coded: <10% red, 10–30% amber, >30% green), "Zysk ~X zł" estimate, "Kup →" button linking to cheapest store
 **And** row background `#DDD0BC`, border-radius 10px, hover `translateY(-1px)` (150ms)
 
 **Given** the margin % badge
-**When** `margin > 40%`
-**Then** badge background `#3D5C3A` (green), when `20–40%` background `#C07B18` (amber), when `< 20%` background `#6B5744` (muted brown)
+**When** `margin > 30%`
+**Then** badge background `#3D5C3A` (green), when `10–30%` background `#C07B18` (amber), when `< 10%` background `#C42B2B` (red)
 
 **Given** a game where `historical_max = null` (insufficient history)
 **When** rendered in FlipperTable
@@ -1928,8 +2000,8 @@ So that I can quickly identify which games are worth buying for resale.
 
 ### Story 7.4: Flipper DB Query & calcMarginProxy()
 
-**Dev: Dev B (Scraper/Infra)** — *pliki: `db/queries/flipper.ts`, `lib/calc.ts` (rozszerzenie o `calcMarginProxy`)*
-*(po 7.1 PASSED + danych w DB)*
+**Dev: Dev B (Scraper/Infra)** — _pliki: `db/queries/flipper.ts`, `lib/calc.ts` (rozszerzenie o `calcMarginProxy`)_
+_(po 7.1 PASSED + danych w DB)_
 
 As a **developer**,
 I want a query that returns flipper data sorted by margin descending and a pure function for margin calculation,
@@ -1963,8 +2035,8 @@ So that the Flipper Mode page always shows the most profitable opportunities fir
 
 ### Story 7.5: Flipper Filters & Sorting
 
-**Dev: Dev A (Web)** — *pliki: `components/FlipperFilterBar.tsx`*
-*(po 7.3 + 7.4)*
+**Dev: Dev A (Web)** — _pliki: `components/FlipperFilterBar.tsx`_
+_(po 7.3 + 7.4)_
 
 As a **reseller**,
 I want to filter Flipper Mode by game type and minimum margin, and sort by different criteria,
@@ -1997,8 +2069,8 @@ So that I can focus on the opportunities that match my buying strategy.
 
 ### Story 7.6: Type B Alert Subscription z Flipper Mode
 
-**Dev: Dev A (Web)** — *pliki: `components/FlipperRow.tsx` (rozszerzenie), `components/AlertModal.tsx` (reuse z 6.1)*
-*(po 7.3 + 6.1)*
+**Dev: Dev A (Web)** — _pliki: `components/FlipperRow.tsx` (rozszerzenie), `components/AlertModal.tsx` (reuse z 6.1)_
+_(po 7.3 + 6.1)_
 
 As a **reseller**,
 I want to subscribe to a Type B anomaly alert directly from a Flipper Mode row without leaving the page,
@@ -2031,20 +2103,20 @@ So that I'm automatically notified when a flip opportunity becomes exceptional.
 
 **Podział:** Epic 8 celowo przesunięty w stronę Dev B dla wyrównania obciążenia — Dev B dostaje 3 historyjki (spike + spider + pipeline), Dev A 2 historyjki (UI). Tory mogą biec równolegle od Story 8.2/8.4.
 
-| Story | Dev | Zależność |
-|---|---|---|
-| 8.1 (spike) | Dev B | po Epic 2 |
-| 8.2 | Dev B | po 8.1 PASSED |
-| 8.3 | Dev B | po 8.2 |
-| 8.4 | Dev A | po 3.1 (można równolegle z 8.1) |
-| 8.5 | Dev A | po 8.4 + 8.2 (potrzebne dane) |
+| Story       | Dev   | Zależność                       |
+| ----------- | ----- | ------------------------------- |
+| 8.1 (spike) | Dev B | po Epic 2                       |
+| 8.2         | Dev B | po 8.1 PASSED                   |
+| 8.3         | Dev B | po 8.2                          |
+| 8.4         | Dev A | po 3.1 (można równolegle z 8.1) |
+| 8.5         | Dev A | po 8.4 + 8.2 (potrzebne dane)   |
 
 ---
 
 ### Story 8.1: Spike — Walidacja Źródła Danych dla Premier
 
-**Dev: Dev B (Scraper/Infra)** — *spike — brak plików produkcyjnych*
-*(po Epic 2)*
+**Dev: Dev B (Scraper/Infra)** — _spike — brak plików produkcyjnych_
+_(po Epic 2)_
 
 As a **team**,
 I want to validate whether we can reliably scrape upcoming release data before building the UI,
@@ -2072,8 +2144,8 @@ So that the /nadchodzace page shows real games, not a placeholder.
 
 ### Story 8.2: UpcomingReleasesSpider & Pipeline
 
-**Dev: Dev B (Scraper/Infra)** — *pliki: `scraper/spiders/upcoming_spider.py`, `scraper/pipelines/upcoming_pipeline.py`, `.github/workflows/upcoming.yml`*
-*(po 8.1 PASSED)*
+**Dev: Dev B (Scraper/Infra)** — _pliki: `scraper/spiders/upcoming_spider.py`, `scraper/pipelines/upcoming_pipeline.py`, `.github/workflows/upcoming.yml`_
+_(po 8.1 PASSED)_
 
 As a **user**,
 I want the upcoming releases section to show real games with estimated release dates scraped from store websites,
@@ -2104,8 +2176,8 @@ So that I can discover games I'd want to pre-order or be notified about.
 
 ### Story 8.3: Availability Trigger w Alert Engine
 
-**Dev: Dev B (Scraper/Infra)** — *pliki: `scraper/alert_engine.py` (rozszerzenie), `scraper/templates/available_email.html`*
-*(po 8.2)*
+**Dev: Dev B (Scraper/Infra)** — _pliki: `scraper/alert_engine.py` (rozszerzenie), `scraper/templates/available_email.html`_
+_(po 8.2)_
 
 As a **user**,
 I want to receive an email when a game I signed up for becomes available in stores,
@@ -2138,14 +2210,18 @@ So that I can be among the first to buy it before it sells out.
 
 ### Story 8.4: /nadchodzace Page Shell & UpcomingCard
 
-**Dev: Dev A (Web)** — *pliki: `app/nadchodzace/page.tsx`, `app/nadchodzace/loading.tsx`, `components/UpcomingCard.tsx`*
-*(po 3.1, można zacząć równolegle z 8.1)*
+**Dev: Dev A (Web)** — _pliki: `app/nadchodzace/page.tsx`, `app/nadchodzace/loading.tsx`, `components/UpcomingCard.tsx`_
+_(po 3.1, można zacząć równolegle z 8.1)_
 
 As a **user**,
 I want a dedicated page listing upcoming game releases with clear visual hierarchy showing what's coming and when,
 So that I can plan my wishlist and pre-orders.
 
 **Acceptance Criteria:**
+
+**Given** Story 8.1 spike (gate check)
+**When** Story 8.4 is ready to be marked Done
+**Then** Story 8.1 must already be marked Done with a recorded spike decision — if spike result is "no reliable preorder signal found", Story 8.4 ships with the empty state only and Stories 8.2, 8.3, 8.5 are deferred; the empty state on line below covers this case and is not an excuse to skip the spike gate
 
 **Given** `app/nadchodzace/page.tsx` as a Server Component
 **When** `upcoming_games` table has data
@@ -2172,8 +2248,8 @@ So that I can plan my wishlist and pre-orders.
 
 ### Story 8.5: "Powiadom gdy dostępna" — Formularz & API
 
-**Dev: Dev A (Web)** — *pliki: `components/AvailabilityAlertForm.tsx`, `app/api/alerts/route.ts` (rozszerzenie o `alert_type`)*
-*(po 8.4 + 8.2)*
+**Dev: Dev A (Web)** — _pliki: `components/AvailabilityAlertForm.tsx`, `app/api/alerts/route.ts` (rozszerzenie o `alert_type`)_
+_(po 8.4 + 8.2)_
 
 As a **user**,
 I want to click "Powiadom mnie" on an upcoming game and enter my email to get notified when it becomes available,
@@ -2198,4 +2274,3 @@ So that I don't have to check the page manually.
 **Given** `AvailabilityAlertForm` after successful submit
 **When** API returns 200
 **Then** form collapses, "Powiadom mnie →" button replaced with "Powiadomienie ustawione ✓" (muted, non-clickable) — same success pattern as AlertForm (Story 6.1)
-

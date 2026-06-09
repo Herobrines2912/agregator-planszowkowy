@@ -254,7 +254,7 @@ User can subscribe to a "notify me when available" alert for a specific Game via
 User activates Flipper Mode from the main navigation. All active filters (FR-5, FR-6) remain applied. Each Game entry displays: name, current price, original price, 7-day price sparkline, Margin Proxy percentage, trend indicator (↑ rising / → stable / ↓ falling).
 
 **Consequences (testable):**
-- Flipper Mode is a view toggle, not a separate URL — filter state is preserved.
+- Flipper Mode is accessible at the dedicated route `/flipper` (ADR-004 overrides the original toggle-only intent — the route is the canonical entry point). Active filters are preserved via URL params when navigating to `/flipper`.
 - Trend indicator is calculated from the last 7 recorded prices: rising if last price > first price, falling if last price < first price, stable otherwise.
 - Margin Proxy is suppressed (shown as "—") if fewer than 5 price data points exist for the Game.
 
@@ -368,7 +368,7 @@ When a Game is first linked to a BGG ID, the system fetches and caches BGG metad
 - BGG API enrichment with registered Bearer Token
 - RODO-compliant Double Opt-In for all email subscriptions
 - Operator scraper health alerts
-- GitHub Actions + Neon free + Vercel Hobby deployment (€0/month)
+- GitHub Actions + Neon free + Vercel Hobby deployment (≤€10/month target)
 
 ### 6.2 Out of Scope for MVP
 
@@ -422,7 +422,7 @@ When a Game is first linked to a BGG ID, the system fetches and caches BGG metad
 
 ### 8.3 Cost
 
-- **C-9:** Infrastructure operating cost target for MVP €0 / month (GitHub Actions + Neon free + Vercel Hobby free + Brevo free tier).
+- **C-9:** Infrastructure operating cost target for MVP ≤€10 / month (GitHub Actions + Neon free + Vercel Hobby free + Brevo free tier — €0 on free tiers; ≤€10 budget exists for any required paid upgrade).
 - **C-10:** No external paid services (residential proxies, managed databases, commercial anti-bot tools) are used in MVP.
 
 ---
@@ -437,7 +437,7 @@ When a Game is first linked to a BGG ID, the system fetches and caches BGG metad
 |---|---|---|
 | Hot Deals Feed | `/` | No |
 | Game Passport | `/gra/{slug}` | No |
-| Upcoming / Preorders | `/nadchodzi` | No |
+| Upcoming / Preorders | `/nadchodzace` | No |
 | Flipper Mode | Toggle on `/` and `/gra/` surfaces | No |
 | Alert subscription | Inline on Game Passport | No |
 | Opt-in confirmation | `/alerty/potwierdz/{token}` | No |

@@ -130,7 +130,7 @@ updated: 2026-06-07
 
 ### View Toggle (Karty / Lista)
 
-- **State persists** in `localStorage` — returning user sees their last-used view
+- **State persists** in URL parameter `?view=list` (default: card view) — filter state lives entirely in URL, no localStorage (aligns with FilterBar decision in Story 3.4)
 - **Switching view:** Animates transition between grid and list layout [ASSUMPTION: crossfade or layout morph, exact animation not yet defined]
 - **Data is identical** between card and list view — no re-fetch needed on toggle. All deal data is already in-memory; only rendering changes
 - Active segment in toggle button is filled green (#3D5C3A), inactive is transparent with muted text
@@ -412,4 +412,4 @@ All timing uses `ease` easing unless noted. No `linear` timing on visible transi
 
 ## Implementation Notes
 
-- **localStorage hydration (View Toggle):** View toggle persistence via localStorage requires two-pass render or URL parameter (`?view=list`) to avoid Next.js 14 SSR hydration mismatch. Treat as implementation decision for Sprint 1.
+- **View Toggle state:** Persisted via `?view=list` URL param (resolved in Sprint 1 planning — no localStorage, no hydration mismatch).
