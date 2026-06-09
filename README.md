@@ -85,6 +85,7 @@ Projekt przeszedł pełny proces planowania BMad Method:
 | UX Design | `_bmad-output/planning-artifacts/ux-designs/` |
 | Architektura | `_bmad-output/planning-artifacts/architecture.md` |
 | Epiki i Stories | `_bmad-output/planning-artifacts/epics.md` |
+| Implementation Readiness | `_bmad-output/planning-artifacts/implementation-readiness-report-2026-06-09.md` |
 
 ---
 
@@ -97,6 +98,7 @@ Projekt przeszedł pełny proces planowania BMad Method:
 ✅ UX Design
 ✅ Architektura
 ✅ Epiki i Stories (50 historyjek, 8 epiców)
+✅ Implementation Readiness Check (wszystkie 8 epiców: GO)
 ⬜ Implementacja
 ```
 
