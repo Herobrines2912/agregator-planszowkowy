@@ -734,7 +734,14 @@ schema.ts ←→ scraper/scraper/items.py  ← ZAWSZE synchronizowane
 
 **Decyzja: DELETE z email_suppressions + INSERT do consent_log**
 
-Przy świadomej resubskrypcji (`user_request` suppression):
+`email_suppressions.reason` ma cztery wartości:
+- `user_request` — wypisanie z pojedynczego alertu eskalowane do suppression; **nadpisywalne** świadomą resubskrypcją.
+- `global_optout` — "Wyłącz wszystkie powiadomienia" (Story 6.3); **nadpisywalne** świadomą resubskrypcją (tak jak `user_request`).
+- `hard_bounce`, `complaint` — z webhooka Brevo (L-7); **permanentne**, nie można nadpisać.
+
+`email_suppressions.email` przechowywany jest **w postaci surowej** (nie hash) — alert-engine join w L-3 (`pa.email = es.email`) i sprawdzenie przy zapisie alertu wymagają dokładnego dopasowania na surowym adresie. Anonimizacja następuje dopiero po 3 latach (L-5). Hash trzymamy w `consent_log` (audit), surowy adres w tabelach operacyjnych (`price_alerts`, `email_suppressions`), które i tak muszą zaadresować maila.
+
+Przy świadomej resubskrypcji (suppression `user_request` lub `global_optout`):
 1. `DELETE FROM email_suppressions WHERE email = ?` — czyści aktywną suppression
 2. `INSERT INTO consent_log (action='suppression_overridden', ...)` — zachowuje audit trail
 
@@ -796,7 +803,7 @@ export const consentLog = pgTable('consent_log', {
   source: text('source')
     .$type<'user' | 'brevo_webhook' | 'system'>()
     .notNull(),
-  ip_address: text('ip_address'),             // NULL po 12 mies. (automated cron)
+  ip_hash: text('ip_hash'),                   // SHA-256(ip); NULL po 12 mies. (automated cron)
   token_id: integer('token_id'),              // referencja, nie sam token
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
 })
@@ -821,23 +828,25 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Anonimizuj IP w consent_log (>12 mies.)
-        # UPDATE consent_log SET ip_address = NULL WHERE created_at < now() - interval '12 months'
+        # UPDATE consent_log SET ip_hash = NULL WHERE created_at < now() - interval '12 months'
       - name: Anonimizuj email w email_suppressions (>3 lata)
         # UPDATE email_suppressions SET email = encode(sha256(email::bytea),'hex'), is_anonymized=true
         # WHERE created_at < now() - interval '3 years' AND NOT is_anonymized
       - name: Usuń stare scrape_runs (>90 dni)
         # DELETE FROM scrape_runs WHERE created_at < now() - interval '90 days'
-      - name: Usuń stare consent_log (>5 lat)
-        # DELETE FROM consent_log WHERE created_at < now() - interval '5 years'
+      - name: Usuń stare consent_log (>5 lat, tylko nieaktywne subskrypcje)
+        # DELETE FROM consent_log cl WHERE cl.created_at < now() - interval '5 years'
+        #   AND NOT EXISTS (SELECT 1 FROM price_alerts pa
+        #                   WHERE pa.email_hash = cl.email_hash AND pa.status = 'active')
       - name: Zapisz log retencji
         # INSERT INTO data_retention_log (run_at, rows_affected)
 ```
 
 | Dane | Retencja | Akcja |
 |---|---|---|
-| `consent_log.ip_address` | 12 mies. | SET NULL |
+| `consent_log.ip_hash` | 12 mies. | SET NULL |
 | `email_suppressions.email` | 3 lata | SHA-256 anonimizacja |
-| `consent_log` (hash) | 5 lat | DELETE |
+| `consent_log` (hash) | 5 lat | DELETE (tylko gdy brak aktywnej subskrypcji dla `email_hash`) |
 | `scrape_runs` | 90 dni | DELETE |
 
 ---
@@ -875,6 +884,10 @@ export async function POST(req: Request) {
 
   const event = JSON.parse(rawBody)
   if (event.event === 'hard_bounce' || event.event === 'complaint') {
+    // suppressEmail() MUSI w jednej transakcji:
+    //   1. INSERT email_suppressions (raw email, reason = event.event)
+    //   2. INSERT consent_log (action='suppressed', email_hash=SHA-256(email), source='brevo_webhook')
+    // — reguła L-4: każda operacja na email_suppressions ma odpowiadający wpis w consent_log.
     await suppressEmail(event.email, event.event as 'hard_bounce' | 'complaint')
   }
   // soft_bounce → ignoruj (nie suppressuj)
@@ -888,9 +901,54 @@ export async function POST(req: Request) {
 
 **Decyzja: Checkbox + Privacy Policy**
 
-- Formularz alertu: checkbox "Mam ukończone 16 lat" — wymagany do subskrypcji
-- Wartość NIE jest przechowywana (data minimization)
+- Formularz alertu: checkbox "Mam ukończone 16 lat" — wymagany; API odrzuca submission (400) gdy niezaznaczony
+- Nie przechowujemy osobnej flagi wieku — wiersz `consent_log` z `action='opt_in_requested'` powstaje wyłącznie po przejściu walidacji obu checkboxów (zgoda + wiek), więc JEST dowodem złożenia oświadczenia (rozliczalność art. 5 ust. 2 bez nadmiarowych danych)
 - Zapis w Privacy Policy: "Usługa przeznaczona dla osób które ukończyły 16 lat."
+
+---
+
+### L-13: Procedura Naruszeń Danych (art. 33/34 RODO)
+
+**Decyzja: Runbook + 72h SLA do UODO**
+
+- Wykrycie naruszenia → ocena ryzyka → zgłoszenie do UODO w ciągu **72h** (art. 33); powiadomienie osób, których dane dotyczą, gdy wysokie ryzyko (art. 34).
+- Źródła sygnałów: alert operatora z GitHub Actions, anomalia w `consent_log`/`scrape_runs`, zgłoszenie od procesora (Brevo/Neon/Vercel/GitHub).
+- Rejestr naruszeń w `docs/GDPR_PROCEDURE.md` (data, zakres, kategorie danych, działania naprawcze).
+- Kontakt: `privacy@[domena]`.
+
+---
+
+### L-14: Umowy Powierzenia (art. 28) i Rejestr Czynności (art. 30)
+
+**Decyzja: DPA z każdym procesorem + jednostronicowy rejestr**
+
+- Podmioty przetwarzające: **Brevo** (email), **Neon** (DB), **Vercel** (hosting/compute), **GitHub** (Actions/sekrety). Dla każdego zaakceptować i zarchiwizować DPA przed produkcją — linki w `docs/GDPR_PROCEDURE.md`.
+- Rejestr czynności (art. 30): jedna tabela w `docs/GDPR_PROCEDURE.md` — cel, kategorie danych (email, `ip_hash`), podstawa prawna (zgoda, art. 6 ust. 1 lit. a), retencja, odbiorcy (procesorzy wyżej).
+- Administrator danych: patrz C-11 w PRD (tożsamość + kontakt).
+
+---
+
+### L-15: Rezydencja Danych — Region EU (art. 44–49)
+
+**Decyzja: dane osobowe wyłącznie w regionie EU; brak transferu do USA bez podstawy**
+
+- **Neon:** projekt utworzony w regionie **EU** (np. `eu-central-1`, Frankfurt) — `price_alerts`, `email_suppressions`, `consent_log` nie opuszczają UE.
+- **Vercel:** funkcje przetwarzające dane osobowe (API Routes opt-in, webhook Brevo) przypięte do regionu EU (`fra1`); te trasy nie używają Edge runtime.
+- **Brevo:** serwery EU (RODO-native) — bez zmian.
+- **GitHub Actions:** runner może być poza UE, ale alert-engine trzyma w pamięci tylko dane operacyjne i łączy się do Neon EU po TLS; brak trwałego składowania danych osobowych na runnerze.
+- Każdy komponent wymuszający region poza UE → wymaga SCC udokumentowanych w `docs/GDPR_PROCEDURE.md` przed uruchomieniem.
+- **Uwaga:** porzucony VPS Hetzner (EU) spełniał to natywnie; pivot na free-tier (Neon/Vercel) **nie może** być wdrożony na domyślnych regionach US.
+
+---
+
+### L-16: Cookies i Analityka (PKE 2024 / ePrivacy)
+
+**Decyzja MVP: tylko cookies niezbędne; analityka bezciasteczkowa albo żadna**
+
+- MVP nie ustawia cookies nie-niezbędnych; brak Google Analytics / Vercel Analytics identyfikujących użytkownika.
+- Pomiar ruchu/SEO (jeśli w ogóle): wyłącznie rozwiązanie cookieless/agregujące bez danych osobowych (logi serwerowe; Plausible self-host rozważany w V2) — nie wymaga zgody.
+- Dodanie **jakiegokolwiek** cookie nie-niezbędnego lub analityki identyfikującej → wymaga banera zgody (opt-in, nie pre-checked) ładowanego PRZED skryptem. Warunek blokujący, nie „nice-to-have".
+- Privacy Policy zawiera sekcję „Cookies" nawet w MVP (tylko techniczne niezbędne).
 
 ---
 
@@ -1034,7 +1092,7 @@ Projekt struktura wspiera wszystkie decyzje architektoniczne. Scraper (`/scraper
 ### Implementation Readiness Validation ✅
 
 **Decision Completeness:**
-Wszystkie 24 decyzje udokumentowane z wersjami. 12 luk wykrytych podczas walidacji rozwiązanych z konkretnymi decyzjami (L-1–L-12). Brak ambiguousnych wyborów pozostawionych do implementacji.
+Wszystkie decyzje udokumentowane z wersjami. 16 luk wykrytych podczas walidacji rozwiązanych z konkretnymi decyzjami (L-1–L-16). Brak ambiguousnych wyborów pozostawionych do implementacji.
 
 **Structure Completeness:**
 Kompletne drzewo katalogów z 40+ plikami zdefiniowanymi. Wszystkie granice architektoniczne opisane. Punkty integracji zmapowane. Mapowanie FR → pliki/katalogi kompletne.
@@ -1060,13 +1118,17 @@ Naming conventions dla DB, TypeScript i Python. Canonical API routes. Error hand
 | Luka | Rozwiązanie |
 |---|---|
 | GDPR rights procedure brak | L-6: MVP ręczny SLA 30 dni; V2 endpoint |
-| Age restriction brak | L-8: Checkbox 16+ + Privacy Policy |
+| Age restriction brak | L-8: Checkbox 16+ + dowód w consent_log + Privacy Policy |
+| Breach notification brak (art. 33/34) | L-13: runbook 72h do UODO + rejestr naruszeń |
+| DPA + rejestr czynności brak (art. 28/30) | L-14: DPA z procesorami + rejestr art. 30 |
+| Rezydencja danych nieokreślona (art. 44–49) | L-15: region EU dla Neon/Vercel + SCC jeśli US |
+| Cookies/analityka nieokreślone (PKE/ePrivacy) | L-16: tylko niezbędne; baner zgody gdy analityka |
 | assertNever pattern nieokreślony | L-9: lib/utils.ts + reguła w CLAUDE.md |
 | YAML workflow lint brak | L-10: validate-workflows.yml |
 | SchemaOrgOffer lokalizacja | L-11+L-12: components/ + getGameBySlug() |
 
 **Luki nice-to-have (odroczone):**
-- Vercel Analytics konfiguracja — post-MVP
+- Analityka: tylko cookieless (L-16) — Vercel Analytics z identyfikacją wykluczone bez banera zgody
 - Conventional Commits enforcement — opcjonalne
 - localStorage view toggle — Phase 2
 
@@ -1079,7 +1141,7 @@ Naming conventions dla DB, TypeScript i Python. Canonical API routes. Error hand
 - [x] Cross-cutting concerns mapped (7 zidentyfikowanych)
 
 **Architectural Decisions**
-- [x] Critical decisions documented with versions (ADR-001–004 + L-1–L-12)
+- [x] Critical decisions documented with versions (ADR-001–004 + L-1–L-16)
 - [x] Technology stack fully specified (Next.js 16, Drizzle 0.45, Scrapy 2.16, uv)
 - [x] Integration patterns defined (read/write path, email, ISR, scraper)
 - [x] Performance considerations addressed (NFR-1–3, ISR, Neon serverless)

@@ -31,7 +31,7 @@ The following research findings are adequately captured:
 | Python 3.11 + Scrapy 2.14 stack | Addendum A |
 | FastAPI + PostgreSQL 16 + Next.js 14 App Router | Addendum A, C |
 | APScheduler for cron (vs Celery trade-off) | Addendum A, L |
-| Docker Compose + Hetzner CX21 deployment | PRD §6.1; Addendum C, I |
+| Docker Compose + Hetzner CX21 deployment **superseded by D-8** — current: Vercel + GitHub Actions cron, no VPS (`architecture.md`) | PRD §6.1; Addendum C, I |
 | Modular monolith over microservices | Addendum A, L (with justification) |
 | RODO/PKE 2024 double opt-in requirements | PRD C-1 through C-4, FR-12; Addendum G |
 | PostgreSQL schema (products, price_history, bgg_data, price_alerts, scrape_runs) | Addendum B |
@@ -41,7 +41,7 @@ The following research findings are adequately captured:
 | Fuzzy matching for BGG ID (with confidence threshold) | Addendum D (rapidfuzz, thresholds 0.85/0.7) |
 | CI/CD: GitHub Actions → SSH → docker compose | Addendum J |
 | Scraper health CI workflow (daily selector check) | PRD NFR-6, FR-21 consequences; Addendum J |
-| Infrastructure cost target ~€5–6/month | PRD C-9, C-10; Addendum I |
+| Infrastructure cost target — research ~€5–6/mo (Hetzner) **superseded by D-8**; current C-9 = **€0/mo** free-tier | PRD C-9, C-10; Addendum I (superseded) |
 | Email providers: Brevo / Resend free tiers | Addendum H |
 | Implementation sprint timeline ~8–12 weeks | Addendum K |
 | Operator alert if scraper product count < threshold | PRD FR-21, NFR-8 |

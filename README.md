@@ -97,7 +97,7 @@ Projekt przeszedł pełny proces planowania BMad Method:
 ✅ PRD
 ✅ UX Design
 ✅ Architektura
-✅ Epiki i Stories (50 historyjek, 8 epiców)
+✅ Epiki i Stories (51 historyjek, 8 epiców)
 ✅ Implementation Readiness Check (wszystkie 8 epiców: GO)
 ⬜ Implementacja
 ```

@@ -93,10 +93,10 @@ NFR-8: If a Store's scraped product count falls below 80% of its 7-day rolling a
 - **GitHub Actions workflows:** `scraper.yml` (cron `0 6 * * *`: Scrapy → Neon → alert check → Brevo → revalidate Vercel); `selector-health.yml` (cron `0 8 * * *`: daily smoke test, NFR-6); `maintenance.yml` (weekly Sunday 3am UTC: data retention); `validate-workflows.yml` (push/PR: YAML lint, timeout ≤ 14 min for NFR-2).
 - **ISR on-demand revalidation:** POST `/api/revalidate` with `REVALIDATION_SECRET` header; `--retry 3` from scraper.yml; fallback TTL 2h.
 - **RODO consent_log:** append-only table, SHA-256 email hash, 6 action types (`opt_in_requested`, `opt_in_confirmed`, `unsubscribed`, `suppressed`, `suppression_overridden`, `reactivated`), indexed on (email_hash, created_at). Never DELETE from this table.
-- **RODO email_suppressions:** hard_bounce and complaint are permanent. user_request suppression can be overridden (DELETE suppression + INSERT consent_log event).
-- **Data retention policy (maintenance.yml):** IP anonymization in consent_log after 12 months; email SHA-256 anonymization in email_suppressions after 3 years; scrape_runs DELETE after 90 days; consent_log DELETE after 5 years.
+- **RODO email_suppressions:** stores the **raw email** (not hashed — matched by the alert-engine join in arch L-3); `reason` is one of `hard_bounce`, `complaint` (permanent), `user_request`, `global_optout` (both overridable via conscious resubscription: DELETE suppression + INSERT consent_log `suppression_overridden`).
+- **Data retention policy (maintenance.yml):** `ip_hash` NULL in consent_log after 12 months; email SHA-256 anonymization in email_suppressions after 3 years; scrape_runs DELETE after 90 days; consent_log DELETE after 5 years **only for rows whose subscription is no longer active** (no `price_alerts` row with `status = 'active'` for that `email_hash`) — proof of consent for active subscribers is never deleted while processing continues.
 - **Brevo webhook HMAC-SHA256 verification:** timingSafeEqual + 401 on bad signature; hard_bounce and complaint trigger email suppression.
-- **Age restriction checkbox (16+)** on alert subscription form — required but value not stored (data minimization).
+- **Age restriction checkbox (16+)** on alert subscription form — required (submission rejected if unchecked); not stored as a separate flag — the `opt_in_requested` consent_log row is the durable proof the attestation passed (data minimization without losing accountability).
 - **ESLint no-restricted-imports** enforcing DB access boundary: only `db/queries/` allowed to import `db/index` (components banned from direct Drizzle access).
 - **assertNever pattern** required in every TypeScript switch on `.$type<>()` enum fields.
 - **db_health.py** monitoring: SELECT pg_database_size(), alert when > 400MB.
@@ -436,7 +436,15 @@ So that Dev B can immediately write matching Pydantic models and both devs share
 
 **Given** the `consent_log` table
 **When** reviewed
-**Then** `email_hash` is `text` (stores SHA-256, never raw email), `action` supports exactly 6 values, index exists on `(email_hash, created_at)`, table is marked append-only in `CLAUDE.md`
+**Then** `email_hash` is `text` (stores SHA-256, never raw email), `ip_hash` is nullable `text` (SHA-256 of IP, never raw IP; NULLed after 12 months), `action` supports exactly 6 values (`opt_in_requested`, `opt_in_confirmed`, `unsubscribed`, `suppressed`, `suppression_overridden`, `reactivated`), index exists on `(email_hash, created_at)`, table is marked append-only in `CLAUDE.md`
+
+**Given** the `price_alerts` table
+**When** reviewed
+**Then** it has **both** `email` (`text`, raw — required to send the notification and for the suppression join in arch L-3) **and** `email_hash` (`text`, SHA-256(email) — used by the `(email_hash, game_id)` unique dedup index and by the consent_log 5-year retention guard in L-5); a unique constraint on `(email_hash, game_id)`; `status` is `text.$type<'pending_doi'|'active'|'cancelled'>()`; `confirmation_token` is UUID; `target_price` is `NUMERIC(10,2)`
+
+**Given** the `email_suppressions` table
+**When** reviewed
+**Then** `email` is `text` stored **raw** (matched by the L-3 join; anonymized to SHA-256 only after 3 years per L-5), `reason` is `text.$type<'hard_bounce'|'complaint'|'user_request'|'global_optout'>()`, `is_anonymized` boolean defaults false
 
 **Given** GitHub Secrets and Vercel env vars
 **When** configured
@@ -461,7 +469,7 @@ So that code quality and RODO data retention compliance are enforced automatical
 
 **Given** `.github/workflows/maintenance.yml`
 **When** triggered on `cron: '0 3 * * 0'` (Sunday 3am UTC)
-**Then** it runs 4 ordered steps: (1) `SET ip_address = NULL` in `consent_log` for records older than 12 months, (2) SHA-256 anonymization in `email_suppressions` for records older than 3 years, (3) `DELETE FROM scrape_runs` older than 90 days, (4) `DELETE FROM consent_log` older than 5 years
+**Then** it runs 4 ordered steps: (1) `SET ip_hash = NULL` in `consent_log` for records older than 12 months, (2) SHA-256 anonymization in `email_suppressions` for records older than 3 years, (3) `DELETE FROM scrape_runs` older than 90 days, (4) `DELETE FROM consent_log` older than 5 years **only where no `price_alerts` row with `status = 'active'` exists for that `email_hash`** (never delete proof of consent for an active subscriber)
 **And** each step INSERTs a row into `data_retention_log` recording `run_at` and `rows_affected`
 **And** workflow has `timeout-minutes: 10`
 
@@ -1579,6 +1587,8 @@ So that Google can discover and index all Game Passports without configuration g
 | 6.5   | Dev B         | po 6.4                        |
 | 6.6   | Dev B         | po 6.5                        |
 | 6.7   | Dev B         | po 6.5                        |
+| 6.8   | Dev A         | po 6.3                        |
+| 6.9   | Dev A         | przed pierwszą subskrypcją (gate launch) |
 
 **Tor Dev A** (6.1 AlertForm → 6.2 → 6.3) i **Tor Dev B** (6.1 API+DB równolegle, potem 6.4 → 6.5 → 6.6) — łączą się w 6.5 (alert engine wywołuje Brevo client).
 
@@ -1602,12 +1612,12 @@ So that I'll be notified when the price drops to a level I'm willing to pay.
 
 **Given** `AlertModal` open (State 1 — Form)
 **When** displayed
-**Then** it shows: email input (`type="email"`, placeholder "twój@email.pl"), price threshold input (`type="number"`, suffix "zł", range slider 50 zł → current retail price), Type B checkbox ("Powiadamiaj też o przecenach > 50%" — default checked), age checkbox ("Mam ukończone 16 lat" — required, value not stored — data minimization), "Powiadom mnie" CTA button
+**Then** it shows: email input (`type="email"`, placeholder "twój@email.pl"), price threshold input (`type="number"`, suffix "zł", range slider 50 zł → current retail price), Type B checkbox ("Powiadamiaj też o przecenach > 50%" — default checked), age checkbox ("Mam ukończone 16 lat" — required; submission rejected if unchecked; attestation evidenced by the resulting `consent_log` opt_in_requested row — no separate flag stored), "Powiadom mnie" CTA button
 **And** RODO consent checkbox: "Wyrażam zgodę na przetwarzanie adresu e-mail w celu wysyłki powiadomienia o cenie" — required, not pre-checked (PKE 2024)
 
 **Given** user submits the form with valid email, price, and checked consent
 **When** `POST /api/alerts` fires
-**Then** the API: validates email format, validates price > 0, checks `email_suppressions` for global opt-out (if present → return 200 with generic "sprawdź skrzynkę" message — no info leak), inserts `price_alerts` row with `status = 'pending_doi'`, inserts `consent_log` row with `SHA-256(email)`, `action = 'subscribe_request'`, `ip_hash = SHA-256(ip)`, `timestamp`, then calls Brevo to send DOI email (fire-and-forget, response not awaited)
+**Then** the API: validates email format, validates price > 0, validates that both the consent checkbox and the 16+ age checkbox were checked (submission rejected with 400 if either is missing — the resulting `consent_log` row is the durable proof both attestations passed), checks `email_suppressions` for global opt-out (if present → return 200 with generic "sprawdź skrzynkę" message — no info leak), inserts `price_alerts` row with `status = 'pending_doi'`, inserts `consent_log` row with `SHA-256(email)`, `action = 'opt_in_requested'`, `ip_hash = SHA-256(ip)`, `timestamp`, then calls Brevo to send the DOI email **and awaits the result**; on send failure the row stays `status = 'pending_doi'`, an operator-visible error is logged (email never in plaintext — only `SHA-256(email)[:8]`), and the API still returns the same generic 200 (no enumeration)
 **And** API returns `200 { message: "Sprawdź skrzynkę i potwierdź otrzymywanie powiadomień" }` — identical message regardless of email_suppressions hit
 
 **Given** user submits with invalid email
@@ -1640,7 +1650,7 @@ So that I'm sure I'll receive notifications and no one can activate alerts using
 
 **Given** `GET /api/alerts/confirm?token=<uuid>`
 **When** called with a valid, unexpired token (48h window from creation)
-**Then** it updates `price_alerts.status = 'active'`, writes `consent_log` row with `action = 'doi_confirmed'`, redirects to `/alerts/confirmed`
+**Then** it updates `price_alerts.status = 'active'`, writes `consent_log` row with `action = 'opt_in_confirmed'`, redirects to `/alerts/confirmed`
 
 **Given** `GET /api/alerts/confirm?token=<uuid>`
 **When** called with an expired token (> 48h) or token not found
@@ -1680,7 +1690,7 @@ So that I can stop receiving them at any time without needing to log in.
 
 **Given** user clicks "Wyłącz wszystkie powiadomienia"
 **When** confirmed (single confirm dialog / inline expand — no modal)
-**Then** `POST /api/alerts/unsubscribe-all` fires: sets all `price_alerts` for that email to `status = 'cancelled'`, inserts row in `email_suppressions` with `SHA-256(email)` and `reason = 'global_optout'`
+**Then** `POST /api/alerts/unsubscribe-all` fires: sets all `price_alerts` for that email to `status = 'cancelled'`, inserts row in `email_suppressions` with the **raw email address** (not hashed — the alert-engine suppression join in arch L-3 matches on raw email; the row is anonymized after 3 years per L-5) and `reason = 'global_optout'`, and writes a `consent_log` row with `action = 'suppressed'`, `SHA-256(email)`, timestamp (L-4 rule: every `email_suppressions` write has a matching `consent_log` entry)
 **And** future `POST /api/alerts` calls with this email return 200 with generic message but never insert to DB (email_suppressions check in Story 6.1)
 
 **Given** an unsubscribe token that's expired or invalid
@@ -1689,7 +1699,7 @@ So that I can stop receiving them at any time without needing to log in.
 
 **Given** RODO data retention
 **When** `consent_log` is reviewed
-**Then** all unsubscribe events are present with `action = 'unsubscribed'` or `action = 'global_optout'` — append-only, no deletes — compliance audit trail intact
+**Then** all unsubscribe events are present with `action = 'unsubscribed'` (per-alert) or `action = 'suppressed'` (global opt-out) — append-only, no deletes — compliance audit trail intact
 
 ---
 
@@ -1844,11 +1854,11 @@ So that we stay RODO/PKE 2024 compliant and our sender reputation is protected.
 
 **Given** `POST /api/webhooks/brevo` with a valid HMAC-SHA256 signature in `X-Brevo-Signature` header
 **When** event type is `hard_bounce`
-**Then** route inserts a row into `email_suppressions` with `SHA-256(email)` and `reason = 'hard_bounce'` (if not already suppressed), returns `200 { ok: true }`
+**Then** route inserts a row into `email_suppressions` with the **raw email** (not hashed — alert-engine join in arch L-3 matches on raw email) and `reason = 'hard_bounce'` (if not already suppressed), **and** writes a `consent_log` row (`action = 'suppressed'`, `SHA-256(email)`, `source = 'brevo_webhook'`) in the same transaction (L-4 rule), returns `200 { ok: true }`
 
 **Given** `POST /api/webhooks/brevo` with a valid signature
 **When** event type is `complaint`
-**Then** route inserts a row into `email_suppressions` with `SHA-256(email)` and `reason = 'complaint'` (if not already suppressed), returns `200 { ok: true }`
+**Then** route inserts a row into `email_suppressions` with the **raw email** (not hashed — see L-3) and `reason = 'complaint'` (if not already suppressed), **and** writes a `consent_log` row (`action = 'suppressed'`, `SHA-256(email)`, `source = 'brevo_webhook'`) in the same transaction (L-4 rule), returns `200 { ok: true }`
 
 **Given** `POST /api/webhooks/brevo`
 **When** `X-Brevo-Signature` header is missing or does not match `HMAC-SHA256(body, BREVO_WEBHOOK_SECRET)` verified with `timingSafeEqual`
@@ -1864,7 +1874,44 @@ So that we stay RODO/PKE 2024 compliant and our sender reputation is protected.
 
 **Given** `app/api/webhooks/brevo/route.test.ts`
 **When** run
-**Then** covers: valid hard_bounce inserts suppression, valid complaint inserts suppression, bad signature returns 401, unknown event type returns 200 no-op, missing secret returns 500, duplicate suppression (already suppressed email) does not throw
+**Then** covers: valid hard_bounce inserts suppression + consent_log 'suppressed' row, valid complaint inserts suppression + consent_log 'suppressed' row, bad signature returns 401, unknown event type returns 200 no-op, missing secret returns 500, duplicate suppression (already suppressed email) does not throw
+
+---
+
+### Story 6.9: Dokumenty Prawne — Privacy Policy, Regulamin, Cookie Policy, GDPR Procedure
+
+**Dev: Dev A (Web)** — _pliki: `app/polityka-prywatnosci/page.tsx`, `app/regulamin/page.tsx`, `app/polityka-cookies/page.tsx`, `docs/GDPR_PROCEDURE.md`, `components/SiteFooter.tsx` (linki)_
+_(blokuje launch — musi być Done zanim przyjmiemy pierwszą subskrypcję email; satysfakcjonuje PRD C-11–C-15)_
+
+As a **data controller**,
+I want published Privacy Policy, Regulamin, and Cookie Policy plus an internal GDPR runbook,
+So that consent is informed and lawful and we can answer rights requests and breaches within statutory deadlines.
+
+**Acceptance Criteria:**
+
+**Given** `/polityka-prywatnosci` (Privacy Policy)
+**When** rendered
+**Then** it states: the named **data controller** (administrator danych) and contact `privacy@[domena]` (PRD C-11); categories of data processed (email, `ip_hash`) and legal basis (zgoda — art. 6 ust. 1 lit. a); retention periods matching arch L-5; the list of processors (Brevo, Neon, Vercel, GitHub) and that data stays in the EU (PRD C-12, arch L-15); the rights procedure and 30-day SLA (arch L-6); the 16+ age restriction (arch L-8); a "Cookies" section consistent with the Cookie Policy
+
+**Given** the subscription consent text (Story 6.1) and the site footer
+**When** rendered
+**Then** both name the data controller and link to `/polityka-prywatnosci` — consent is informed (PRD C-11); footer also links `/regulamin` and `/polityka-cookies`
+
+**Given** `/polityka-cookies` (Cookie Policy)
+**When** rendered
+**Then** it declares that MVP sets **only essential technical cookies** and uses **no identifying analytics** (arch L-16); states that any future non-essential cookie/analytics requires an opt-in consent banner before the script loads
+
+**Given** `/regulamin` (Terms of Service)
+**When** rendered
+**Then** it covers: scope of the free service, no-account model, that prices are scraped/cached and may be stale (NFR-5), affiliate/redirect disclosure if applicable, limitation of liability, and BGG non-commercial data attribution
+
+**Given** `docs/GDPR_PROCEDURE.md` (internal runbook — not public)
+**When** reviewed
+**Then** it contains: (1) rights-request handling (art. 15–22) with the manual erasure/anonymization steps and 30-day SLA (L-6); (2) the **art. 30** records-of-processing register (L-14); (3) links to each processor **DPA** (art. 28, L-14); (4) the **72-hour breach-notification** procedure to UODO with a breach register (art. 33/34, L-13)
+
+**Given** the launch gate
+**When** Epic 6 is marked ready to accept live subscriptions
+**Then** Story 6.9 must be Done — no email subscription is accepted before the Privacy Policy and consent linkage are live (PRD C-15)
 
 ---
 

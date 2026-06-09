@@ -2,6 +2,8 @@
 
 *Techniczna głębokość, opcje odrzucone, decyzje architektoniczne — materiał dla Architecture i sprint planowania. Nie należy do PRD.*
 
+> **⚠️ STACK INFRASTRUKTURALNY SUPERSEDED (decyzja D-8 + `architecture.md`).** Warstwa wdrożeniowa/backendowa opisana w tym addendum (FastAPI, Next.js 14, **Hetzner CX21 VPS ~€5–6/mies.**, Docker Compose, APScheduler, SQLAlchemy) została **wycofana**. Obowiązuje stos z `architecture.md`: Vercel API Routes + Server Components (bez FastAPI), Next.js 16, **Neon free + Vercel Hobby + GitHub Actions cron — koszt operacyjny €0/mies.** (PRD C-9). Diagramy, blok „A. stack", sekcja „I. Koszty" i krok „Deploy to Hetzner VPS" poniżej to **kontekst historyczny**. Nadal aktualne pozostają części domenowe: model RODO (G), badania scrapingu/etyki (E, L), BGG/EAN (D, F), porównanie email (H).
+
 ---
 
 ## A. Rekomendowany stack techniczny
@@ -317,7 +319,9 @@ class PriceAlertCreate(BaseModel):
 
 ## I. Koszty infrastruktury
 
-**MVP stack (najtańszy działający):**
+> **⚠️ SUPERSEDED (decyzja D-8):** Model Hetzner VPS (~€5–6/mies.) poniżej został **wycofany**. MVP nie używa VPS — działa na free-tier stacku (GitHub Actions + Neon free + Vercel Hobby + Brevo free), koszt operacyjny **€0/mies.** (PRD C-9). Tabela „MVP stack" poniżej zachowana wyłącznie jako kontekst historyczny / dolny punkt ścieżki skalowania. Rejestracja domeny (~€10/rok) to koszt **roczny** poza miesięcznym targetem operacyjnym — nie wlicza się do €0.
+
+**Model historyczny (Hetzner — wycofany D-8):**
 
 | Komponent | Rozwiązanie | Koszt/mies. |
 |---|---|---|
@@ -326,6 +330,17 @@ class PriceAlertCreate(BaseModel):
 | Email | Brevo free tier | $0 |
 | Domena | ~$10/rok | ~$0.83 |
 | **Łącznie** | | **~€5–6/mies.** |
+
+**Aktualny model MVP (free-tier, D-8):**
+
+| Komponent | Rozwiązanie | Koszt/mies. |
+|---|---|---|
+| Backend/API + frontend | Vercel Hobby (free) | €0 |
+| Scraper cron | GitHub Actions (free, public repo) | €0 |
+| Baza danych | Neon free (0.5GB, region EU) | €0 |
+| Email | Brevo free tier (300/dzień) | €0 |
+| **Łącznie (operacyjnie)** | | **€0/mies.** |
+| Domena (poza targetem) | ~$10/rok | roczny |
 
 **Ścieżka skalowania:**
 

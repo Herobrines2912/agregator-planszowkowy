@@ -368,7 +368,7 @@ When a Game is first linked to a BGG ID, the system fetches and caches BGG metad
 - BGG API enrichment with registered Bearer Token
 - RODO-compliant Double Opt-In for all email subscriptions
 - Operator scraper health alerts
-- GitHub Actions + Neon free + Vercel Hobby deployment (≤€10/month target)
+- GitHub Actions + Neon free + Vercel Hobby deployment (€0/month operating target on free tiers)
 
 ### 6.2 Out of Scope for MVP
 
@@ -412,6 +412,11 @@ When a Game is first linked to a BGG ID, the system fetches and caches BGG metad
 - **C-2:** Unsubscribed emails are retained on a per-subscription-type suppression list; they are not deleted on unsubscribe. Deletion is a separate RODO Art. 17 erasure request.
 - **C-3:** Stored data per subscription is minimized to: email address, game_id, alert type, price threshold (Type A only), unsubscribe token, confirmed flag, and timestamps. No other personal data is collected or stored.
 - **C-4:** Unconfirmed subscriptions expire after 48 hours. Confirmed subscriptions are retained until unsubscribed or explicitly erased.
+- **C-11:** A named **data controller** (administrator danych) is published in the Privacy Policy, the site footer, and the subscription consent text, contactable at `privacy@[domena]`. `[OPERATOR_IDENTITY]` is a pre-launch blocker: confirm whether the controller is an individual or a registered entity — it determines personal liability and the breach-reporting contact (architecture L-13/L-14).
+- **C-12:** All personal data (email, `ip_hash`) is stored and processed **only in the EU region** — Neon EU project, Vercel EU functions, Brevo EU servers. Any component on a non-EU region requires documented SCCs before launch (architecture L-15).
+- **C-13:** A signed/accepted **DPA (art. 28)** exists for every processor (Brevo, Neon, Vercel, GitHub) and a **records-of-processing register (art. 30)** plus a **72-hour breach-notification procedure (art. 33/34)** are documented in `docs/GDPR_PROCEDURE.md` before launch (architecture L-13/L-14).
+- **C-14:** MVP sets **no non-essential cookies** and uses **no identifying analytics**. Introducing either requires an opt-in consent banner loaded before the script (architecture L-16).
+- **C-15:** A **Privacy Policy, Regulamin (Terms), and Cookie Policy** are authored and published before the first email subscription can be accepted (covered by Story 6.9).
 
 ### 8.2 Scraping Ethics
 
@@ -422,7 +427,7 @@ When a Game is first linked to a BGG ID, the system fetches and caches BGG metad
 
 ### 8.3 Cost
 
-- **C-9:** Infrastructure operating cost target for MVP ≤€10 / month (GitHub Actions + Neon free + Vercel Hobby free + Brevo free tier — €0 on free tiers; ≤€10 budget exists for any required paid upgrade).
+- **C-9:** Infrastructure **operating** cost target for MVP = **€0 / month**. GitHub Actions + Neon free + Vercel Hobby free + Brevo free tier carry the full MVP load at €0/month (decision D-8). Excluded from this monthly operating target — and therefore **not** a violation of it: one-time/annual costs such as domain registration (~€10/year) and the abandoned Hetzner VPS (the €5–6/month figure in Addendum I is superseded; the architecture uses no VPS). Any move to a paid tier is a deliberate scaling decision (Addendum I scaling path), tracked separately, not part of the MVP target.
 - **C-10:** No external paid services (residential proxies, managed databases, commercial anti-bot tools) are used in MVP.
 
 ---

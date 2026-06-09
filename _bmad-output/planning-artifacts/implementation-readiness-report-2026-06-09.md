@@ -111,7 +111,7 @@ NFR-8: If a Store's scraped product count falls below 80% of its 7-day rolling a
 - C-8: Rebel.pl robots.txt restrictions not circumvented in v1.
 
 **Cost Constraints:**
-- C-9: Infrastructure operating cost target €0/month (GitHub Actions + Neon free + Vercel Hobby free + Brevo free tier). [Addendum revised to ~€5–6/month with Hetzner CX21 VPS.]
+- C-9: Infrastructure operating cost target €0/month (GitHub Actions + Neon free + Vercel Hobby free + Brevo free tier). [Addendum I's ~€5–6/month Hetzner CX21 figure is **superseded** by decision D-8 — the architecture provisions no VPS; domain registration is an annual cost outside the monthly operating target.]
 - C-10: No external paid services (proxies, managed DBs, commercial anti-bot) in MVP.
 
 **Technical Constraints (from Addendum):**
@@ -228,9 +228,9 @@ Story 3.1 builds a search bar in the sticky header (`aria-label="Szukaj gry"`). 
 
 **Recommendation:** Either (a) add a story defining search behavior (at minimum: "typing in search bar with Enter navigates to /gra/{slug}" or a simple game-name filter), or (b) explicitly document in Story 3.1 ACs that the search bar is a non-functional placeholder in MVP ("search is Phase 2 — input renders but does not respond to input events except focus styling"). Leaving it ambiguous creates implementation debt.
 
-#### Gap #7 — Cost Constraint C-9 Mismatch (LOW, Known)
+#### Gap #7 — Cost Constraint C-9 vs Stale Addendum (LOW, Resolved)
 
-PRD C-9 states "Infrastructure cost target €0/month." Addendum and architecture use Hetzner CX21 at ~€4.50/month + domain ~€0.83/month = ~€5–6/month. The constraint is internally contradicted by the recommended stack. No story resolves this — it should be treated as a PRD update (change C-9 to "≤ €10/month") rather than an implementation blocker.
+PRD C-9 correctly states the MVP **operating** cost target is €0/month, met by the free-tier stack (GitHub Actions + Neon + Vercel Hobby + Brevo) per decision **D-8**. The ~€5–6/month figure in **Addendum I** (Hetzner CX21 + amortized domain) is **stale**: D-8 retired the Hetzner model and the architecture provisions no VPS. That figure also wrongly folded an *annual* domain registration into a *monthly* operating cost. **Resolution:** keep C-9 = €0/month operating; mark Addendum I superseded; treat domain registration as an out-of-scope annual cost. The earlier revision of C-9 to "≤€10/month" is **reverted** — it weakened a correct product constraint by anchoring on the stale document instead of fixing it.
 
 ### Coverage Statistics
 
@@ -452,9 +452,9 @@ Story 5.1 DB query accepts `'1M' | '3M' | '6M' | '1Y' | 'ALL'`. Story 5.2 TimeRa
 
 ### PRD Completeness Assessment
 
-The PRD is thorough and well-structured. All 24 FRs are clearly numbered with testable consequences. NFRs are quantified with concrete metrics. Constraints are explicit. The Addendum provides technical depth that complements rather than contradicts the PRD. The cost constraint in §8.3 (C-9: €0/month) conflicts with the Addendum's actual revised infrastructure cost (~€5–6/month with Hetzner VPS), which is a minor but noted inconsistency. Three open questions (OQ-2, OQ-5, OQ-7) represent genuine implementation blockers that will need to be tracked against the epic coverage.
+The PRD is thorough and well-structured. All 24 FRs are clearly numbered with testable consequences. NFRs are quantified with concrete metrics. Constraints are explicit. The Addendum provides technical depth that complements rather than contradicts the PRD. The cost constraint in §8.3 (C-9: €0/month) is correct for the free-tier stack; Addendum I's ~€5–6/month Hetzner figure is stale (superseded by D-8) and is the document to fix, not the constraint. Three open questions (OQ-2, OQ-5, OQ-7) represent genuine implementation blockers that will need to be tracked against the epic coverage.
 
-**PRD quality: HIGH.** The document is one of the strongest artifacts in the project. The main issue is that three items need cosmetic updates to reflect decisions already made in architecture and UX: (1) FR-16 consequence text about "not a separate URL," (2) C-9 cost target, and (3) the `/nadchodzi` vs `/nadchodzace` path.
+**PRD quality: HIGH.** The document is one of the strongest artifacts in the project. The main issue is that three items need cosmetic updates to reflect decisions already made in architecture and UX: (1) FR-16 consequence text about "not a separate URL," (2) Addendum I cost table (mark the Hetzner €5–6/month superseded by D-8's free-tier €0 — C-9 itself stays €0), and (3) the `/nadchodzi` vs `/nadchodzace` path.
 
 ---
 
@@ -498,7 +498,7 @@ The project documentation is well above average quality and largely ready for im
 | 12 | ~~**Filter panel behavior undefined** (UX-04)~~ ✅ RESOLVED — AC added to Story 3.4: "Filtry button is non-functional in MVP — Phase 2 feature" | ~~Define in Story 3.4 ACs~~ Done |
 | 13 | ~~**Search bar non-functional** (Gap #6 / UX-06)~~ ✅ RESOLVED — AC added to Story 3.1: search input is non-functional placeholder in MVP | ~~Add AC to Story 3.1~~ Done |
 | 14 | ~~**Hamburger menu content undefined** (UX-07)~~ ✅ RESOLVED — AC added to Story 3.1: hamburger is non-functional placeholder in MVP | ~~Add AC to Story 3.1~~ Done |
-| 15 | ~~**Cost constraint C-9 mismatch** (Gap #7)~~ ✅ RESOLVED — PRD C-9 updated from €0/month to ≤€10/month | ~~Update PRD C-9~~ Done |
+| 15 | ~~**Cost constraint C-9 mismatch** (Gap #7)~~ ✅ RESOLVED — C-9 kept at €0/month operating (D-8); Addendum I Hetzner €5–6 marked superseded; domain treated as annual cost outside the target. Prior ≤€10/month change **reverted**. | ~~Update Addendum I; keep C-9 €0~~ Done |
 
 ---
 
