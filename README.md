@@ -84,6 +84,7 @@ Projekt przeszedł pełny proces planowania BMad Method:
 | PRD | `_bmad-output/planning-artifacts/prds/` |
 | UX Design | `_bmad-output/planning-artifacts/ux-designs/` |
 | Architektura | `_bmad-output/planning-artifacts/architecture.md` |
+| Epiki i Stories | `_bmad-output/planning-artifacts/epics.md` |
 
 ---
 
@@ -95,7 +96,7 @@ Projekt przeszedł pełny proces planowania BMad Method:
 ✅ PRD
 ✅ UX Design
 ✅ Architektura
-🔜 Epiki i Stories
+✅ Epiki i Stories (50 historyjek, 8 epiców)
 ⬜ Implementacja
 ```
 
@@ -112,7 +113,7 @@ Projekt przeszedł pełny proces planowania BMad Method:
 
 ## Wkład w projekt
 
-Projekt jest w fazie przygotowania do implementacji. Jeśli chcesz pomóc lub masz pytania — otwórz Issue.
+Projekt jest gotowy do implementacji — planowanie zakończone. Jeśli chcesz pomóc lub masz pytania — otwórz Issue.
 
 ---
 
