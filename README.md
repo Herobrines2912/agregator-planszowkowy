@@ -55,10 +55,28 @@ Preordery i nowości ze sklepów z alertem "powiadom gdy dostępne".
 | Walidacja (scraper) | Pydantic v2 |
 | Email | Brevo (free tier, EU serwery) |
 | CI / cron | GitHub Actions |
-| Hosting | Vercel (free tier) |
-| Koszt infrastruktury | €0 / miesiąc |
+| Hosting | Vercel (Hobby) — wybór architektoniczny, nie tylko free tier |
+| Koszt infrastruktury | €0 / miesiąc operacyjnie na starcie (patrz drabina kosztów) |
 
 Monorepo: `/web` (Next.js) + `/scraper` (Python). Drizzle `schema.ts` jako wspólny kontrakt między modułami.
+
+---
+
+## Hosting i koszty
+
+Hostingu wymaga **wyłącznie aplikacja Next.js** — baza to Neon (managed), scraper to GitHub Actions (cron), email to Brevo. Żaden z nich nie jest wynajętym serwerem. Vercel to świadomy wybór architektoniczny (ISR on-demand, region EU `fra1` dla RODO, Edge Middleware), nie tylko „darmowy tier" — VPS odrzucony, bo nic tu nie potrzebuje stałego serwera.
+
+**Start (operacyjnie €0/mies.):** Vercel Hobby + Neon Free (0.5 GB, Frankfurt) + GitHub Actions + Brevo Free. Legalne bezterminowo dopóki projekt jest non-commercial.
+
+**Drabina upgrade'ów — płatne tylko przy konkretnym triggerze:**
+
+| Trigger | Upgrade | Koszt |
+|---|---|---|
+| Afiliacja / użytek komercyjny | Vercel Pro | $20/mies. |
+| Baza > 0.5 GB lub > 100 CU-h | Neon Launch (always-on) | ~$19/mies. |
+| Publiczny launch z własną marką | Domena `.pl` (patrz niżej) | ~73 zł/rok |
+
+**Domena (na publiczny launch):** kluczowa jest cena **odnowienia**, nie promo za 1. rok. Rekomendacja: **OVHcloud** (~73 zł brutto/rok, stabilne ceny, akredytowany partner NASK). SEOhost OK (~85 zł/rok). **Unikać** nazwa.pl / home.pl / cyberFolks — promo „1 zł" → odnowienie 170–246 zł/rok. Cloudflare/Porkbun/Namecheap nie obsługują `.pl`. Do Vercel wystarczy darmowy panel DNS (`CNAME → cname.vercel-dns.com`); opcjonalnie Cloudflare DNS (free) dla CDN/DDoS.
 
 ---
 

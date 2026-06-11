@@ -51,7 +51,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 
 ### Technical Constraints & Dependencies
 
-- **Infrastructure budget: €0/miesiąc** (fully free target) — GitHub Actions + Neon + Vercel + Brevo
+- **Infrastructure budget: €0/miesiąc operacyjnie na starcie** (Vercel Hobby + Neon Free + GitHub Actions + Brevo). Hosting to świadoma decyzja, nie tylko „darmowy tier" — patrz sekcja Infrastructure & Deployment. Jedyny pewny koszt to domena (~€12/rok, poza targetem operacyjnym). Płatne tiery uruchamiane wyłącznie przy konkretnych triggerach (komercjalizacja → Vercel Pro; >0.5 GB → Neon Launch).
 - **BGG API Bearer Token** wymagany przed Sprint 1 — hard blocker na Game Passport, deduplication, DLC warning (A-6)
 - **Brak kont użytkownika w v1** — cała personalizacja przez email tokens (unsubscribe, opt-in)
 - **Scraping etyka:** robots.txt + crawl-delay per sklep; descriptive User-Agent; Rebel.pl poza MVP
@@ -218,8 +218,26 @@ cd ..
 
 ### Infrastructure & Deployment
 
-- **Repo:** Public (unlimited GH Actions; wzmacnia BGG non-commercial claim)
-- **Hosting:** Vercel free (web) + GitHub Actions free (scraper cron) + Neon free 0.5GB (DB) + Brevo free (email)
+**Decyzja hostingowa (świadoma, nie domyślny free-tier):** Vercel jako host aplikacji Next.js — nie z powodu darmowości, lecz dopasowania architektonicznego. Cała architektura jest Vercel-natywna: ADR-002 (API Routes), ADR-003 (ISR on-demand `revalidateTag`), L-15 (przypięcie regionu `fra1` dla tras z danymi osobowymi — RODO), Edge Middleware do rate-limitingu alertów.
+
+**Rozważone i odrzucone alternatywy:**
+- **VPS (Hetzner/Oracle):** Odrzucone — nic w architekturze nie wymaga stałego serwera. Scraper to zadanie cron na GitHub Actions (runner umiera po cyklu), nie demon. VPS = płacenie za serwer bezczynny ~23h/dobę + narzut DevOps (patching, backupy, security updates, single point of failure).
+- **Cloudflare Workers:** Odrzucone twardo — przypięcie compute do EU (Regional Services) jest tylko w planie Enterprise. Trasy z danymi osobowymi działałyby na losowym PoP globalnie (w tym USA) → łamie L-15.
+- **Netlify:** Działa przez OpenNext, ale wymaga przeróbki decyzji Vercel-specyficznych przy zerowej oszczędności (Hobby €0 < Netlify $9; Pro $20 ≈ Netlify $19). Argument „CLOUD Act" nie różnicuje — Vercel i Netlify to obie spółki US, RODO zaadresowane przez region EU + DPA/SCC (L-14/L-15).
+
+**Co wymaga hostingu:** wyłącznie aplikacja Next.js. Baza = Neon (managed), scraper = GitHub Actions (cron), email = Brevo — żaden z nich nie jest „hostingiem" w sensie wynajętego serwera.
+
+**Stack na starcie (operacyjnie €0/mies.):** Vercel Hobby (web) + GitHub Actions free (scraper cron) + Neon Free 0.5GB region Frankfurt (DB) + Brevo free (email). Vercel Hobby jest legalny bezterminowo dopóki projekt pozostaje non-commercial (README/PRD definiują go jako open-source hobby).
+
+**Drabina upgrade'ów (niezależne triggery — płacić tylko gdy realnie potrzeba):**
+
+| Trigger | Upgrade | Koszt |
+|---|---|---|
+| Dodanie afiliacji / użytek komercyjny | Vercel Pro | $20/mies. |
+| Przekroczenie 0.5 GB lub 100 CU-h w Neon | Neon Launch (always-on compute) | ~$19/mies. |
+| Publiczny launch z własną marką | Domena `agregatorplanszowek.pl` (SEOhost) | ~€12/rok |
+
+**Neon cold-start a NFR-1/NFR-3:** Free tier usypia compute po 5 min bezczynności (wybudzenie: mediana ~500 ms, p95 ~2.6 s). Nie narusza NFR — strony są ISR serwowane z cache Vercel, nie z bazy. Cold start dotyka tylko regeneracji ISR w tle (non-blocking, stale-while-revalidate) i rzadkiego zapisu z formularza alertu — żadne na krytycznej ścieżce LCP/SEO. Trigger upgrade'u Neon to pojemność/CU-godziny, nie latencja.
 - **GitHub Actions workflows:**
   ```
   .github/workflows/
@@ -1168,7 +1186,7 @@ Naming conventions dla DB, TypeScript i Python. Canonical API routes. Error hand
 - Boring technology stack — wysoki pattern-match z treningowymi danymi AI agentów
 - Mechaniczna egzekucja konwencji (ESLint, YAML lint, assertNever, drizzle-kit)
 - RODO compliance od dnia 1 z audit trail (consent_log)
-- Free infra €0/mies. z jasną ścieżką upgrade (każdy komponent ma płatny tier)
+- Infra €0/mies. operacyjnie na starcie z jasną drabiną upgrade'ów (świadoma decyzja Vercel-natywna, nie domyślny free-tier; triggery: komercjalizacja → Vercel Pro, >0.5 GB → Neon Launch)
 - Scraper↔Web izolacja z jedynym shared contract (schema.ts)
 
 **Areas for Future Enhancement:**
