@@ -8,3 +8,16 @@ _bmad/custom/config.user.toml
 # Pliki robocze z sesji UX (drafty, nie finalne)
 _bmad-output/**/. working/
 _bmad-output/**/.working/
+
+# Web (Next.js) — node_modules i env zarządzane przez web/.gitignore
+web/node_modules/
+web/.next/
+web/.env.local
+
+# Scraper (Python) — środowisko wirtualne uv
+scraper/.venv/
+scraper/.env
+
+# Sekrety i dane lokalne
+*.env.local
+.env
