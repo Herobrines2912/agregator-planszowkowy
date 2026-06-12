@@ -1,4 +1,6 @@
+import { Suspense } from 'react'
 import { DealCard } from '@/components/DealCard'
+import { FilterBar } from '@/components/FilterBar'
 
 const mockDeals = [
   {
@@ -53,6 +55,11 @@ export default function HomePage() {
       >
         Gorące okazje
       </h2>
+
+      <Suspense>
+        <FilterBar resultCount={mockDeals.length} />
+      </Suspense>
+
       <div
         style={{
           display: 'grid',
