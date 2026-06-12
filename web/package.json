@@ -9,7 +9,9 @@
     "lint": "eslint",
     "db:generate": "node --env-file=.env.local node_modules/.bin/drizzle-kit generate",
     "db:migrate": "node --env-file=.env.local node_modules/.bin/drizzle-kit migrate",
-    "db:studio": "node --env-file=.env.local node_modules/.bin/drizzle-kit studio"
+    "db:studio": "node --env-file=.env.local node_modules/.bin/drizzle-kit studio",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.1.0",
@@ -20,13 +22,18 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.2",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.8"
   }
 }
