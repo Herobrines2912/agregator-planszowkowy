@@ -1,26 +1,53 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@theme {
+  /* 16 brand colors */
+  --color-background: #F2EAD8;
+  --color-surface: #DDD0BC;
+  --color-surface-header: #EDE5D4;
+  --color-surface-card: #DDD0BC;
+  --color-primary: #3D5C3A;
+  --color-primary-dark: #2E4A2C;
+  --color-text-primary: #2C1F14;
+  --color-text-secondary: #6B5744;
+  --color-text-muted: #A89480;
+  --color-border: #D4C4AE;
+  --color-border-strong: #C5B49A;
+  --color-badge-hot: #C4622D;
+  --color-badge-discount-low: #3D5C3A;
+  --color-badge-discount-mid: #C07B18;
+  --color-badge-discount-high: #C42B2B;
+  --color-overlay: rgba(44, 31, 20, 0.5);
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 40px;
+  --spacing-2xl: 64px;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Border radius */
+  --radius-sm: 5px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 14px;
+  --radius-full: 9999px;
+
+  /* Shadows — warm brown base, never neutral grey */
+  --shadow-card: 0 2px 8px rgba(44, 31, 20, 0.08), 0 1px 2px rgba(44, 31, 20, 0.05);
+  --shadow-card-hover: 0 8px 28px rgba(44, 31, 20, 0.16), 0 2px 6px rgba(44, 31, 20, 0.08);
+  --shadow-modal: 0 24px 64px rgba(44, 31, 20, 0.28);
+
+  /* Font families */
+  --font-heading: var(--font-playfair), Georgia, serif;
+  --font-body: var(--font-dm-sans), system-ui, sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-background);
+  color: var(--color-text-primary);
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
 }
