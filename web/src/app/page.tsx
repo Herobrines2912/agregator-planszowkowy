@@ -1,6 +1,7 @@
 import { Suspense } from 'react'
 import { DealCard } from '@/components/DealCard'
 import { FilterBar } from '@/components/FilterBar'
+import { ListRow } from '@/components/ListRow'
 
 const mockDeals = [
   {
@@ -41,7 +42,14 @@ const mockDeals = [
   },
 ]
 
-export default function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>
+}) {
+  const { view } = await searchParams
+  const isList = view === 'list'
+
   return (
     <div style={{ padding: '40px' }}>
       <h2
@@ -60,17 +68,25 @@ export default function HomePage() {
         <FilterBar resultCount={mockDeals.length} />
       </Suspense>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-          gap: '20px',
-        }}
-      >
-        {mockDeals.map((deal, i) => (
-          <DealCard key={deal.slug} {...deal} index={i} />
-        ))}
-      </div>
+      {isList ? (
+        <ul style={{ padding: 0, margin: 0, borderTop: '1px solid #D4C4AE', borderRadius: '8px', overflow: 'hidden' }}>
+          {mockDeals.map((deal, i) => (
+            <ListRow key={deal.slug} {...deal} index={i} />
+          ))}
+        </ul>
+      ) : (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            gap: '20px',
+          }}
+        >
+          {mockDeals.map((deal, i) => (
+            <DealCard key={deal.slug} {...deal} index={i} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
