@@ -13,16 +13,13 @@ export async function POST(request: NextRequest) {
     secretBuf.length !== expectedBuf.length ||
     !timingSafeEqual(secretBuf, expectedBuf)
   ) {
-    return Response.json<ApiResponse<never>>(
-      { success: false, error: 'unauthorized' },
-      { status: 401 },
-    )
+    const body: ApiResponse<never> = { success: false, error: 'unauthorized' }
+    return Response.json(body, { status: 401 })
   }
 
   revalidatePath('/gra/[slug]', 'page')
   revalidatePath('/')
 
-  return Response.json<ApiResponse<{ revalidated: true }>>(
-    { success: true, data: { revalidated: true } },
-  )
+  const body: ApiResponse<{ revalidated: true }> = { success: true, data: { revalidated: true } }
+  return Response.json(body)
 }
