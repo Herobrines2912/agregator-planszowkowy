@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { ListRow } from './ListRow'
 import { formatPrice } from '@/lib/format'
 
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
 }))
@@ -59,5 +60,26 @@ describe('ListRow', () => {
     render(<ListRow {...base} price="99.00" price_orig="159.00" />)
     expect(screen.getByText('99 zł')).toBeInTheDocument()
     expect(screen.getByText(formatPrice('159.00'))).toBeInTheDocument()
+  })
+
+  test('CTA ma tekst "Zobacz →"', () => {
+    render(<ListRow {...base} price="129.00" price_orig="219.00" />)
+    expect(screen.getByRole('link', { name: 'Zobacz →' })).toBeInTheDocument()
+  })
+
+  test('isBestDeal dodaje zielony border-left', () => {
+    const { container } = render(
+      <ListRow {...base} price="89.00" price_orig="150.00" isBestDeal />
+    )
+    const li = container.querySelector('li')
+    expect(li).toHaveStyle({ borderLeft: '3px solid #3D5C3A' })
+  })
+
+  test('bez isBestDeal brak wyróżnionego border-left', () => {
+    const { container } = render(
+      <ListRow {...base} price="89.00" price_orig="150.00" />
+    )
+    const li = container.querySelector('li')
+    expect(li).toHaveStyle({ borderLeft: '1px solid #D4C4AE' })
   })
 })

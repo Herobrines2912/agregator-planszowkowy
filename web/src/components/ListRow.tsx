@@ -11,6 +11,10 @@ function badgeColor(discount: number): string {
   return '#C42B2B'
 }
 
+export interface ListRowProps extends DealCardProps {
+  isBestDeal?: boolean
+}
+
 export function ListRow({
   slug,
   game_name,
@@ -20,39 +24,41 @@ export function ListRow({
   store_name,
   store_url,
   index = 0,
-}: DealCardProps) {
+  isBestDeal = false,
+}: ListRowProps) {
   const router = useRouter()
 
   if (!price_orig) return null
 
   const discount = calcDiscount(parseFloat(price), parseFloat(price_orig))
   const isHot = discount > 40
-  const animationDelay = `${index * 40}ms`
+  const animationDelay = `${index * 50}ms`
 
   return (
     <li
+      className="list-row"
       onClick={() => router.push(`/gra/${slug}`)}
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: '14px',
+        gap: '12px',
         padding: '12px 16px',
-        backgroundColor: '#F2EAD8',
-        borderBottom: '1px solid #D4C4AE',
+        backgroundColor: '#DDD0BC',
+        border: '1px solid #D4C4AE',
+        borderLeft: isBestDeal ? '3px solid #3D5C3A' : '1px solid #D4C4AE',
+        borderRadius: '10px',
         cursor: 'pointer',
-        animation: 'fadeInUp 0.4s ease both',
+        animation: 'fadeInUp 0.35s ease both',
         animationDelay,
         listStyle: 'none',
       }}
-      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = '#DDD0BC' }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.backgroundColor = '#F2EAD8' }}
     >
       {/* Cover image */}
       <div
         style={{
           width: '48px',
           height: '48px',
-          borderRadius: '6px',
+          borderRadius: '8px',
           overflow: 'hidden',
           flexShrink: 0,
           background: cover_image_url
@@ -98,6 +104,8 @@ export function ListRow({
                 borderRadius: '4px',
                 flexShrink: 0,
                 letterSpacing: '0.4px',
+                transform: 'rotate(-2deg)',
+                display: 'inline-block',
               }}
             >
               HOT
@@ -150,7 +158,7 @@ export function ListRow({
             whiteSpace: 'nowrap',
           }}
         >
-          Zobacz ofertę →
+          Zobacz →
         </a>
       </div>
     </li>

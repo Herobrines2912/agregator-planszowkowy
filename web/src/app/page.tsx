@@ -50,6 +50,12 @@ export default async function HomePage({
   const { view } = await searchParams
   const isList = view === 'list'
 
+  const minPrice = Math.min(
+    ...mockDeals
+      .filter((d) => d.price_orig !== null)
+      .map((d) => parseFloat(d.price))
+  )
+
   return (
     <div style={{ padding: '40px' }}>
       <h2
@@ -69,9 +75,14 @@ export default async function HomePage({
       </Suspense>
 
       {isList ? (
-        <ul style={{ padding: 0, margin: 0, borderTop: '1px solid #D4C4AE', borderRadius: '8px', overflow: 'hidden' }}>
+        <ul style={{ padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {mockDeals.map((deal, i) => (
-            <ListRow key={deal.slug} {...deal} index={i} />
+            <ListRow
+              key={deal.slug}
+              {...deal}
+              index={i}
+              isBestDeal={parseFloat(deal.price) === minPrice}
+            />
           ))}
         </ul>
       ) : (
