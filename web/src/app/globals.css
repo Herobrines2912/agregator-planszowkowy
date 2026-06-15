@@ -63,6 +63,12 @@
   .passport-grid {
     grid-template-columns: 1fr;
   }
+
+  .game-meta-cover img,
+  .game-meta-cover [aria-hidden="true"] {
+    width: 120px !important;
+    height: 120px !important;
+  }
 }
 
 .shimmer-box {

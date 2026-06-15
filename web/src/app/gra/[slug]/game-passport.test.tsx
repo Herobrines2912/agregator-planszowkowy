@@ -97,7 +97,7 @@ describe('GamePassportPage', () => {
     const output = await GamePassportPage({ params: Promise.resolve({ slug: 'brass-birmingham' }) })
     render(output)
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeTruthy()
-    expect(screen.getByText('Brass: Birmingham')).toBeTruthy()
+    expect(screen.getAllByText('Brass: Birmingham').length).toBeGreaterThan(0)
     expect(screen.getByRole('link', { name: 'Okazje' })).toHaveAttribute('href', '/')
   })
 

@@ -1,13 +1,60 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { GameMeta, type GameMetaGame } from '@/components/GameMeta'
 
-// Mock implementation until Story 4.5 (Dev B) provides real queries
-// Replace this entire block when game.ts query is ready
-async function getGameBySlugMock(slug: string) {
-  const mockGames: Record<string, { name: string; slug: string }> = {
-    'brass-birmingham': { name: 'Brass: Birmingham', slug: 'brass-birmingham' },
-    scythe: { name: 'Scythe', slug: 'scythe' },
+// Mock implementation until Story 4.5 (Dev B) provides real queries.
+// Replace this entire block when game-passport.ts query is ready.
+type MockGame = GameMetaGame & { slug: string }
+
+async function getGameBySlugMock(slug: string): Promise<MockGame | null> {
+  const mockGames: Record<string, MockGame> = {
+    'brass-birmingham': {
+      name: 'Brass: Birmingham',
+      slug: 'brass-birmingham',
+      cover_image_url: null,
+      is_expansion: false,
+      designers: ['Martin Wallace'],
+      publishers: ['Roxley Games'],
+      year_published: 2018,
+      bgg_rank: 2,
+      bgg_category_rank: { category: 'Strategiczne', rank: 1 },
+      bgg_avg_rating: '8.60',
+      complexity: '3.89',
+      mechanics: [
+        'Network and Route Building',
+        'Hand Management',
+        'Loans',
+        'Set Collection',
+        'Tech Trees',
+      ],
+      min_players: 2,
+      max_players: 4,
+      min_playtime: 60,
+      max_playtime: 120,
+      min_age: 14,
+      rules_pdf_url: null,
+    },
+    scythe: {
+      name: 'Scythe',
+      slug: 'scythe',
+      cover_image_url: null,
+      is_expansion: false,
+      designers: ['Jamey Stegmaier'],
+      publishers: ['Stonemaier Games'],
+      year_published: 2016,
+      bgg_rank: 10,
+      bgg_category_rank: null,
+      bgg_avg_rating: '8.20',
+      complexity: '3.43',
+      mechanics: ['Area Majority', 'Engine Building', 'Variable Player Powers'],
+      min_players: 1,
+      max_players: 5,
+      min_playtime: 90,
+      max_playtime: 115,
+      min_age: 14,
+      rules_pdf_url: null,
+    },
   }
   return mockGames[slug] ?? null
 }
@@ -79,25 +126,14 @@ export default async function GamePassportPage({
       </nav>
 
       <div className="passport-grid">
+        {/* Left column — GameMeta panel */}
         <div>
-          <div
-            style={{
-              backgroundColor: 'var(--color-surface)',
-              borderRadius: '12px',
-              padding: '20px',
-              minHeight: '300px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--color-text-muted)',
-              fontSize: '13px',
-            }}
-          >
-            GameMeta (Story 4.2)
-          </div>
+          <GameMeta game={game} />
         </div>
 
+        {/* Right column — price data */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {/* BestDealBanner — Story 4.4 */}
           <div
             style={{
               backgroundColor: 'var(--color-surface)',
@@ -114,6 +150,7 @@ export default async function GamePassportPage({
             BestDealBanner (Story 4.4)
           </div>
 
+          {/* PriceTable — Story 4.3 */}
           <div
             style={{
               backgroundColor: 'var(--color-surface)',
