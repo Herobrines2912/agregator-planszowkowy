@@ -18,3 +18,10 @@ export function formatTimestamp(value: Date | string | null | undefined): string
   const date = typeof value === 'string' ? new Date(value) : value
   return date.toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
+
+export function formatDateMedium(value: Date | string | null | undefined): string {
+  if (value === null || value === undefined) return '—'
+  const date = typeof value === 'string' ? new Date(value) : value
+  return date.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short', year: 'numeric' })
+  // → "12 cze 2026"
+}

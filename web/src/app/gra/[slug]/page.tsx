@@ -166,6 +166,23 @@ export default async function GamePassportPage({
           >
             PriceTable (Story 4.3)
           </div>
+
+          {/* PriceChart — Story 5.3 */}
+          <div
+            style={{
+              backgroundColor: 'var(--color-surface)',
+              borderRadius: '12px',
+              padding: '20px',
+              minHeight: '320px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--color-text-muted)',
+              fontSize: '13px',
+            }}
+          >
+            PriceChart (Story 5.3)
+          </div>
         </div>
       </div>
     </>
