@@ -3,6 +3,7 @@ import { Playfair_Display, DM_Sans } from 'next/font/google'
 import './globals.css'
 import { SiteHeader } from '@/components/SiteHeader'
 import { SiteFooter } from '@/components/SiteFooter'
+import { siteUrl } from '@/lib/config'
 
 const playfair = Playfair_Display({
   variable: '--font-playfair',
@@ -20,6 +21,7 @@ const dmSans = DM_Sans({
 export const metadata: Metadata = {
   title: 'Agregator Cen Planszówek',
   description: 'Porównaj ceny planszówek w polskich sklepach internetowych',
+  metadataBase: new URL(siteUrl),
 }
 
 export default function RootLayout({

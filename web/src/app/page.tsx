@@ -1,10 +1,26 @@
+import type { Metadata } from 'next'
 import { Suspense } from 'react'
+import { siteUrl } from '@/lib/config'
 import { DealCard } from '@/components/DealCard'
 import { DealCardSkeleton } from '@/components/DealCardSkeleton'
 import { FilterBar } from '@/components/FilterBar'
 import { ListRow } from '@/components/ListRow'
 import { ListRowSkeleton } from '@/components/ListRowSkeleton'
 import { StalenessWarningBanner } from '@/components/StalenessWarningBanner'
+
+export const metadata: Metadata = {
+  title: 'Agregator Cen Planszówek — Porównaj ceny planszówek w Polsce',
+  description:
+    'Znajdź najlepsze okazje na planszówki w polskich sklepach. Porównujemy ceny w AlePlanszowki, 3Trolle i innych. Aktualizowane codziennie.',
+  openGraph: {
+    title: 'Agregator Cen Planszówek',
+    description: 'Porównaj ceny planszówek w polskich sklepach internetowych',
+    images: [`${siteUrl}/opengraph-image.png`],
+    locale: 'pl_PL',
+    type: 'website',
+  },
+  robots: { index: true, follow: true },
+}
 
 const mockDeals = [
   {

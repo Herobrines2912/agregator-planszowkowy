@@ -114,12 +114,39 @@ describe('GamePassportPage', () => {
 describe('generateMetadata', () => {
   test('returns formatted title for known slug', async () => {
     const meta = await generateMetadata({ params: Promise.resolve({ slug: 'brass-birmingham' }) })
-    expect(meta.title).toBe('Brass: Birmingham — Ceny | Agregator Planszówek')
+    expect(meta.title).toBe('Brass: Birmingham — najlepsza cena | Agregator Planszówek')
   })
 
   test('returns fallback title for unknown slug', async () => {
     const meta = await generateMetadata({ params: Promise.resolve({ slug: 'unknown-slug' }) })
     expect(meta.title).toBe('Nie znaleziono gry | Agregator Planszówek')
+  })
+
+  test('returns description for known slug', async () => {
+    const meta = await generateMetadata({ params: Promise.resolve({ slug: 'brass-birmingham' }) })
+    expect(typeof meta.description).toBe('string')
+    expect((meta.description as string).length).toBeLessThanOrEqual(155)
+    expect((meta.description as string).length).toBeGreaterThan(0)
+  })
+
+  test('returns canonical URL for known slug', async () => {
+    const meta = await generateMetadata({ params: Promise.resolve({ slug: 'brass-birmingham' }) })
+    expect((meta as { alternates?: { canonical?: string } }).alternates?.canonical).toMatch(/\/gra\/brass-birmingham$/)
+  })
+
+  test('returns openGraph with locale pl_PL', async () => {
+    const meta = await generateMetadata({ params: Promise.resolve({ slug: 'brass-birmingham' }) })
+    expect((meta as { openGraph?: { locale?: string } }).openGraph?.locale).toBe('pl_PL')
+  })
+
+  test('returns robots index:true follow:true', async () => {
+    const meta = await generateMetadata({ params: Promise.resolve({ slug: 'brass-birmingham' }) })
+    expect(meta.robots).toEqual({ index: true, follow: true })
+  })
+
+  test('unknown slug returns only title (no OG fields)', async () => {
+    const meta = await generateMetadata({ params: Promise.resolve({ slug: 'unknown-slug' }) })
+    expect((meta as { openGraph?: unknown }).openGraph).toBeUndefined()
   })
 })
 

@@ -2,6 +2,9 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { GameMeta, type GameMetaGame } from '@/components/GameMeta'
+import { GameJsonLd } from '@/components/GameJsonLd'
+import { OfferJsonLd } from '@/components/OfferJsonLd'
+import { siteUrl } from '@/lib/config'
 
 // Mock implementation until Story 4.5 (Dev B) provides real queries.
 // Replace this entire block when game-passport.ts query is ready.
@@ -71,11 +74,29 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params
   const game = await getGameBySlugMock(slug)
+
   if (!game) return { title: 'Nie znaleziono gry | Agregator Planszówek' }
 
   const name = game.name.length > 57 ? game.name.slice(0, 57) + '…' : game.name
+  const title = `${name} — najlepsza cena | Agregator Planszówek`
+
+  const rawDesc = `Sprawdź aktualną cenę ${game.name} w polskich sklepach. Porównaj oferty AlePlanszowki, 3Trolle i innych.`
+  const description = rawDesc.length > 155 ? rawDesc.slice(0, 152) + '…' : rawDesc
+
+  const image = game.cover_image_url ?? `${siteUrl}/opengraph-image.png`
+
   return {
-    title: `${name} — Ceny | Agregator Planszówek`,
+    title,
+    description,
+    alternates: { canonical: `${siteUrl}/gra/${slug}` },
+    openGraph: {
+      title,
+      description,
+      images: [image],
+      type: 'website',
+      locale: 'pl_PL',
+    },
+    robots: { index: true, follow: true },
   }
 }
 
@@ -93,6 +114,9 @@ export default async function GamePassportPage({
 
   return (
     <>
+      <GameJsonLd game={game} />
+      <OfferJsonLd products={[]} />
+
       <nav
         aria-label="Breadcrumb"
         style={{
