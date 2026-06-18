@@ -18,6 +18,9 @@ web/.env.local
 scraper/.venv/
 scraper/.env
 
+# Eksploracje i drafty tymczasowe
+_tmp/
+
 # Sekrety i dane lokalne
 *.env.local
 .env
