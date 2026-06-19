@@ -1,0 +1,22 @@
+name: Selector Health Check
+
+on:
+  schedule:
+    - cron: '0 8 * * *'  # Daily 8:00 AM UTC
+  workflow_dispatch:
+
+jobs:
+  selector-health:
+    name: Live selector smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Real test logic added in Story 2.6 (Epic 2)
+      # File: scraper/tests/test_live_selectors.py
+      - name: Placeholder - selector health not yet implemented
+        run: |
+          echo "Selector health check - test implementation added in Story 2.6"
+          echo "Target file: scraper/tests/test_live_selectors.py"
