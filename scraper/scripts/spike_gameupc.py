@@ -3,12 +3,13 @@ Spike: GameUPC EAN coverage test for Polish board games.
 Story 1.6 — Dev B.
 
 API discovered: https://api.gameupc.com/test/upc/{ean}
-Auth: NONE required (open /test/ endpoint)
-BGG ID field in response: bgg_info[0].id (when bgg_info_status == 'verified')
+Auth: x-api-key header required — public test key visible in gameupc.com/demo.html
+BGG ID field in response: bgg_info[0].id (when bgg_info is non-empty)
 
 Run: cd scraper && python -m scripts.spike_gameupc
 """
 import logging
+import os
 import time
 
 import httpx
@@ -46,11 +47,12 @@ TEST_EANS = [
 GAMEUPC_BASE = "https://api.gameupc.com/test/upc"
 
 
-# Public test API key visible in gameupc.com/demo.html source code
-GAMEUPC_TEST_KEY = "test_test_test_test_test"
+# Fallback: public test key visible in gameupc.com/demo.html — dev use only
+_GAMEUPC_DEMO_KEY = "test_test_test_test_test"
+GAMEUPC_API_KEY = os.environ.get("GAMEUPC_API_KEY", _GAMEUPC_DEMO_KEY)
 
 HEADERS = {
-    "x-api-key": GAMEUPC_TEST_KEY,
+    "x-api-key": GAMEUPC_API_KEY,
     "Accept": "application/json",
 }
 
@@ -91,7 +93,7 @@ def main() -> None:
                 logger.warning("  → ERROR: %s", result)
             else:
                 bgg_info = result.get("bgg_info", [])
-                bgg_id = bgg_info[0]["id"] if bgg_info else None
+                bgg_id = bgg_info[0].get("id") if bgg_info else None
                 status = result.get("bgg_info_status", "unknown")
                 matched.append((ean, name, bgg_id, status, result))
                 logger.info("  → MATCHED — bgg_id=%s status=%s", bgg_id, status)
