@@ -16,7 +16,7 @@ ADDONS = {}
 
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
-#USER_AGENT = "scraper (+http://www.yourdomain.com)"
+USER_AGENT = "agregator-cen-planszowek/0.1 (+https://github.com/JeanJones/agregator-planszowkowy)"
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = True
@@ -58,9 +58,9 @@ DOWNLOAD_DELAY = 1
 
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
-#ITEM_PIPELINES = {
-#    "scraper.pipelines.ScraperPipeline": 300,
-#}
+ITEM_PIPELINES = {
+    "scraper.pipelines.validation.ValidationPipeline": 200,
+}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html
