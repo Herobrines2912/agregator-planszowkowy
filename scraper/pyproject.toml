@@ -9,6 +9,7 @@ dependencies = [
     "psycopg2-binary>=2.9.12",
     "pydantic>=2.13.4",
     "python-dotenv>=1.2.2",
+    "rapidfuzz>=3.14.5",
     "scrapy>=2.16.0",
 ]
 

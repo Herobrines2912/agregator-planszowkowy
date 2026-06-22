@@ -60,7 +60,7 @@ DOWNLOAD_DELAY = 1
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
     "scraper.pipelines.validation.ValidationPipeline": 200,
-    # slot 300 reserved for DeduplicationPipeline (Story 2.2)
+    "scraper.pipelines.deduplication.DeduplicationPipeline": 300,
     "scraper.pipelines.database.DatabasePipeline": 400,
 }
 
