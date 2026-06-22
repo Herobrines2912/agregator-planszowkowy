@@ -13,6 +13,7 @@ _INSTOCK = "https://schema.org/InStock"
 
 class ThreeTrolleSpider(scrapy.Spider):
     name = "three_trolle"
+    store_id = STORE_ID
     start_urls = ["https://3trolle.pl/12-gry-planszowe"]
 
     def parse(self, response):

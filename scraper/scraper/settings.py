@@ -60,6 +60,8 @@ DOWNLOAD_DELAY = 1
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
     "scraper.pipelines.validation.ValidationPipeline": 200,
+    # slot 300 reserved for DeduplicationPipeline (Story 2.2)
+    "scraper.pipelines.database.DatabasePipeline": 400,
 }
 
 # Enable and configure the AutoThrottle extension (disabled by default)

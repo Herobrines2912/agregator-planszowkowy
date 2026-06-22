@@ -59,20 +59,24 @@ export const games = pgTable('games', {
 // ---------------------------------------------------------------------------
 // products  (per-store product; current price snapshot)
 // ---------------------------------------------------------------------------
-export const products = pgTable('products', {
-  id: serial('id').primaryKey(),
-  game_id: integer('game_id').references(() => games.id),
-  store_id: integer('store_id').notNull().references(() => stores.id),
-  external_id: text('external_id'),
-  name: text('name').notNull(),
-  url: text('url').notNull(),
-  price: numeric('price', { precision: 10, scale: 2 }),
-  price_orig: numeric('price_orig', { precision: 10, scale: 2 }),
-  in_stock: boolean('in_stock').notNull().default(true),
-  bgg_id: integer('bgg_id'),
-  created_at: timestamptz('created_at').defaultNow(),
-  updated_at: timestamptz('updated_at').defaultNow(),
-})
+export const products = pgTable(
+  'products',
+  {
+    id: serial('id').primaryKey(),
+    game_id: integer('game_id').references(() => games.id),
+    store_id: integer('store_id').notNull().references(() => stores.id),
+    external_id: text('external_id'),
+    name: text('name').notNull(),
+    url: text('url').notNull(),
+    price: numeric('price', { precision: 10, scale: 2 }),
+    price_orig: numeric('price_orig', { precision: 10, scale: 2 }),
+    in_stock: boolean('in_stock').notNull().default(true),
+    bgg_id: integer('bgg_id'),
+    created_at: timestamptz('created_at').defaultNow(),
+    updated_at: timestamptz('updated_at').defaultNow(),
+  },
+  (t) => [unique('products_store_external_unique').on(t.store_id, t.external_id)],
+)
 
 // ---------------------------------------------------------------------------
 // price_history  (append-only — no UPDATE or DELETE)

@@ -13,6 +13,7 @@ _INSTOCK = "https://schema.org/InStock"
 
 class AlePlanszowkiSpider(scrapy.Spider):
     name = "ale_planszowki"
+    store_id = STORE_ID
     start_urls = ["https://aleplanszowki.pl/368-gry-planszowe-i-towarzyskie"]
 
     def parse(self, response):
