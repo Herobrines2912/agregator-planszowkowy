@@ -9,14 +9,21 @@ jobs:
   selector-health:
     name: Live selector smoke test
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 8
 
     steps:
       - uses: actions/checkout@v4
 
-      # Real test logic added in Story 2.6 (Epic 2)
-      # File: scraper/tests/test_live_selectors.py
-      - name: Placeholder - selector health not yet implemented
-        run: |
-          echo "Selector health check - test implementation added in Story 2.6"
-          echo "Target file: scraper/tests/test_live_selectors.py"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install dependencies
+        run: cd scraper && uv sync
+
+      - name: Run live selector tests
+        run: cd scraper && uv run pytest -m live tests/test_live_selectors.py -v
