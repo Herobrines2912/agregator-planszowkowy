@@ -217,3 +217,193 @@ class TestBggRateLimitError:
         err = BggRateLimitError("HTTP 429")
         assert isinstance(err, Exception)
         assert "429" in str(err)
+
+
+# ---------------------------------------------------------------------------
+# Tests for get_thing_with_retry() — Task 1 (Story 2.4)
+# ---------------------------------------------------------------------------
+
+class TestGetThingWithRetry:
+    def setup_method(self):
+        self.client = BggClient(token="test-token")
+
+    @patch("utils.bgg_client.httpx.get")
+    @patch("utils.bgg_client.time.sleep")
+    def test_retry_on_429_then_success(self, mock_sleep, mock_get):
+        """First call raises BggRateLimitError (429), second succeeds."""
+        rate_limit_resp = _make_response(429)
+        success_resp = _make_response(200, BRASS_BIRMINGHAM_XML)
+        mock_get.side_effect = [rate_limit_resp, success_resp]
+
+        result = self.client.get_thing_with_retry(224517)
+
+        assert result is not None
+        assert result["name"] == "Brass: Birmingham"
+        assert mock_get.call_count == 2
+        # 60s retry delay must be among the sleep calls (throttle may also sleep)
+        sleep_args = [c[0][0] for c in mock_sleep.call_args_list]
+        assert 60 in sleep_args
+
+    @patch("utils.bgg_client.httpx.get")
+    @patch("utils.bgg_client.time.sleep")
+    def test_retry_exhausted_raises_bgg_rate_limit_error(self, mock_sleep, mock_get):
+        """Three 429s exhaust retries — raises BggRateLimitError."""
+        mock_get.return_value = _make_response(429)
+
+        with pytest.raises(BggRateLimitError):
+            self.client.get_thing_with_retry(224517, max_retries=3)
+
+        # Retry delays must appear in order: 60, 120, 240
+        sleep_args = [c[0][0] for c in mock_sleep.call_args_list]
+        retry_delays = [x for x in sleep_args if x in (60, 120, 240)]
+        assert retry_delays == [60, 120, 240]
+
+    @patch("utils.bgg_client.httpx.get")
+    @patch("utils.bgg_client.time.sleep")
+    def test_retry_delay_sequence(self, mock_sleep, mock_get):
+        """Delays appear in ascending order: 60 → 120 → 240."""
+        mock_get.return_value = _make_response(429)
+
+        with pytest.raises(BggRateLimitError):
+            self.client.get_thing_with_retry(1, max_retries=3)
+
+        sleep_args = [c[0][0] for c in mock_sleep.call_args_list]
+        retry_delays = [x for x in sleep_args if x in (60, 120, 240)]
+        assert retry_delays == [60, 120, 240]
+
+    @patch("utils.bgg_client.httpx.get")
+    @patch("utils.bgg_client.time.sleep")
+    def test_no_retry_on_404(self, mock_sleep, mock_get):
+        """404 returns None immediately — no retries."""
+        mock_get.return_value = _make_response(404)
+
+        result = self.client.get_thing_with_retry(999999)
+
+        assert result is None
+        assert mock_get.call_count == 1
+        # No retry delays (60/120/240) — throttle may have slept < 1s
+        sleep_args = [c[0][0] for c in mock_sleep.call_args_list]
+        assert 60 not in sleep_args
+        assert 120 not in sleep_args
+
+    @patch("utils.bgg_client.httpx.get")
+    @patch("utils.bgg_client.time.sleep")
+    def test_no_retry_on_success(self, mock_sleep, mock_get):
+        """Successful first call — no retries."""
+        mock_get.return_value = _make_response(200, BRASS_BIRMINGHAM_XML)
+
+        result = self.client.get_thing_with_retry(224517)
+
+        assert result is not None
+        assert mock_get.call_count == 1
+        sleep_args = [c[0][0] for c in mock_sleep.call_args_list]
+        assert 60 not in sleep_args
+
+    @patch("utils.bgg_client.httpx.get")
+    @patch("utils.bgg_client.time.sleep")
+    def test_202_treated_as_rate_limit(self, mock_sleep, mock_get):
+        """HTTP 202 (BGG queue) is retried like 429."""
+        queue_resp = _make_response(202)
+        success_resp = _make_response(200, BRASS_BIRMINGHAM_XML)
+        mock_get.side_effect = [queue_resp, success_resp]
+
+        result = self.client.get_thing_with_retry(224517)
+
+        assert result is not None
+        assert mock_get.call_count == 2
+        sleep_args = [c[0][0] for c in mock_sleep.call_args_list]
+        assert 60 in sleep_args
+
+
+# ---------------------------------------------------------------------------
+# Tests for extended _parse_thing() — is_expansion, complexity, bgg_category_rank
+# ---------------------------------------------------------------------------
+
+EXPANSION_XML = """<?xml version="1.0" encoding="utf-8"?>
+<items>
+  <item type="boardgameexpansion" id="161936">
+    <name type="primary" value="Arkham Horror: The Card Game" />
+    <minplayers value="1" />
+    <maxplayers value="2" />
+    <statistics page="1">
+      <ratings>
+        <average value="8.21" />
+        <averageweight value="3.12" />
+        <ranks>
+          <rank type="subtype" id="1" name="boardgame" value="Not Ranked" />
+          <rank type="family" id="5496" name="thematic" friendlyname="Thematic Rank" value="15" />
+        </ranks>
+      </ratings>
+    </statistics>
+  </item>
+</items>"""
+
+BASE_GAME_WITH_CATEGORY_RANK_XML = """<?xml version="1.0" encoding="utf-8"?>
+<items>
+  <item type="boardgame" id="174430">
+    <name type="primary" value="Gloomhaven" />
+    <statistics page="1">
+      <ratings>
+        <averageweight value="3.87" />
+        <ranks>
+          <rank type="subtype" id="1" name="boardgame" value="1" />
+          <rank type="family" id="5496" name="thematic" friendlyname="Thematic Rank" value="1" />
+        </ranks>
+      </ratings>
+    </statistics>
+  </item>
+</items>"""
+
+NO_CATEGORY_RANK_XML = """<?xml version="1.0" encoding="utf-8"?>
+<items>
+  <item type="boardgame" id="1">
+    <name type="primary" value="Simple Game" />
+    <statistics page="1">
+      <ratings>
+        <ranks>
+          <rank type="subtype" id="1" name="boardgame" value="5000" />
+        </ranks>
+      </ratings>
+    </statistics>
+  </item>
+</items>"""
+
+
+class TestParseThing_Extended:
+    def setup_method(self):
+        self.client = BggClient(token="test-token")
+
+    def test_is_expansion_true_for_boardgameexpansion(self):
+        result = self.client._parse_thing(EXPANSION_XML, 161936)
+        assert result["is_expansion"] is True
+
+    def test_is_expansion_false_for_boardgame(self):
+        result = self.client._parse_thing(BRASS_BIRMINGHAM_XML, 224517)
+        assert result["is_expansion"] is False
+
+    def test_bgg_rank_not_ranked_returns_none(self):
+        result = self.client._parse_thing(EXPANSION_XML, 161936)
+        assert result["bgg_rank"] is None
+
+    def test_bgg_rank_integer_when_ranked(self):
+        result = self.client._parse_thing(BASE_GAME_WITH_CATEGORY_RANK_XML, 174430)
+        assert result["bgg_rank"] == "1"  # returned as string from XML; _safe_int in enrichment converts
+
+    def test_complexity_parsed(self):
+        result = self.client._parse_thing(EXPANSION_XML, 161936)
+        assert result["complexity"] == "3.12"
+
+    def test_complexity_absent_returns_none(self):
+        result = self.client._parse_thing(BRASS_BIRMINGHAM_XML, 224517)
+        # BRASS_BIRMINGHAM_XML has no averageweight — should return None
+        assert result["complexity"] is None
+
+    def test_bgg_category_rank_parsed(self):
+        result = self.client._parse_thing(EXPANSION_XML, 161936)
+        assert result["bgg_category_rank"] is not None
+        assert result["bgg_category_rank"]["category"] == "Thematic Rank"
+        assert result["bgg_category_rank"]["rank"] == 15
+
+    def test_bgg_category_rank_absent_returns_none(self):
+        result = self.client._parse_thing(NO_CATEGORY_RANK_XML, 1)
+        assert result["bgg_category_rank"] is None
