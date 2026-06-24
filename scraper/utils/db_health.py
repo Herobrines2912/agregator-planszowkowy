@@ -1,7 +1,7 @@
 """Database health checks for operator monitoring.
 
-Story 2.6: check_product_count_baseline() — 80% rolling average guard.
-Story 2.5: check_database_size() will be added here later.
+check_product_count_baseline() — 80% rolling average guard (Story 2.6).
+check_database_size() — pg_database_size() > 400 MB alert (Story 2.5).
 
 Usage (called from scraper.yml after each Scrape Cycle):
     python -m utils.db_health
@@ -15,6 +15,8 @@ import psycopg2
 from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
+
+DB_SIZE_LIMIT_MB = 400
 
 
 def check_product_count_baseline(conn) -> bool:
@@ -90,7 +92,31 @@ def check_product_count_baseline(conn) -> bool:
     return not breach_detected
 
 
-if __name__ == "__main__":
+def check_database_size(conn) -> bool:
+    """Check pg_database_size() and alert operator if > 400 MB.
+
+    Returns True if within limit, False if over limit.
+    """
+    with conn.cursor() as cur:
+        cur.execute("SELECT pg_database_size(current_database())")
+        row = cur.fetchone()
+        size_bytes = row[0] if row else 0
+
+    size_mb = size_bytes / (1024 * 1024)
+
+    if size_mb > DB_SIZE_LIMIT_MB:
+        logger.critical(
+            "OPERATOR ALERT — Database size %.1f MB exceeds %d MB limit",
+            size_mb,
+            DB_SIZE_LIMIT_MB,
+        )
+        return False
+
+    logger.info("Database size OK: %.1f MB", size_mb)
+    return True
+
+
+def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
     load_dotenv()
 
@@ -105,10 +131,17 @@ if __name__ == "__main__":
         logger.error("Cannot connect to database: %s", exc)
         sys.exit(2)
 
+    size_ok = False
+    baseline_ok = False
     try:
-        healthy = check_product_count_baseline(conn)
+        size_ok = check_database_size(conn)
+        baseline_ok = check_product_count_baseline(conn)
     finally:
         conn.close()
 
-    if not healthy:
+    if not size_ok or not baseline_ok:
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

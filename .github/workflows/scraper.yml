@@ -1,0 +1,77 @@
+name: Daily Scraper
+
+on:
+  schedule:
+    - cron: '0 6 * * *'  # Daily 6:00 AM UTC
+  workflow_dispatch:       # Allow manual trigger for testing/debugging
+
+concurrency:
+  group: scraper-daily
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    name: Scrape + enrich + health check + revalidate
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install scraper dependencies
+        run: cd scraper && uv sync
+
+      - name: Step 1 — Run all spiders
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          cd scraper
+          SPIDERS=$(uv run python -c "from scraper.spiders.__manifest__ import SPIDERS; print(' '.join(SPIDERS))")
+          echo "Spiders to run: $SPIDERS"
+          if [ -z "$SPIDERS" ]; then
+            echo "::error::SPIDERS list is empty — check scraper/scraper/spiders/__manifest__.py"
+            exit 1
+          fi
+          for spider in $SPIDERS; do
+            echo "--- Running spider: $spider ---"
+            uv run scrapy crawl "$spider" || echo "::warning::Spider $spider exited with non-zero code"
+          done
+
+      - name: Step 2 — BGG enrichment for pending games
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BGG_API_TOKEN: ${{ secrets.BGG_API_TOKEN }}
+        run: |
+          cd scraper
+          uv run python -m utils.bgg_enrichment || echo "::warning::BGG enrichment failed — enrichment skipped, health check will still run"
+
+      - name: Step 3 — Database health check
+        if: always()
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          cd scraper
+          uv run python -m utils.db_health
+
+      - name: Step 4 — Revalidate Vercel ISR
+        if: always()
+        env:
+          VERCEL_URL: ${{ secrets.VERCEL_URL }}
+          REVALIDATION_SECRET: ${{ secrets.REVALIDATION_SECRET }}
+        run: |
+          curl --retry 3 --retry-delay 10 --retry-all-errors \
+            --connect-timeout 10 --max-time 30 -f \
+            -X POST "$VERCEL_URL/api/revalidate" \
+            -H "x-revalidate-secret: $REVALIDATION_SECRET" \
+          || echo "::warning::ISR revalidation failed — stale data risk (fallback TTL 2h)"
+
+      - name: Step 5 — Alert engine placeholder (Epic 6)
+        run: echo "Alert engine not yet implemented — Epic 6"
