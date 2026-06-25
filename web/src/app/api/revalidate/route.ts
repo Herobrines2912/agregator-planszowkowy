@@ -1,5 +1,5 @@
 import { timingSafeEqual } from 'crypto'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, revalidateTag } from 'next/cache'
 import type { NextRequest } from 'next/server'
 import type { ApiResponse } from '@/types/api'
 
@@ -19,6 +19,8 @@ export async function POST(request: NextRequest) {
 
   revalidatePath('/gra/[slug]', 'page')
   revalidatePath('/')
+  revalidateTag('hot-deals', {})
+  revalidateTag('scrape-time', {})
 
   const body: ApiResponse<{ revalidated: true }> = { success: true, data: { revalidated: true } }
   return Response.json(body)

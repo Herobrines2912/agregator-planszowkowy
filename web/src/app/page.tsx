@@ -2,11 +2,13 @@ import type { Metadata } from 'next'
 import { Suspense } from 'react'
 import { siteUrl } from '@/lib/config'
 import { DealCard } from '@/components/DealCard'
-import { DealCardSkeleton } from '@/components/DealCardSkeleton'
 import { FilterBar } from '@/components/FilterBar'
 import { ListRow } from '@/components/ListRow'
-import { ListRowSkeleton } from '@/components/ListRowSkeleton'
 import { StalenessWarningBanner } from '@/components/StalenessWarningBanner'
+import { calcMinPrice } from '@/lib/calc'
+import { getHotDeals } from '@/db/queries/hot-deals'
+import type { HotDeal, HotDealsFilters } from '@/db/queries/hot-deals'
+import { getLastScrapeTime } from '@/db/queries/scrape-runs'
 
 export const metadata: Metadata = {
   title: 'Agregator Cen Planszówek — Porównaj ceny planszówek w Polsce',
@@ -22,79 +24,33 @@ export const metadata: Metadata = {
   robots: { index: true, follow: true },
 }
 
-const mockDeals = [
-  {
-    slug: 'brass-birmingham',
-    game_name: 'Brass: Birmingham',
-    cover_image_url: null,
-    price: '129.00',
-    price_orig: '219.00',
-    store_name: 'AlePlanszowki',
-    store_url: 'https://aleplanszowki.pl',
-  },
-  {
-    slug: 'scythe',
-    game_name: 'Scythe',
-    cover_image_url: null,
-    price: '189.90',
-    price_orig: '279.00',
-    store_name: '3Trolle',
-    store_url: 'https://3trolle.pl',
-  },
-  {
-    slug: 'wingspan',
-    game_name: 'Wingspan',
-    cover_image_url: null,
-    price: '99.00',
-    price_orig: '159.00',
-    store_name: 'AlePlanszowki',
-    store_url: 'https://aleplanszowki.pl',
-  },
-  {
-    slug: 'twilight-imperium-4',
-    game_name: 'Twilight Imperium IV',
-    cover_image_url: null,
-    price: '399.00',
-    price_orig: '649.00',
-    store_name: '3Trolle',
-    store_url: 'https://3trolle.pl',
-  },
-]
-
-// TODO Story 3.3: replace with real query from db/queries/scrape-runs.ts
-async function getLastScrapeTime(): Promise<Date | null> {
-  return null
-}
-
-function SkeletonFeed({ isList, count }: { isList: boolean; count: number }) {
-  if (isList) {
-    return (
-      <ul style={{ padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {Array.from({ length: count }).map((_, i) => <ListRowSkeleton key={i} />)}
-      </ul>
-    )
-  }
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '20px' }}>
-      {Array.from({ length: count }).map((_, i) => <DealCardSkeleton key={i} />)}
-    </div>
-  )
-}
-
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string }>
+  searchParams: Promise<{ view?: string; type?: string; players?: string }>
 }) {
-  const { view } = await searchParams
+  const { view, type, players } = await searchParams
   const isList = view === 'list'
-  const lastScrapedAt = await getLastScrapeTime()
 
-  const minPrice = Math.min(
-    ...mockDeals
-      .filter((d) => d.price_orig !== null)
-      .map((d) => parseFloat(d.price))
-  )
+  const filters: HotDealsFilters = {}
+  if (type === 'base' || type === 'expansion') filters.type = type
+  if (players) {
+    const p = parseInt(players, 10)
+    if (!isNaN(p) && p >= 1 && p <= 20) filters.players = p
+  }
+
+  let deals: HotDeal[] = []
+  let lastScrapedAt: Date | null = null
+  try {
+    ;[deals, lastScrapedAt] = await Promise.all([
+      getHotDeals(40, Object.keys(filters).length > 0 ? filters : undefined),
+      getLastScrapeTime(),
+    ])
+  } catch {
+    // DB unavailable — render empty state
+  }
+
+  const minPrice = calcMinPrice(deals)
 
   return (
     <div style={{ padding: '40px' }}>
@@ -113,10 +69,10 @@ export default async function HomePage({
       </h2>
 
       <Suspense fallback={<div style={{ height: '40px', marginBottom: '24px' }} aria-hidden />}>
-        <FilterBar resultCount={mockDeals.length} />
+        <FilterBar resultCount={deals.length} />
       </Suspense>
 
-      {mockDeals.length === 0 ? (
+      {deals.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '64px 0' }}>
           <p style={{ fontSize: '16px', color: '#6B5744', marginBottom: '16px' }}>
             Brak okazji spełniających filtry — spróbuj rozszerzyć kryteria
@@ -138,33 +94,45 @@ export default async function HomePage({
             Wyczyść filtry
           </a>
         </div>
+      ) : isList ? (
+        <ul style={{ padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {deals.map((deal, i) => (
+            <ListRow
+              key={deal.slug}
+              slug={deal.slug}
+              game_name={deal.game_name}
+              cover_image_url={deal.cover_image_url}
+              price={deal.price}
+              price_orig={deal.price_orig}
+              store_name={deal.store_name}
+              store_url={deal.store_url}
+              index={i}
+              isBestDeal={Number(deal.price) === minPrice}
+            />
+          ))}
+        </ul>
       ) : (
-        <Suspense fallback={<SkeletonFeed isList={isList} count={isList ? 6 : 8} />}>
-          {isList ? (
-            <ul style={{ padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {mockDeals.map((deal, i) => (
-                <ListRow
-                  key={deal.slug}
-                  {...deal}
-                  index={i}
-                  isBestDeal={parseFloat(deal.price) === minPrice}
-                />
-              ))}
-            </ul>
-          ) : (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
-                gap: '20px',
-              }}
-            >
-              {mockDeals.map((deal, i) => (
-                <DealCard key={deal.slug} {...deal} index={i} />
-              ))}
-            </div>
-          )}
-        </Suspense>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            gap: '20px',
+          }}
+        >
+          {deals.map((deal, i) => (
+            <DealCard
+              key={deal.slug}
+              slug={deal.slug}
+              game_name={deal.game_name}
+              cover_image_url={deal.cover_image_url}
+              price={deal.price}
+              price_orig={deal.price_orig}
+              store_name={deal.store_name}
+              store_url={deal.store_url}
+              index={i}
+            />
+          ))}
+        </div>
       )}
     </div>
   )

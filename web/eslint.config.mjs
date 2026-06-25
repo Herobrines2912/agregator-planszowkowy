@@ -15,6 +15,13 @@ const eslintConfig = defineConfig([
       }]
     }
   },
+  {
+    // db/queries/ is the only place allowed to import @/db/index directly
+    files: ["./src/db/queries/**/*.ts"],
+    rules: {
+      "no-restricted-imports": "off"
+    }
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
