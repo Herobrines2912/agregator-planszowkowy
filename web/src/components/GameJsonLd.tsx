@@ -1,4 +1,4 @@
-import type { GameMetaGame } from '@/components/GameMeta'
+import type { GameMetaGame } from '@/types/game'
 import { safeJsonLdStringify } from '@/lib/utils'
 
 interface Props {

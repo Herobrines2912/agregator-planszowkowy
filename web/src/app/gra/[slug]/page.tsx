@@ -1,70 +1,14 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { GameMeta, type GameMetaGame } from '@/components/GameMeta'
+import { GameMeta } from '@/components/GameMeta'
 import { GameJsonLd } from '@/components/GameJsonLd'
 import { OfferJsonLd } from '@/components/OfferJsonLd'
 import { siteUrl } from '@/lib/config'
-
-// Mock implementation until Story 4.5 (Dev B) provides real queries.
-// Replace this entire block when game-passport.ts query is ready.
-type MockGame = GameMetaGame & { slug: string }
-
-async function getGameBySlugMock(slug: string): Promise<MockGame | null> {
-  const mockGames: Record<string, MockGame> = {
-    'brass-birmingham': {
-      name: 'Brass: Birmingham',
-      slug: 'brass-birmingham',
-      cover_image_url: null,
-      is_expansion: false,
-      designers: ['Martin Wallace'],
-      publishers: ['Roxley Games'],
-      year_published: 2018,
-      bgg_rank: 2,
-      bgg_category_rank: { category: 'Strategiczne', rank: 1 },
-      bgg_avg_rating: '8.60',
-      complexity: '3.89',
-      mechanics: [
-        'Network and Route Building',
-        'Hand Management',
-        'Loans',
-        'Set Collection',
-        'Tech Trees',
-      ],
-      min_players: 2,
-      max_players: 4,
-      min_playtime: 60,
-      max_playtime: 120,
-      min_age: 14,
-      rules_pdf_url: null,
-    },
-    scythe: {
-      name: 'Scythe',
-      slug: 'scythe',
-      cover_image_url: null,
-      is_expansion: false,
-      designers: ['Jamey Stegmaier'],
-      publishers: ['Stonemaier Games'],
-      year_published: 2016,
-      bgg_rank: 10,
-      bgg_category_rank: null,
-      bgg_avg_rating: '8.20',
-      complexity: '3.43',
-      mechanics: ['Area Majority', 'Engine Building', 'Variable Player Powers'],
-      min_players: 1,
-      max_players: 5,
-      min_playtime: 90,
-      max_playtime: 115,
-      min_age: 14,
-      rules_pdf_url: null,
-    },
-  }
-  return mockGames[slug] ?? null
-}
+import { getGameBySlug, getAllGameSlugs } from '@/db/queries/game-passport'
 
 export async function generateStaticParams() {
-  // Story 4.5 will provide getAllGameSlugs() — stub for now
-  return []
+  return getAllGameSlugs()
 }
 
 export async function generateMetadata({
@@ -73,7 +17,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>
 }): Promise<Metadata> {
   const { slug } = await params
-  const game = await getGameBySlugMock(slug)
+  const game = await getGameBySlug(slug)
 
   if (!game) return { title: 'Nie znaleziono gry | Agregator Planszówek' }
 
@@ -106,7 +50,7 @@ export default async function GamePassportPage({
   params: Promise<{ slug: string }>
 }) {
   const { slug } = await params
-  const game = await getGameBySlugMock(slug)
+  const game = await getGameBySlug(slug)
 
   if (!game) {
     notFound()
@@ -115,7 +59,7 @@ export default async function GamePassportPage({
   return (
     <>
       <GameJsonLd game={game} />
-      <OfferJsonLd products={[]} />
+      <OfferJsonLd products={game.products} />
 
       <nav
         aria-label="Breadcrumb"

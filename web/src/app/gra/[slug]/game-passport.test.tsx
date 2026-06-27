@@ -10,10 +10,19 @@ vi.mock('next/link', () => ({
 vi.mock('next/cache', () => ({
   revalidatePath: vi.fn(),
   revalidateTag: vi.fn(),
+  unstable_cache: (fn: unknown) => fn,
 }))
 
 vi.mock('next/navigation', () => ({
   notFound: vi.fn(() => { throw new Error('NEXT_NOT_FOUND') }),
+}))
+
+const mockGetGameBySlug = vi.fn()
+const mockGetAllGameSlugs = vi.fn()
+
+vi.mock('@/db/queries/game-passport', () => ({
+  getGameBySlug: (...args: unknown[]) => mockGetGameBySlug(...args),
+  getAllGameSlugs: (...args: unknown[]) => mockGetAllGameSlugs(...args),
 }))
 
 import GameNotFound from './not-found'
@@ -22,6 +31,33 @@ import GamePassportPage, { generateStaticParams, generateMetadata } from './page
 import { POST } from '../../api/revalidate/route'
 import { revalidatePath } from 'next/cache'
 import { notFound } from 'next/navigation'
+
+const makeGameData = (overrides: Record<string, unknown> = {}) => ({
+  id: 1,
+  slug: 'brass-birmingham',
+  name: 'Brass: Birmingham',
+  cover_image_url: null,
+  is_expansion: false,
+  designers: ['Martin Wallace'],
+  publishers: ['Roxley Games'],
+  year_published: 2018,
+  bgg_id: 224517,
+  bgg_rank: 1,
+  bgg_category_rank: null,
+  bgg_avg_rating: '8.60',
+  complexity: '3.89',
+  mechanics: ['Network and Route Building', 'Hand Management'],
+  min_players: 2,
+  max_players: 4,
+  min_playtime: 60,
+  max_playtime: 120,
+  min_age: 14,
+  rules_pdf_url: null,
+  products: [],
+  best_product: null,
+  base_game: null,
+  ...overrides,
+})
 
 // ── not-found.tsx ─────────────────────────────────────────────────────────────
 
@@ -94,7 +130,10 @@ describe('GamePassportLoading', () => {
 // ── page.tsx — GamePassportPage ───────────────────────────────────────────────
 
 describe('GamePassportPage', () => {
+  beforeEach(() => vi.clearAllMocks())
+
   test('renders breadcrumb with aria-label and game name for known slug', async () => {
+    mockGetGameBySlug.mockResolvedValue(makeGameData())
     const output = await GamePassportPage({ params: Promise.resolve({ slug: 'brass-birmingham' }) })
     render(output)
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeTruthy()
@@ -103,6 +142,7 @@ describe('GamePassportPage', () => {
   })
 
   test('calls notFound() for unknown slug', async () => {
+    mockGetGameBySlug.mockResolvedValue(null)
     await expect(
       GamePassportPage({ params: Promise.resolve({ slug: 'not-a-real-game' }) })
     ).rejects.toThrow('NEXT_NOT_FOUND')
@@ -113,17 +153,22 @@ describe('GamePassportPage', () => {
 // ── page.tsx — generateMetadata ───────────────────────────────────────────────
 
 describe('generateMetadata', () => {
+  beforeEach(() => vi.clearAllMocks())
+
   test('returns formatted title for known slug', async () => {
+    mockGetGameBySlug.mockResolvedValue(makeGameData())
     const meta = await generateMetadata({ params: Promise.resolve({ slug: 'brass-birmingham' }) })
     expect(meta.title).toBe('Brass: Birmingham — najlepsza cena | Agregator Planszówek')
   })
 
   test('returns fallback title for unknown slug', async () => {
+    mockGetGameBySlug.mockResolvedValue(null)
     const meta = await generateMetadata({ params: Promise.resolve({ slug: 'unknown-slug' }) })
     expect(meta.title).toBe('Nie znaleziono gry | Agregator Planszówek')
   })
 
   test('returns description for known slug', async () => {
+    mockGetGameBySlug.mockResolvedValue(makeGameData())
     const meta = await generateMetadata({ params: Promise.resolve({ slug: 'brass-birmingham' }) })
     expect(typeof meta.description).toBe('string')
     expect((meta.description as string).length).toBeLessThanOrEqual(155)
@@ -131,30 +176,43 @@ describe('generateMetadata', () => {
   })
 
   test('returns canonical URL for known slug', async () => {
+    mockGetGameBySlug.mockResolvedValue(makeGameData())
     const meta = await generateMetadata({ params: Promise.resolve({ slug: 'brass-birmingham' }) })
     expect((meta as { alternates?: { canonical?: string } }).alternates?.canonical).toMatch(/\/gra\/brass-birmingham$/)
   })
 
   test('returns openGraph with locale pl_PL', async () => {
+    mockGetGameBySlug.mockResolvedValue(makeGameData())
     const meta = await generateMetadata({ params: Promise.resolve({ slug: 'brass-birmingham' }) })
     expect((meta as { openGraph?: { locale?: string } }).openGraph?.locale).toBe('pl_PL')
   })
 
   test('returns robots index:true follow:true', async () => {
+    mockGetGameBySlug.mockResolvedValue(makeGameData())
     const meta = await generateMetadata({ params: Promise.resolve({ slug: 'brass-birmingham' }) })
     expect(meta.robots).toEqual({ index: true, follow: true })
   })
 
   test('unknown slug returns only title (no OG fields)', async () => {
+    mockGetGameBySlug.mockResolvedValue(null)
     const meta = await generateMetadata({ params: Promise.resolve({ slug: 'unknown-slug' }) })
     expect((meta as { openGraph?: unknown }).openGraph).toBeUndefined()
   })
 })
 
-// ── page.tsx — generateStaticParams stub ─────────────────────────────────────
+// ── page.tsx — generateStaticParams ──────────────────────────────────────────
 
 describe('generateStaticParams', () => {
-  test('returns empty array (stub until Story 4.5)', async () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  test('returns mapped slugs from getAllGameSlugs', async () => {
+    mockGetAllGameSlugs.mockResolvedValue([{ slug: 'brass-birmingham' }, { slug: 'wingspan' }])
+    const result = await generateStaticParams()
+    expect(result).toEqual([{ slug: 'brass-birmingham' }, { slug: 'wingspan' }])
+  })
+
+  test('returns empty array when no games with products', async () => {
+    mockGetAllGameSlugs.mockResolvedValue([])
     const result = await generateStaticParams()
     expect(result).toEqual([])
   })

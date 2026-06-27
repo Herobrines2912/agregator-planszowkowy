@@ -1,45 +1,17 @@
 import { formatNull } from '@/lib/format'
+import type { GameMetaGame } from '@/types/game'
+import { isCategoryRank } from '@/types/game'
 
-export interface GameMetaGame {
-  name: string
-  cover_image_url: string | null
-  is_expansion: boolean
-  designers: string[] | null
-  publishers: string[] | null
-  year_published: number | null
-  bgg_rank: number | null
-  bgg_category_rank: { category: string; rank: number } | null
-  bgg_avg_rating: string | null
-  complexity: string | null
-  mechanics: string[] | null
-  min_players: number | null
-  max_players: number | null
-  min_playtime: number | null
-  max_playtime: number | null
-  min_age: number | null
-  rules_pdf_url: string | null
-}
+export type { GameMetaGame }
 
 export interface GameMetaProps {
   game: GameMetaGame
 }
 
-// Safely parses a Drizzle NUMERIC string. Returns null for null, empty, NaN, or Infinity.
 function parseNumericField(val: string | null): number | null {
   if (val == null || val === '') return null
   const n = parseFloat(val)
   return isFinite(n) ? n : null
-}
-
-// Runtime guard for bgg_category_rank jsonb shape — Drizzle returns jsonb as unknown.
-function isCategoryRank(v: unknown): v is { category: string; rank: number } {
-  return (
-    v !== null &&
-    typeof v === 'object' &&
-    !Array.isArray(v) &&
-    typeof (v as Record<string, unknown>).category === 'string' &&
-    typeof (v as Record<string, unknown>).rank === 'number'
-  )
 }
 
 function formatPlayers(min: number | null, max: number | null): string {
