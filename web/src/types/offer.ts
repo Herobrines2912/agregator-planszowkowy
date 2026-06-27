@@ -1,5 +1,5 @@
 export interface OfferProduct {
-  price: string
+  price: string | null
   in_stock: boolean
   store_name: string
   product_url: string

@@ -8,12 +8,13 @@ interface Props {
 }
 
 export function OfferJsonLd({ products }: Props) {
-  if (products.length === 0) return null
+  const pricedProducts = products.filter((p): p is OfferProduct & { price: string } => p.price !== null)
+  if (pricedProducts.length === 0) return null
 
   const schema = {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
-    itemListElement: products.map((p, i) => ({
+    itemListElement: pricedProducts.map((p, i) => ({
       '@type': 'ListItem',
       position: i + 1,
       item: {
