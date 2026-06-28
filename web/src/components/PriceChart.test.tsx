@@ -2,19 +2,25 @@ import { describe, test, expect } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { PriceChart, type PriceDataPoint } from './PriceChart'
 
+function daysAgo(n: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - n)
+  return d.toISOString().slice(0, 10)
+}
+
 const mockData: PriceDataPoint[] = [
-  // AlePlanszowki — storeId 1
-  { date: '2026-05-16', storeId: 1, storeName: 'AlePlanszowki', price: '99.90' },
-  { date: '2026-05-23', storeId: 1, storeName: 'AlePlanszowki', price: '94.99' },
-  { date: '2026-05-30', storeId: 1, storeName: 'AlePlanszowki', price: '89.90' },
-  { date: '2026-06-06', storeId: 1, storeName: 'AlePlanszowki', price: '89.90' },
-  { date: '2026-06-13', storeId: 1, storeName: 'AlePlanszowki', price: '84.90' },
+  // AlePlanszowki — storeId 1 (points at 28, 21, 12, 5, 1 days ago)
+  { date: daysAgo(28), storeId: 1, storeName: 'AlePlanszowki', price: '99.90' },
+  { date: daysAgo(21), storeId: 1, storeName: 'AlePlanszowki', price: '94.99' },
+  { date: daysAgo(12), storeId: 1, storeName: 'AlePlanszowki', price: '89.90' },
+  { date: daysAgo(5),  storeId: 1, storeName: 'AlePlanszowki', price: '84.90' },
+  { date: daysAgo(1),  storeId: 1, storeName: 'AlePlanszowki', price: '84.90' },
   // 3Trolle — storeId 2
-  { date: '2026-05-16', storeId: 2, storeName: '3Trolle', price: '104.99' },
-  { date: '2026-05-23', storeId: 2, storeName: '3Trolle', price: '99.99' },
-  { date: '2026-05-30', storeId: 2, storeName: '3Trolle', price: '99.99' },
-  { date: '2026-06-06', storeId: 2, storeName: '3Trolle', price: '94.99' },
-  { date: '2026-06-13', storeId: 2, storeName: '3Trolle', price: '94.99' },
+  { date: daysAgo(28), storeId: 2, storeName: '3Trolle', price: '104.99' },
+  { date: daysAgo(21), storeId: 2, storeName: '3Trolle', price: '99.99' },
+  { date: daysAgo(12), storeId: 2, storeName: '3Trolle', price: '99.99' },
+  { date: daysAgo(5),  storeId: 2, storeName: '3Trolle', price: '94.99' },
+  { date: daysAgo(1),  storeId: 2, storeName: '3Trolle', price: '94.99' },
 ]
 // Spans ~28 days — unlocks 1T and 2T (range thresholds: 1T=7d, 2T=14d)
 
@@ -28,7 +34,7 @@ describe('PriceChart', () => {
   // AC-10: single data point
   test('2. single data point per store → renders without error', () => {
     const singlePoint: PriceDataPoint[] = [
-      { date: '2026-06-13', storeId: 1, storeName: 'AlePlanszowki', price: '89.90' },
+      { date: daysAgo(2), storeId: 1, storeName: 'AlePlanszowki', price: '89.90' },
     ]
     // Should not throw
     const { container } = render(<PriceChart data={singlePoint} gameId={1} />)
