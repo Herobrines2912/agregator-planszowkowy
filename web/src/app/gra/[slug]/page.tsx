@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { GameMeta, type GameMetaGame } from '@/components/GameMeta'
 import { GameJsonLd } from '@/components/GameJsonLd'
 import { OfferJsonLd } from '@/components/OfferJsonLd'
+import { AlertSubscribeForm } from '@/components/AlertSubscribeForm'
 import { siteUrl } from '@/lib/config'
 
 // Mock implementation until Story 4.5 (Dev B) provides real queries.
@@ -157,6 +158,8 @@ export default async function GamePassportPage({
 
         {/* Right column — price data */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <AlertSubscribeForm gameSlug={slug} gameName={game.name} />
+
           {/* BestDealBanner — Story 4.4 */}
           <div
             style={{
