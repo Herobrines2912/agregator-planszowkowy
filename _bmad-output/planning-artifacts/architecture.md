@@ -759,6 +759,8 @@ schema.ts ←→ scraper/scraper/items.py  ← ZAWSZE synchronizowane
 
 `email_suppressions.email` przechowywany jest **w postaci surowej** (nie hash) — alert-engine join w L-3 (`pa.email = es.email`) i sprawdzenie przy zapisie alertu wymagają dokładnego dopasowania na surowym adresie. Anonimizacja następuje dopiero po 3 latach (L-5). Hash trzymamy w `consent_log` (audit), surowy adres w tabelach operacyjnych (`price_alerts`, `email_suppressions`), które i tak muszą zaadresować maila.
 
+**Doprecyzowanie (Story 6.1b code review):** "surowy" oznacza *znormalizowany do lowercase*, nie dosłowny tekst wpisany przez usera. Adresy e-mail są case-insensitive u niemal wszystkich dostawców, więc `input.email.toLowerCase()` jest jedynym stabilnym kluczem tożsamości i musi być stosowany konsekwentnie przy każdym zapisie/odczycie `price_alerts.email` i `email_suppressions.email` (tak jak już jest przy `email_hash`) — inaczej `pa.email = es.email` (dokładne dopasowanie stringów) cicho się rozjeżdża między wielkością liter zapisaną przez różne ścieżki (formularz webowy, webhook Brevo w L-7, przyszłe narzędzia admina). `web/src/db/queries/alerts.ts` normalizuje przy zapisie; każdy przyszły writer `email_suppressions.email` (Story 6.8 — webhook Brevo hard_bounce/complaint) musi robić to samo.
+
 Przy świadomej resubskrypcji (suppression `user_request` lub `global_optout`):
 1. `DELETE FROM email_suppressions WHERE email = ?` — czyści aktywną suppression
 2. `INSERT INTO consent_log (action='suppression_overridden', ...)` — zachowuje audit trail

@@ -5,8 +5,11 @@ import type { NextRequest } from 'next/server'
 const mockSubscribeAlert = vi.fn()
 
 vi.mock('@/db/queries/alerts', () => ({
-  sha256Hex: (s: string) => `hash(${s})`,
   subscribeAlert: (...args: unknown[]) => mockSubscribeAlert(...args),
+}))
+
+vi.mock('@/lib/crypto', () => ({
+  sha256Hex: (s: string) => `hash(${s})`,
 }))
 
 function makeRequest(body: unknown, headers: Record<string, string> = {}) {
@@ -38,6 +41,29 @@ describe('POST /api/alerts/subscribe', () => {
     expect(mockSubscribeAlert).not.toHaveBeenCalled()
   })
 
+  test('email with embedded null byte -> 400, no DB call', async () => {
+    const nullByte = String.fromCharCode(0)
+    const res = await POST(makeRequest({ ...validBody, email: `a${nullByte}b@example.com` }))
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json).toEqual({ success: false, error: 'Nieprawidłowy adres e-mail' })
+    expect(mockSubscribeAlert).not.toHaveBeenCalled()
+  })
+
+  test('malformed JSON body -> 400 with Polish error, no DB call', async () => {
+    const req = {
+      json: async () => {
+        throw new SyntaxError('bad json')
+      },
+      headers: { get: () => null },
+    } as unknown as NextRequest
+    const res = await POST(req)
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json).toEqual({ success: false, error: 'Nieprawidłowe dane żądania' })
+    expect(mockSubscribeAlert).not.toHaveBeenCalled()
+  })
+
   test('consentGiven missing/false -> 400', async () => {
     const res = await POST(makeRequest({ ...validBody, consentGiven: false }))
     expect(res.status).toBe(400)
@@ -60,6 +86,22 @@ describe('POST /api/alerts/subscribe', () => {
     const json = await res.json()
     expect(json).toEqual({ success: false, error: 'Nieprawidłowa cena progowa' })
     expect(mockSubscribeAlert).not.toHaveBeenCalled()
+  })
+
+  test('targetPrice exceeding NUMERIC(10,2) magnitude -> 400, no DB call', async () => {
+    const res = await POST(makeRequest({ ...validBody, targetPrice: '999999999' }))
+    expect(res.status).toBe(400)
+    const json = await res.json()
+    expect(json).toEqual({ success: false, error: 'Nieprawidłowa cena progowa' })
+    expect(mockSubscribeAlert).not.toHaveBeenCalled()
+  })
+
+  test('subscribeAlert throws -> 500 with well-formed ApiResponse error, not an unhandled rejection', async () => {
+    mockSubscribeAlert.mockRejectedValue(new Error('consent_log insert failed'))
+    const res = await POST(makeRequest(validBody))
+    expect(res.status).toBe(500)
+    const json = await res.json()
+    expect(json).toEqual({ success: false, error: 'Wystąpił błąd. Spróbuj ponownie.' })
   })
 
   test('unknown gameSlug -> 400', async () => {

@@ -1,7 +1,8 @@
-import { createHash, randomBytes } from 'crypto'
+import { randomBytes } from 'crypto'
 import { getDb } from '@/db/index'
 import { consentLog, emailSuppressions, games, priceAlerts } from '@/db/schema'
-import { eq } from 'drizzle-orm'
+import { sha256Hex } from '@/lib/crypto'
+import { eq, sql } from 'drizzle-orm'
 
 export type SubscribeAlertInput = {
   email: string
@@ -16,13 +17,15 @@ export type SubscribeAlertResult =
   | { outcome: 'suppressed' }
   | { outcome: 'unknown_game' }
 
-export function sha256Hex(input: string): string {
-  return createHash('sha256').update(input).digest('hex')
-}
-
 export async function subscribeAlert(input: SubscribeAlertInput): Promise<SubscribeAlertResult> {
   const db = getDb()
-  const emailHash = sha256Hex(input.email.toLowerCase())
+  // Normalized once and reused everywhere an email identity is compared or stored
+  // (hash, suppression lookup, price_alerts.email) so price_alerts.email and
+  // email_suppressions.email stay on the same canonical casing — the exact-match
+  // join `pa.email = es.email` (architecture.md L-2) depends on both sides using
+  // the same normalization, not on skipping normalization.
+  const normalizedEmail = input.email.toLowerCase()
+  const emailHash = sha256Hex(normalizedEmail)
 
   const gameRows = await db
     .select({ id: games.id })
@@ -35,8 +38,12 @@ export async function subscribeAlert(input: SubscribeAlertInput): Promise<Subscr
   const suppressed = await db
     .select({ id: emailSuppressions.id })
     .from(emailSuppressions)
-    .where(eq(emailSuppressions.email, input.email))
+    .where(eq(emailSuppressions.email, normalizedEmail))
     .limit(1)
+  // Suppressed and subscribed paths return an identical response body (anti-enumeration,
+  // AC-3), but this path skips the two writes below and is measurably faster. Accepted
+  // residual risk: exploiting the timing gap requires many repeated requests, and the
+  // endpoint has no rate limiting yet to make that practical.
   if (suppressed.length > 0) return { outcome: 'suppressed' }
 
   const confirmationToken = randomBytes(32).toString('hex')
@@ -45,7 +52,7 @@ export async function subscribeAlert(input: SubscribeAlertInput): Promise<Subscr
     .insert(priceAlerts)
     .values({
       game_id: game.id,
-      email: input.email,
+      email: normalizedEmail,
       email_hash: emailHash,
       alert_type: 'price_drop',
       type_b_enabled: input.typeBEnabled,
@@ -58,6 +65,15 @@ export async function subscribeAlert(input: SubscribeAlertInput): Promise<Subscr
       set: {
         target_price: input.targetPrice,
         type_b_enabled: input.typeBEnabled,
+        // An 'active' or still-'pending_doi' alert keeps its status/token untouched on a
+        // threshold update (AC-4: resetting a confirmed subscriber to pending_doi on every
+        // price tweak would silently stop their notifications). A 'cancelled' alert is
+        // different — the user explicitly opted out, so resubmitting the form is a fresh
+        // subscribe intent and must be treated like one: reactivate to pending_doi with a
+        // new token. Unqualified column refs in an ON CONFLICT DO UPDATE SET clause read
+        // the pre-conflict (existing) row, not the values being inserted.
+        status: sql`CASE WHEN ${priceAlerts.status} = 'cancelled' THEN 'pending_doi' ELSE ${priceAlerts.status} END`,
+        confirmation_token: sql`CASE WHEN ${priceAlerts.status} = 'cancelled' THEN ${confirmationToken} ELSE ${priceAlerts.confirmation_token} END`,
       },
     })
     .returning({ id: priceAlerts.id })
