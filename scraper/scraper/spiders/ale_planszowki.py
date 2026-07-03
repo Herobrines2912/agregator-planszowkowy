@@ -8,7 +8,7 @@ from utils.price_parser import parse_price
 logger = logging.getLogger(__name__)
 
 STORE_ID = 2
-_INSTOCK = "https://schema.org/InStock"
+_INSTOCK = "schema.org/InStock"
 
 
 class AlePlanszowkiSpider(scrapy.Spider):
@@ -25,15 +25,14 @@ class AlePlanszowkiSpider(scrapy.Spider):
             yield response.follow(next_page, callback=self.parse)
 
     def parse_product(self, response):
-        name = response.css("h1.page-title::text").get("").strip()
         raw_price = response.css("span.current-price::text, span.price::text").get("").strip()
         raw_price_orig = response.css("span.regular-price::text").get()
 
-        ean, sku, availability_url = self._extract_jsonld(response)
-        in_stock = availability_url == _INSTOCK if availability_url else True
+        name, ean, sku, availability_url = self._extract_jsonld(response)
+        in_stock = _INSTOCK in (availability_url or "") if availability_url else True
 
         yield {
-            "name": name,
+            "name": name or "",
             "url": response.url,
             "store_id": STORE_ID,
             "external_id": sku,
@@ -44,7 +43,7 @@ class AlePlanszowkiSpider(scrapy.Spider):
         }
 
     @staticmethod
-    def _extract_jsonld(response) -> tuple[str | None, str | None, str | None]:
+    def _extract_jsonld(response) -> tuple[str | None, str | None, str | None, str | None]:
         for text in response.css('script[type="application/ld+json"]::text').getall():
             try:
                 data = json.loads(text)
@@ -53,9 +52,10 @@ class AlePlanszowkiSpider(scrapy.Spider):
             items = data if isinstance(data, list) else [data]
             for item in items:
                 if item.get("@type") == "Product":
+                    name = item.get("name") or ""
                     ean = item.get("gtin13") or item.get("gtin")
                     sku = item.get("sku")
                     offers = item.get("offers") or {}
                     availability = offers.get("availability")
-                    return ean, sku, availability
-        return None, None, None
+                    return name, ean, sku, availability
+        return None, None, None, None

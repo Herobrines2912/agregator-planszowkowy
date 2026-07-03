@@ -10,6 +10,7 @@ _bmad-output/**/. working/
 _bmad-output/**/.working/
 
 # Web (Next.js) — node_modules i env zarządzane przez web/.gitignore
+node_modules/
 web/node_modules/
 web/.next/
 web/.env.local
@@ -17,6 +18,7 @@ web/.env.local
 # Scraper (Python) — środowisko wirtualne uv
 scraper/.venv/
 scraper/.env
+__pycache__/
 
 # Eksploracje i drafty tymczasowe
 _tmp/
