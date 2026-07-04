@@ -4,7 +4,7 @@ baseline_commit: 7dfa3f37863a5e55bc81a5589c4e912730086271
 
 # Story 3.3: Hot Deals Feed Query & Real Data Connection
 
-Status: review
+Status: done
 
 ## Story
 
@@ -398,3 +398,18 @@ claude-sonnet-4-6
 - `web/src/db/queries/scrape-runs.test.ts` — NEW: 6 tests for `getLastScrapeTime()`
 - `web/src/app/page.tsx` — MODIFIED: removed mock data, wired real queries, added filter parsing, explicit prop passing
 - `web/eslint.config.mjs` — MODIFIED: added override block allowing `@/db/index` in `db/queries/`
+
+## Senior Developer Review — Round 2 (2026-07-04)
+
+Reviewed via `/ce-code-review` (correctness, project-standards, performance personas) against `edf230b` (the round-1 fix commit, 143 tests passing).
+
+**Findings:**
+
+- **P1 — `getHotDeals()` best-deal selection sorted by price as TEXT, not numeric** (`web/src/db/queries/hot-deals.ts`). `candidates` CTE exposed only `p.price::text AS price`; `best_deals` did `DISTINCT ON (id) ... ORDER BY id, price ASC` over that text column, so PostgreSQL sorted lexicographically (`"199.00" < "89.00"`) — a game with offers at 89 zł and 199 zł could surface the 199 zł offer as "cheapest," violating AC-1. Fixed by carrying a separate `price_numeric` column through the CTE and ordering on it.
+- **P2 — Homepage swallowed all DB errors into the empty-filter-results UI** (`web/src/app/page.tsx`). `try { ... } catch { /* DB unavailable — render empty state */ }` around `getHotDeals`/`getLastScrapeTime` meant a real DB outage rendered identically to "no deals match your filters," with no logging, and never reached the dedicated `app/error.tsx` boundary (whose copy — "Nie udało się załadować ofert" — was written for exactly this case). Fixed by removing the catch and letting the error propagate to `error.tsx`.
+
+Both fixes applied in commit `07ed452` — added a regression test (`hot-deals.test.ts`: asserts the query text orders by `price_numeric`, not `price`), verified `tsc --noEmit` clean, ESLint clean, full suite 204/204 passing.
+
+No CLAUDE.md violations found (queries correctly isolated to `db/queries/*.ts`, prices stay `NUMERIC`/string end-to-end, no naive timestamps introduced). Performance: no N+1, indexes match the query shape, `unstable_cache` tags line up correctly with `/api/revalidate`.
+
+**Residual risks (non-blocking):** `revalidateTag(tag, {})` passes a second argument not in Next's public `revalidateTag(tag: string)` signature — likely inert but unverified against the Next 16 runtime. Hot-deals tests mock `db.execute` entirely, so query-plan-level regressions and NFR-3 (<500ms) at realistic data volume remain unverified by CI.
