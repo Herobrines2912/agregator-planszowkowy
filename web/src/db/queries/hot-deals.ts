@@ -67,6 +67,7 @@ async function _getHotDeals(limit = 40, filters?: HotDealsFilters): Promise<HotD
         g.slug,
         g.name             AS game_name,
         g.cover_image_url,
+        p.price            AS price_numeric,
         p.price::text      AS price,
         p.price_orig::text AS price_orig,
         s.name             AS store_name,
@@ -87,7 +88,7 @@ async function _getHotDeals(limit = 40, filters?: HotDealsFilters): Promise<HotD
         slug, game_name, cover_image_url, price, price_orig, store_name, store_url, discount_ratio
       FROM candidates
       WHERE discount_ratio >= 0.15
-      ORDER BY id, price ASC
+      ORDER BY id, price_numeric ASC
     )
     SELECT slug, game_name, cover_image_url, price, price_orig, store_name, store_url
     FROM best_deals

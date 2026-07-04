@@ -7,7 +7,7 @@ import { ListRow } from '@/components/ListRow'
 import { StalenessWarningBanner } from '@/components/StalenessWarningBanner'
 import { calcMinPrice } from '@/lib/calc'
 import { getHotDeals } from '@/db/queries/hot-deals'
-import type { HotDeal, HotDealsFilters } from '@/db/queries/hot-deals'
+import type { HotDealsFilters } from '@/db/queries/hot-deals'
 import { getLastScrapeTime } from '@/db/queries/scrape-runs'
 
 export const metadata: Metadata = {
@@ -39,16 +39,10 @@ export default async function HomePage({
     if (!isNaN(p) && p >= 1 && p <= 20) filters.players = p
   }
 
-  let deals: HotDeal[] = []
-  let lastScrapedAt: Date | null = null
-  try {
-    ;[deals, lastScrapedAt] = await Promise.all([
-      getHotDeals(40, Object.keys(filters).length > 0 ? filters : undefined),
-      getLastScrapeTime(),
-    ])
-  } catch {
-    // DB unavailable — render empty state
-  }
+  const [deals, lastScrapedAt] = await Promise.all([
+    getHotDeals(40, Object.keys(filters).length > 0 ? filters : undefined),
+    getLastScrapeTime(),
+  ])
 
   const minPrice = calcMinPrice(deals)
 

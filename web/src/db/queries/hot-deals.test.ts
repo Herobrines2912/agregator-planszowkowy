@@ -154,4 +154,17 @@ describe('getHotDeals', () => {
     expect(result).toEqual([])
     expect(mockExecute).not.toHaveBeenCalled()
   })
+
+  test('best-deal selection orders by numeric price, not text', async () => {
+    mockExecute.mockResolvedValue({ rows: [] })
+    await getHotDeals()
+    const sqlArg = mockExecute.mock.calls[0][0] as { strings: ArrayLike<string> }
+    const queryText = Array.from(sqlArg.strings).join('')
+    // Regression guard: DISTINCT ON must order by the numeric price column.
+    // Ordering by the text-cast `price` column sorts lexicographically
+    // ("199.00" < "89.00"), which can select a more expensive offer as
+    // the "cheapest" deal for a game.
+    expect(queryText).toContain('ORDER BY id, price_numeric ASC')
+    expect(queryText).not.toMatch(/ORDER BY id, price ASC/)
+  })
 })
