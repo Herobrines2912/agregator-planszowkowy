@@ -22,6 +22,13 @@ __pycache__/
 
 # Eksploracje i drafty tymczasowe
 _tmp/
+tmp/
+
+# Playwright MCP — logi/zrzuty z sesji lokalnych
+.playwright-mcp/
+
+# BMad — backupy plików konfiguracyjnych
+*.bak
 
 # Sekrety i dane lokalne
 *.env.local
