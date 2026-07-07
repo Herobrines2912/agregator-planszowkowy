@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
   revalidateTag('hot-deals', {})
   revalidateTag('scrape-time', {})
   revalidateTag('game-passport', {})
+  revalidateTag('price-history', {})
 
   const body: ApiResponse<{ revalidated: true }> = { success: true, data: { revalidated: true } }
   return Response.json(body)
