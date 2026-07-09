@@ -23,8 +23,8 @@ ROBOTSTXT_OBEY = True
 
 # Concurrency and throttling settings
 #CONCURRENT_REQUESTS = 16
-CONCURRENT_REQUESTS_PER_DOMAIN = 1
-DOWNLOAD_DELAY = 1
+CONCURRENT_REQUESTS_PER_DOMAIN = 4
+DOWNLOAD_DELAY = 0.5
 
 # Disable cookies (enabled by default)
 #COOKIES_ENABLED = False
