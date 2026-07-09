@@ -5,6 +5,7 @@ import { GameMeta } from '@/components/GameMeta'
 import { GameJsonLd } from '@/components/GameJsonLd'
 import { OfferJsonLd } from '@/components/OfferJsonLd'
 import { AlertSubscribeForm } from '@/components/AlertSubscribeForm'
+import { PriceTable } from '@/components/PriceTable'
 import { siteUrl } from '@/lib/config'
 import { getGameBySlug, getAllGameSlugs } from '@/db/queries/game-passport'
 
@@ -122,21 +123,25 @@ export default async function GamePassportPage({
           </div>
 
           {/* PriceTable — Story 4.3 */}
-          <div
-            style={{
-              backgroundColor: 'var(--color-surface)',
-              borderRadius: '12px',
-              padding: '20px',
-              minHeight: '160px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--color-text-muted)',
-              fontSize: '13px',
-            }}
-          >
-            PriceTable (Story 4.3)
-          </div>
+          {game.products.length > 0 ? (
+            <PriceTable products={game.products} bestProductId={game.best_product?.id ?? null} />
+          ) : (
+            <div
+              style={{
+                backgroundColor: 'var(--color-surface)',
+                borderRadius: '12px',
+                padding: '20px',
+                minHeight: '80px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--color-text-muted)',
+                fontSize: '13px',
+              }}
+            >
+              Brak aktywnych ofert
+            </div>
+          )}
 
           {/* PriceChart — Story 5.3 */}
           <div
