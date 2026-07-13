@@ -44,11 +44,11 @@ describe('getLastScrapeTime', () => {
     expect(result).toBeNull()
   })
 
-  test('returns the finished_at date of the last successful run', async () => {
+  test('returns the finished_at date of the last successful run as an ISO string', async () => {
     const date = new Date('2024-06-01T06:00:00Z')
     ;(mockChain.limit as ReturnType<typeof vi.fn>).mockResolvedValue([{ finished_at: date }])
     const result = await getLastScrapeTime()
-    expect(result).toEqual(date)
+    expect(result).toBe(date.toISOString())
   })
 
   test('returns null when finished_at is null (crashed mid-run)', async () => {

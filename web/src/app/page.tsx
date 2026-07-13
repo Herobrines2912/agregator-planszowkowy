@@ -48,7 +48,7 @@ export default async function HomePage({
 
   return (
     <div style={{ padding: '40px' }}>
-      <StalenessWarningBanner lastScrapedAt={lastScrapedAt?.toISOString() ?? null} />
+      <StalenessWarningBanner lastScrapedAt={lastScrapedAt} />
 
       <h2
         style={{
