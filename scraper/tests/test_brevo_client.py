@@ -10,6 +10,7 @@ import importlib
 import os
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 
 os.environ.setdefault("BREVO_API_KEY", "test-api-key")
@@ -70,26 +71,40 @@ class TestSendDoiEmailSuccess:
 
 class TestSendDoiEmailFailure:
     @patch("utils.brevo_client.httpx.post")
-    def test_returns_false_on_non_2xx_non_429(self, mock_post):
+    def test_returns_false_on_non_2xx_non_429(self, mock_post, caplog):
         mock_post.return_value = _make_response(400)
 
-        result = brevo_client.send_doi_email(
-            "user@example.com", "https://example.com/confirm?token=abc",
-            "Brass: Birmingham", "89.99",
-        )
+        with caplog.at_level("WARNING"):
+            result = brevo_client.send_doi_email(
+                "user@example.com", "https://example.com/confirm?token=abc",
+                "Brass: Birmingham", "89.99",
+            )
 
         assert result is False
+        assert "failed" in caplog.text.lower()
 
     @patch("utils.brevo_client.httpx.post")
-    def test_returns_false_on_500(self, mock_post):
+    def test_returns_false_on_500(self, mock_post, caplog):
         mock_post.return_value = _make_response(500)
 
-        result = brevo_client.send_doi_email(
-            "user@example.com", "https://example.com/confirm?token=abc",
-            "Brass: Birmingham", "89.99",
-        )
+        with caplog.at_level("WARNING"):
+            result = brevo_client.send_doi_email(
+                "user@example.com", "https://example.com/confirm?token=abc",
+                "Brass: Birmingham", "89.99",
+            )
 
         assert result is False
+        assert "failed" in caplog.text.lower()
+
+    @patch("utils.brevo_client.httpx.post")
+    def test_network_error_propagates_uncaught(self, mock_post):
+        mock_post.side_effect = httpx.ConnectError("boom")
+
+        with pytest.raises(httpx.ConnectError):
+            brevo_client.send_doi_email(
+                "user@example.com", "https://example.com/confirm?token=abc",
+                "Brass: Birmingham", "89.99",
+            )
 
 
 class TestSendDoiEmailRetry:
@@ -109,17 +124,19 @@ class TestSendDoiEmailRetry:
 
     @patch("utils.brevo_client.httpx.post")
     @patch("utils.brevo_client.time.sleep")
-    def test_429_then_429_returns_false(self, mock_sleep, mock_post):
+    def test_429_then_429_returns_false(self, mock_sleep, mock_post, caplog):
         mock_post.side_effect = [_make_response(429), _make_response(429)]
 
-        result = brevo_client.send_doi_email(
-            "user@example.com", "https://example.com/confirm?token=abc",
-            "Brass: Birmingham", "89.99",
-        )
+        with caplog.at_level("WARNING"):
+            result = brevo_client.send_doi_email(
+                "user@example.com", "https://example.com/confirm?token=abc",
+                "Brass: Birmingham", "89.99",
+            )
 
         assert result is False
         assert mock_post.call_count == 2
         mock_sleep.assert_called_once_with(2)
+        assert "failed" in caplog.text.lower()
 
 
 class TestNoRawEmailInLogs:
@@ -219,7 +236,7 @@ class TestMissingEnvVarsFailFast:
         )
 
         try:
-            with pytest.raises(EnvironmentError):
+            with patch("utils.brevo_client.load_dotenv"), pytest.raises(EnvironmentError):
                 importlib.reload(brevo_client)
         finally:
             monkeypatch.setenv("BREVO_API_KEY", "test-api-key")
@@ -235,7 +252,7 @@ class TestMissingEnvVarsFailFast:
         )
 
         try:
-            with pytest.raises(EnvironmentError):
+            with patch("utils.brevo_client.load_dotenv"), pytest.raises(EnvironmentError):
                 importlib.reload(brevo_client)
         finally:
             monkeypatch.setenv("BREVO_API_KEY", "test-api-key")
@@ -251,7 +268,7 @@ class TestMissingEnvVarsFailFast:
         )
 
         try:
-            with pytest.raises(EnvironmentError):
+            with patch("utils.brevo_client.load_dotenv"), pytest.raises(EnvironmentError):
                 importlib.reload(brevo_client)
         finally:
             monkeypatch.setenv("BREVO_API_KEY", "test-api-key")

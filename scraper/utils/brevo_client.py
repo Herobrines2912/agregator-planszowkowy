@@ -1,4 +1,5 @@
 import hashlib
+import html
 import logging
 import os
 import time
@@ -38,9 +39,10 @@ def _load_template(name: str) -> str:
 
 
 def _render(template: str, **kwargs: str) -> str:
+    """Substitute {{key}} tokens with HTML-escaped values (all values render into HTML text or href attributes)."""
     rendered = template
     for key, value in kwargs.items():
-        rendered = rendered.replace("{{" + key + "}}", value)
+        rendered = rendered.replace("{{" + key + "}}", html.escape(value, quote=True))
     return rendered
 
 
