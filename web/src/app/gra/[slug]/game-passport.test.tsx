@@ -148,6 +148,43 @@ describe('GamePassportPage', () => {
     ).rejects.toThrow('NEXT_NOT_FOUND')
     expect(notFound).toHaveBeenCalled()
   })
+
+  // AC-6: BestDealBanner receives game.best_product ?? game.products[0] ?? null
+  test('BestDealBanner shows the cheapest in-stock product when one exists', async () => {
+    mockGetGameBySlug.mockResolvedValue(makeGameData({
+      products: [
+        { id: 1, store_name: '3Trolle', price: '99.00', price_orig: null, in_stock: true, product_url: 'https://3trolle.pl/gra' },
+      ],
+      best_product: { id: 1, store_name: '3Trolle', price: '99.00', price_orig: null, in_stock: true, product_url: 'https://3trolle.pl/gra' },
+    }))
+    const output = await GamePassportPage({ params: Promise.resolve({ slug: 'brass-birmingham' }) })
+    render(output)
+    expect(screen.getByTestId('best-deal-store')).toHaveTextContent('3Trolle')
+    expect(screen.getByTestId('best-deal-cta')).toBeTruthy()
+  })
+
+  // AC-2/AC-6: all products out of stock → best_product is null, falls back to products[0]
+  test('BestDealBanner falls back to products[0] (dimmed) when nothing is in stock', async () => {
+    mockGetGameBySlug.mockResolvedValue(makeGameData({
+      products: [
+        { id: 2, store_name: 'AlePlanszowki', price: '120.00', price_orig: null, in_stock: false, product_url: 'https://aleplanszowki.pl/gra' },
+      ],
+      best_product: null,
+    }))
+    const output = await GamePassportPage({ params: Promise.resolve({ slug: 'brass-birmingham' }) })
+    render(output)
+    expect(screen.getByTestId('best-deal-store')).toHaveTextContent('AlePlanszowki')
+    expect(screen.queryByTestId('best-deal-cta')).toBeNull()
+    expect(screen.getByTestId('best-deal-unavailable-label')).toBeTruthy()
+  })
+
+  // AC-5/AC-6: zero products → BestDealBanner renders nothing
+  test('BestDealBanner renders nothing when the game has zero products', async () => {
+    mockGetGameBySlug.mockResolvedValue(makeGameData({ products: [], best_product: null }))
+    const output = await GamePassportPage({ params: Promise.resolve({ slug: 'brass-birmingham' }) })
+    render(output)
+    expect(screen.queryByTestId('best-deal-banner')).toBeNull()
+  })
 })
 
 // ── page.tsx — generateMetadata ───────────────────────────────────────────────

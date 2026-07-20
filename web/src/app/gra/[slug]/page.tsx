@@ -5,6 +5,7 @@ import { GameMeta } from '@/components/GameMeta'
 import { GameJsonLd } from '@/components/GameJsonLd'
 import { OfferJsonLd } from '@/components/OfferJsonLd'
 import { AlertSubscribeForm } from '@/components/AlertSubscribeForm'
+import { BestDealBanner } from '@/components/BestDealBanner'
 import { PriceTable } from '@/components/PriceTable'
 import { siteUrl } from '@/lib/config'
 import { getGameBySlug, getAllGameSlugs } from '@/db/queries/game-passport'
@@ -105,22 +106,7 @@ export default async function GamePassportPage({
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <AlertSubscribeForm gameSlug={slug} gameName={game.name} />
 
-          {/* BestDealBanner — Story 4.4 */}
-          <div
-            style={{
-              backgroundColor: 'var(--color-surface)',
-              borderRadius: '12px',
-              padding: '20px',
-              minHeight: '80px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--color-text-muted)',
-              fontSize: '13px',
-            }}
-          >
-            BestDealBanner (Story 4.4)
-          </div>
+          <BestDealBanner product={game.best_product ?? game.products[0] ?? null} />
 
           {/* PriceTable — Story 4.3 */}
           {game.products.length > 0 ? (
