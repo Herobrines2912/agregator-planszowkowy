@@ -1,0 +1,121 @@
+# generated: 2026-07-20
+# last_updated: 2026-07-20
+# project: board_games_app
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - This file is the SOURCE OF TRUTH for project status — update it immediately after every
+#   fully completed story or fix (see CLAUDE.md "Sprint status" section)
+
+generated: 2026-07-20
+last_updated: 2026-07-20
+project: board_games_app
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  epic-1: done
+  1-1-monorepo-initialization: done
+  1-2-database-schema-neon-postgresql-setup: done
+  1-3-cicd-workflow-foundation: done
+  1-4-design-system-foundation: done
+  1-5-bgg-api-access-validation-spike: done
+  1-6-gameupc-coverage-spike: done
+  1-7-store-preorder-signal-audit: done
+  1-2b-pydantic-models-sync: done
+  epic-1-retrospective: optional
+
+  epic-2: done
+  2-1-scrapy-spiders-three-trolle-ale-planszowki: done
+  2-2-product-deduplication-pipeline: done
+  2-3-price-history-recording-database-pipeline: done
+  2-4-bgg-data-enrichment-background-job: done
+  2-5-scraper-github-actions-workflow: done
+  2-6-operator-monitoring-selector-health-tests: done
+  epic-2-retrospective: optional
+
+  epic-3: done
+  3-1-homepage-shell-sticky-header: done
+  3-2-dealcard-component-card-view: done
+  3-3-hot-deals-feed-query-real-data-connection: done
+  3-4-filterbar-view-toggle-sort: done
+  3-5-list-row-view-stagger-animations: done
+  3-6-skeleton-loading-empty-states-staleness-banner: done
+  epic-3-retrospective: optional
+
+  epic-4: in-progress
+  4-1-game-passport-shell-dynamic-routing: done
+  4-2-gamemeta-panel-bgg-metadata-display: done
+  4-3-pricetable-multi-store-price-comparison: done
+  4-4-best-deal-banner: backlog
+  4-5-game-passport-db-queries: done
+  4-6-dlc-dependency-warning: backlog
+  epic-4-retrospective: optional
+
+  epic-5: in-progress
+  5-1-price-history-db-query: done
+  5-2-pricechart-component-visual-shell: done
+  5-3-pricechart-connected-to-real-data: backlog
+  5-4-seo-meta-tags-open-graph-canonical: done
+  5-5-json-ld-structured-data: done
+  5-6-sitemap-robots-txt: done
+  epic-5-retrospective: optional
+
+  epic-6: in-progress
+  6-1-alertform-post-api-alerts-zapis-powiadomienia: done
+  6-2-double-opt-in-confirmation-get-api-alerts-confirm: backlog
+  6-3-wylaczanie-powiadomien: backlog
+  6-4-brevo-client-szablon-emaila-doi: done
+  6-5-alert-engine-wykrywanie-spadku-ceny: backlog
+  6-6-email-o-spadku-ceny: backlog
+  6-7-type-b-anomaly-detection: backlog
+  6-8-brevo-webhook-hard-bounce-complaint-suppression: backlog
+  6-9-dokumenty-prawne-privacy-regulamin-cookies-gdpr: backlog
+  epic-6-retrospective: optional
+
+  epic-7: backlog
+  7-1-spike-walidacja-danych-flipper-mode: backlog
+  7-2-flipper-route-shell-empty-state-guard: backlog
+  7-3-flipperrow-component-table-layout: backlog
+  7-4-flipper-db-query-calc-margin-proxy: backlog
+  7-5-flipper-filters-sorting: backlog
+  7-6-type-b-alert-subscription-z-flipper-mode: backlog
+  epic-7-retrospective: optional
+
+  epic-8: backlog
+  8-1-spike-walidacja-zrodla-danych-premier: backlog
+  8-2-upcoming-releases-spider-pipeline: backlog
+  8-3-availability-trigger-alert-engine: backlog
+  8-4-nadchodzace-page-shell-upcomingcard: backlog
+  8-5-powiadom-gdy-dostepna-formularz-api: backlog
+  epic-8-retrospective: optional
