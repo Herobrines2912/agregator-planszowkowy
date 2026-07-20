@@ -1,5 +1,5 @@
 # generated: 2026-07-20
-# last_updated: 2026-07-20
+# last_updated: 2026-07-21
 # project: board_games_app
 # project_key: NOKEY
 # tracking_system: file-system
@@ -37,7 +37,7 @@
 #   fully completed story or fix (see CLAUDE.md "Sprint status" section)
 
 generated: 2026-07-20
-last_updated: 2026-07-20
+last_updated: 2026-07-21
 project: board_games_app
 project_key: NOKEY
 tracking_system: file-system
@@ -77,7 +77,7 @@ development_status:
   4-1-game-passport-shell-dynamic-routing: done
   4-2-gamemeta-panel-bgg-metadata-display: done
   4-3-pricetable-multi-store-price-comparison: done
-  4-4-best-deal-banner: review
+  4-4-best-deal-banner: done
   4-5-game-passport-db-queries: done
   4-6-dlc-dependency-warning: backlog
   epic-4-retrospective: optional
