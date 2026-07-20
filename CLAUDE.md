@@ -35,6 +35,11 @@ Przeczytaj ten plik i `AGENTS.md` przed napisaniem pierwszej linii kodu.
 ### Logging (Python)
 - `logging.getLogger(__name__)` — **nigdy `print()`** w spiderach i pipeline
 
+### Sprint status
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` to **source of truth** dla statusu epików i story — nie odtwarzać statusu z historii commitów
+- Po **każdym** w pełni ukończonym story lub fixie (feature gotowy, przetestowany, zmergowany) — zaktualizować w tym pliku status story (`ready-for-dev` → `in-progress` → `review` → `done`) oraz `last_updated`
+- Gdy wszystkie story w epiku mają `done` — epik też przechodzi na `done`
+
 ## Anti-patterns (ZABRONIONE)
 
 ```typescript
