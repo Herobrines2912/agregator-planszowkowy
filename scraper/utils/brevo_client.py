@@ -2,6 +2,7 @@ import hashlib
 import html
 import logging
 import os
+import re
 import time
 from pathlib import Path
 
@@ -17,15 +18,15 @@ _TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 
 load_dotenv()
 
-BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
+BREVO_API_KEY = (os.environ.get("BREVO_API_KEY") or "").strip()
 if not BREVO_API_KEY:
     raise EnvironmentError("BREVO_API_KEY env var not set — cannot load brevo_client")
 
-BREVO_SENDER_EMAIL = os.environ.get("BREVO_SENDER_EMAIL")
+BREVO_SENDER_EMAIL = (os.environ.get("BREVO_SENDER_EMAIL") or "").strip()
 if not BREVO_SENDER_EMAIL:
     raise EnvironmentError("BREVO_SENDER_EMAIL env var not set — cannot load brevo_client")
 
-BREVO_SENDER_NAME = os.environ.get("BREVO_SENDER_NAME")
+BREVO_SENDER_NAME = (os.environ.get("BREVO_SENDER_NAME") or "").strip()
 if not BREVO_SENDER_NAME:
     raise EnvironmentError("BREVO_SENDER_NAME env var not set — cannot load brevo_client")
 
@@ -39,11 +40,11 @@ def _load_template(name: str) -> str:
 
 
 def _render(template: str, **kwargs: str) -> str:
-    """Substitute {{key}} tokens with HTML-escaped values (all values render into HTML text or href attributes)."""
-    rendered = template
-    for key, value in kwargs.items():
-        rendered = rendered.replace("{{" + key + "}}", html.escape(value, quote=True))
-    return rendered
+    """Substitute {{key}} tokens with HTML-escaped values in a single pass, so a
+    substituted value's literal {{...}} text is never re-matched as a placeholder."""
+    escaped = {key: html.escape(value, quote=True) for key, value in kwargs.items()}
+    pattern = re.compile("|".join(re.escape("{{" + key + "}}") for key in escaped))
+    return pattern.sub(lambda m: escaped[m.group()[2:-2]], template)
 
 
 def _post_doi_email(payload: dict) -> httpx.Response:

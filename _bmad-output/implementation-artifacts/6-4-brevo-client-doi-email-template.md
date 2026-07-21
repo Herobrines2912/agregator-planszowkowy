@@ -4,7 +4,7 @@ baseline_commit: ddf0554
 
 # Story 6.4: Brevo Client & Szablon Emaila DOI (Double Opt-In)
 
-Status: review
+Status: done
 
 **Epic:** 6 — Email Price Alerts
 **Dev:** Dev B (Scraper/Infra)
@@ -76,6 +76,15 @@ so that later stories (6.5 alert engine, 6.2 confirmation flow) can trigger the 
   - [x] `send_doi_email(to_email, confirmation_url, game_name, target_price) -> bool`
   - [x] SHA-256(email)[:8] in all log lines that reference the recipient (AC-5)
 - [x] T4: Create `scraper/tests/test_brevo_client.py` (mirror `test_bgg_client.py` structure — mocked HTTP, no real API key needed at test-run time; see Dev Notes for the import-time-raise testing approach)
+
+### Review Findings
+
+- [x] [Review][Patch] Whitespace-only env vars pass the import-time fail-fast guard [scraper/utils/brevo_client.py:20-30] — fixed: `.strip()` applied before the truthiness check
+- [x] [Review][Patch] `_render()` chained `.replace()` calls allow one substituted value to be re-matched by a later placeholder key ("placeholder re-injection") [scraper/utils/brevo_client.py:41-45] — fixed: single-pass `re.sub()` substitution instead of sequential `.replace()` calls
+- [x] [Review][Defer] Missing/renamed `doi_email.html` raises an uncaught `FileNotFoundError` from `_load_template()` [scraper/utils/brevo_client.py:29-30] — deferred, pre-existing gap not required by any AC
+- [x] [Review][Defer] No URL-scheme allow-list on `confirmation_url` before it's placed in the email's `href` [scraper/utils/brevo_client.py:31-36] — deferred, low risk since the URL is server-generated, not user input
+- [x] [Review][Defer] Network/timeout errors (`httpx.ConnectError`, etc.) propagate uncaught out of `send_doi_email()` [scraper/utils/brevo_client.py:52-58] — deferred, explicitly sanctioned by AC-1; flagging forward so Story 6.5's alert engine wraps its own call in a try/except
+- [x] [Review][Defer] No `List-Unsubscribe` email header; footer link is a static `href="#"` placeholder [scraper/templates/doi_email.html:52-54] — deferred, explicitly sanctioned by AC-3's note (no token exists yet at DOI stage); candidate enhancement for a future unsubscribe-at-DOI story
 
 ---
 
