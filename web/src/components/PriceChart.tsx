@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { formatPrice, formatDateMedium } from '@/lib/format'
 import { TimeRangeSelector, type Range, RANGE_DAYS, ALL_RANGES } from './TimeRangeSelector'
 import type { ApiResponse } from '@/types/api'
@@ -187,6 +187,25 @@ interface TooltipState {
   storeName: string
   price: string
   date: string
+  px: number       // tooltip div left — computed in the mouse handler, never in render
+  py: number       // tooltip div top
+}
+
+// Tooltip pixel position from SVG coords. Pure — the caller passes the measured
+// tooltip width and mobile flag, so nothing here (or in render) reads a ref.
+function tooltipPixelPos(
+  svgX: number,
+  svgY: number,
+  containerWidth: number,
+  tooltipWidth: number,
+  mobile: boolean,
+): { px: number; py: number } {
+  const svgHeight = mobile ? 220 : 280
+  let px = (svgX / 860) * containerWidth
+  const py = (svgY / 280) * svgHeight - 30
+  if (px + tooltipWidth + 12 > containerWidth) px = px - tooltipWidth - 12
+  else px = px + 12
+  return { px, py }
 }
 
 export function PriceChart({ data, gameId, initialRange = '1T' }: PriceChartProps) {
@@ -230,7 +249,7 @@ export function PriceChart({ data, gameId, initialRange = '1T' }: PriceChartProp
     return () => fetchAbortRef.current?.abort()
   }, [])
 
-  const handleRangeChange = useCallback(async (range: Range) => {
+  const handleRangeChange = async (range: Range) => {
     setSelectedRange(range)
     setHiddenStores(new Set())
 
@@ -264,7 +283,7 @@ export function PriceChart({ data, gameId, initialRange = '1T' }: PriceChartProp
         setLoading(false)
       }
     }
-  }, [gameId, loadedRangeDays])
+  }
 
   // Stable store insertion order — derived synchronously from currently-loaded data
   const storeOrder = useMemo(() => {
@@ -279,33 +298,36 @@ export function PriceChart({ data, gameId, initialRange = '1T' }: PriceChartProp
     return order
   }, [chartData])
 
-  const filteredData = filterByRange(chartData, selectedRange)
-
-  // Compute price/date bounds from filtered data
-  const allPrices = filteredData.map(d => parseFloat(d.price))
-  const allDates = filteredData.map(d => new Date(d.date).getTime())
-  const minP = allPrices.length > 0 ? Math.min(...allPrices) : 0
-  const maxP = allPrices.length > 0 ? Math.max(...allPrices) : 100
-  const minDate = allDates.length > 0 ? new Date(Math.min(...allDates)) : new Date()
-  const maxDate = allDates.length > 0 ? new Date(Math.max(...allDates)) : new Date()
-
-  // Pad y range slightly so lines don't sit on the edge
-  const pricePad = (maxP - minP) * 0.1 || 5
-  const paddedMinP = Math.max(0, minP - pricePad)
-  const paddedMaxP = maxP + pricePad
-
-  const storeGroups = buildStoreGroups(
-    filteredData,
-    storeOrder,
-    minDate,
-    maxDate,
-    paddedMinP,
-    paddedMaxP,
+  const filteredData = useMemo(
+    () => filterByRange(chartData, selectedRange),
+    [chartData, selectedRange],
   )
 
-  const uniqueDates = Array.from(
-    new Map(filteredData.map(d => [d.date, new Date(d.date)])).values()
-  ).sort((a, b) => a.getTime() - b.getTime())
+  // Derived geometry — memoized so `storeGroups` keeps a stable identity across
+  // renders. It's a dependency of the memoized `handleMouseMove`; recomputing it
+  // every render gave it a new identity each time, defeating that memoization and
+  // making React Compiler bail on optimizing the whole component.
+  const { storeGroups, minDate, maxDate, paddedMinP, paddedMaxP, uniqueDates } = useMemo(() => {
+    const allPrices = filteredData.map(d => parseFloat(d.price))
+    const allDates = filteredData.map(d => new Date(d.date).getTime())
+    const minP = allPrices.length > 0 ? Math.min(...allPrices) : 0
+    const maxP = allPrices.length > 0 ? Math.max(...allPrices) : 100
+    const minDate = allDates.length > 0 ? new Date(Math.min(...allDates)) : new Date()
+    const maxDate = allDates.length > 0 ? new Date(Math.max(...allDates)) : new Date()
+
+    // Pad y range slightly so lines don't sit on the edge
+    const pricePad = (maxP - minP) * 0.1 || 5
+    const paddedMinP = Math.max(0, minP - pricePad)
+    const paddedMaxP = maxP + pricePad
+
+    const storeGroups = buildStoreGroups(filteredData, storeOrder, minDate, maxDate, paddedMinP, paddedMaxP)
+
+    const uniqueDates = Array.from(
+      new Map(filteredData.map(d => [d.date, new Date(d.date)])).values()
+    ).sort((a, b) => a.getTime() - b.getTime())
+
+    return { storeGroups, minDate, maxDate, paddedMinP, paddedMaxP, uniqueDates }
+  }, [filteredData, storeOrder])
 
   const xLabels = xAxisLabels(uniqueDates, minDate, maxDate, isMobile)
   const yLabels = yAxisLabels(paddedMinP, paddedMaxP)
@@ -323,7 +345,7 @@ export function PriceChart({ data, gameId, initialRange = '1T' }: PriceChartProp
     })
   }
 
-  const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
     if (!svgRef.current) return
     const rect = svgRef.current.getBoundingClientRect()
     const scaleX = 860 / rect.width
@@ -346,30 +368,23 @@ export function PriceChart({ data, gameId, initialRange = '1T' }: PriceChartProp
             storeName: store.storeName,
             price: formatPrice(pt.price.toFixed(2)),
             date: formatDateMedium(pt.date),
+            px: 0,
+            py: 0,
           }
         }
       }
     }
 
     if (nearest && minDist < 40) {
-      setTooltip(nearest)
+      // Ref reads are fine in an event handler — resolve final pixel position here
+      // so the render path never touches svgRef/tooltipRef.
+      const containerW = svgRef.current?.parentElement?.clientWidth ?? 860
+      const tw = tooltipRef.current?.offsetWidth ?? 120
+      const { px, py } = tooltipPixelPos(nearest.svgX, nearest.svgY, containerW, tw, isMobile)
+      setTooltip({ ...nearest, px, py })
     } else {
       setTooltip(null)
     }
-  }, [storeGroups, hiddenStores])
-
-  // Tooltip pixel position from SVG coords
-  function tooltipPixelPos(svgX: number, svgY: number, containerWidth: number) {
-    const pctX = (svgX - 0) / 860
-    const pctY = (svgY - 0) / 280
-    const svgHeight = isMobile ? 220 : 280
-    let px = pctX * containerWidth
-    let py = pctY * svgHeight
-    const tw = tooltipRef.current?.offsetWidth ?? 120
-    if (px + tw + 12 > containerWidth) px = px - tw - 12
-    else px = px + 12
-    py = py - 30
-    return { px, py }
   }
 
   const svgHeight = isMobile ? 220 : 280
@@ -582,34 +597,29 @@ export function PriceChart({ data, gameId, initialRange = '1T' }: PriceChartProp
         )}
 
         {/* Tooltip overlay */}
-        {tooltip && (() => {
-          const containerEl = svgRef.current?.parentElement
-          const containerW = containerEl?.clientWidth ?? 860
-          const { px, py } = tooltipPixelPos(tooltip.svgX, tooltip.svgY, containerW)
-          return (
-            <div
-              ref={tooltipRef}
-              style={{
-                position: 'absolute',
-                top: py,
-                left: px,
-                background: '#DDD0BC',
-                borderRadius: '8px',
-                boxShadow: '0 4px 12px rgba(44,31,20,0.16)',
-                padding: '8px 12px',
-                fontSize: '13px',
-                color: '#2C1F14',
-                pointerEvents: 'none',
-                whiteSpace: 'nowrap',
-                zIndex: 10,
-              }}
-            >
-              <div style={{ fontWeight: 700 }}>{tooltip.price}</div>
-              <div style={{ color: '#6B5744' }}>{tooltip.storeName}</div>
-              <div style={{ color: '#A89480', fontSize: '11px' }}>{tooltip.date}</div>
-            </div>
-          )
-        })()}
+        {tooltip && (
+          <div
+            ref={tooltipRef}
+            style={{
+              position: 'absolute',
+              top: tooltip.py,
+              left: tooltip.px,
+              background: '#DDD0BC',
+              borderRadius: '8px',
+              boxShadow: '0 4px 12px rgba(44,31,20,0.16)',
+              padding: '8px 12px',
+              fontSize: '13px',
+              color: '#2C1F14',
+              pointerEvents: 'none',
+              whiteSpace: 'nowrap',
+              zIndex: 10,
+            }}
+          >
+            <div style={{ fontWeight: 700 }}>{tooltip.price}</div>
+            <div style={{ color: '#6B5744' }}>{tooltip.storeName}</div>
+            <div style={{ color: '#A89480', fontSize: '11px' }}>{tooltip.date}</div>
+          </div>
+        )}
       </div>
 
       {/* Statistics section */}
