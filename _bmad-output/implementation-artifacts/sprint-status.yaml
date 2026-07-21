@@ -79,13 +79,15 @@ development_status:
   4-3-pricetable-multi-store-price-comparison: done
   4-4-best-deal-banner: done
   4-5-game-passport-db-queries: done
-  4-6-dlc-dependency-warning: backlog
+  4-5b-parent-game-bgg-link: ready-for-dev
+  4-6-dlc-dependency-warning: ready-for-dev
   epic-4-retrospective: optional
 
   epic-5: in-progress
   5-1-price-history-db-query: done
   5-2-pricechart-component-visual-shell: done
-  5-3-pricechart-connected-to-real-data: backlog
+  5-3-pricechart-connected-to-real-data: done
+  5-3b-pricechart-accessible-table-fallback: backlog
   5-4-seo-meta-tags-open-graph-canonical: done
   5-5-json-ld-structured-data: done
   5-6-sitemap-robots-txt: done

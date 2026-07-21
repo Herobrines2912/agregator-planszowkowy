@@ -7,8 +7,10 @@ import { OfferJsonLd } from '@/components/OfferJsonLd'
 import { AlertSubscribeForm } from '@/components/AlertSubscribeForm'
 import { BestDealBanner } from '@/components/BestDealBanner'
 import { PriceTable } from '@/components/PriceTable'
+import { PriceChart } from '@/components/PriceChart'
 import { siteUrl } from '@/lib/config'
 import { getGameBySlug, getAllGameSlugs } from '@/db/queries/game-passport'
+import { getPriceHistory } from '@/db/queries/price-history'
 
 export async function generateStaticParams() {
   return getAllGameSlugs()
@@ -58,6 +60,8 @@ export default async function GamePassportPage({
   if (!game) {
     notFound()
   }
+
+  const priceHistory = await getPriceHistory(game.id, '3M')
 
   return (
     <>
@@ -129,22 +133,7 @@ export default async function GamePassportPage({
             </div>
           )}
 
-          {/* PriceChart — Story 5.3 */}
-          <div
-            style={{
-              backgroundColor: 'var(--color-surface)',
-              borderRadius: '12px',
-              padding: '20px',
-              minHeight: '320px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'var(--color-text-muted)',
-              fontSize: '13px',
-            }}
-          >
-            PriceChart (Story 5.3)
-          </div>
+          <PriceChart data={priceHistory} gameId={game.id} initialRange="3M" />
         </div>
       </div>
     </>

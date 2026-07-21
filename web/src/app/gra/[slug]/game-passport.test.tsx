@@ -19,10 +19,15 @@ vi.mock('next/navigation', () => ({
 
 const mockGetGameBySlug = vi.fn()
 const mockGetAllGameSlugs = vi.fn()
+const mockGetPriceHistory = vi.fn()
 
 vi.mock('@/db/queries/game-passport', () => ({
   getGameBySlug: (...args: unknown[]) => mockGetGameBySlug(...args),
   getAllGameSlugs: (...args: unknown[]) => mockGetAllGameSlugs(...args),
+}))
+
+vi.mock('@/db/queries/price-history', () => ({
+  getPriceHistory: (...args: unknown[]) => mockGetPriceHistory(...args),
 }))
 
 import GameNotFound from './not-found'
@@ -130,7 +135,10 @@ describe('GamePassportLoading', () => {
 // ── page.tsx — GamePassportPage ───────────────────────────────────────────────
 
 describe('GamePassportPage', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGetPriceHistory.mockResolvedValue([])
+  })
 
   test('renders breadcrumb with aria-label and game name for known slug', async () => {
     mockGetGameBySlug.mockResolvedValue(makeGameData())
@@ -139,6 +147,20 @@ describe('GamePassportPage', () => {
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toBeTruthy()
     expect(screen.getAllByText('Brass: Birmingham').length).toBeGreaterThan(0)
     expect(screen.getByRole('link', { name: 'Okazje' })).toHaveAttribute('href', '/')
+  })
+
+  // AC-1: server-side fetch wired to real data
+  test('calls getPriceHistory(game.id, "3M") and renders PriceChart instead of the placeholder', async () => {
+    mockGetGameBySlug.mockResolvedValue(makeGameData({ id: 42 }))
+    mockGetPriceHistory.mockResolvedValue([
+      { date: '2026-06-01', storeId: 1, storeName: 'AlePlanszowki', price: '89.90' },
+      { date: '2026-06-15', storeId: 1, storeName: 'AlePlanszowki', price: '84.90' },
+    ])
+    const output = await GamePassportPage({ params: Promise.resolve({ slug: 'brass-birmingham' }) })
+    render(output)
+    expect(mockGetPriceHistory).toHaveBeenCalledWith(42, '3M')
+    expect(screen.queryByText('PriceChart (Story 5.3)')).toBeNull()
+    expect(screen.getByRole('img', { name: /wykres historii cen/i })).toBeTruthy()
   })
 
   test('calls notFound() for unknown slug', async () => {

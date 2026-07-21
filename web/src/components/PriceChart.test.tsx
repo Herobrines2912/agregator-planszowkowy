@@ -1,6 +1,10 @@
-import { describe, test, expect } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, test, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { PriceChart, type PriceDataPoint } from './PriceChart'
+
+beforeEach(() => {
+  vi.restoreAllMocks()
+})
 
 function daysAgo(n: number): string {
   const d = new Date()
@@ -101,14 +105,17 @@ describe('PriceChart', () => {
 
   // AC-7: disabled range button
   test('8. disabled range button renders with cursor: not-allowed', () => {
-    // Use 10-day span data → 1M (30d threshold) remains disabled
+    // Use 10-day span data with initialRange="1M": that declares a 30-day window was
+    // already loaded, so "1M" (30d threshold) is judged on real span (10 < 30 → locked)
+    // rather than the "not yet fetched, optimistically unlocked" branch Story 5.3 added
+    // for ranges wider than what's been loaded.
     const tenDaysAgo = new Date()
     tenDaysAgo.setDate(tenDaysAgo.getDate() - 10)
     const tenDayData: PriceDataPoint[] = [
       { date: tenDaysAgo.toISOString().slice(0, 10), storeId: 1, storeName: 'AlePlanszowki', price: '89.90' },
       { date: new Date().toISOString().slice(0, 10), storeId: 1, storeName: 'AlePlanszowki', price: '84.90' },
     ]
-    const { container } = render(<PriceChart data={tenDayData} gameId={99} initialRange="1T" />)
+    const { container } = render(<PriceChart data={tenDayData} gameId={99} initialRange="1M" />)
     const buttons = container.querySelectorAll('button')
     const monthBtn = Array.from(buttons).find(b => b.textContent === '1M')
     expect(monthBtn).toBeTruthy()
@@ -141,5 +148,80 @@ describe('PriceChart', () => {
     render(<PriceChart data={fewPoints} gameId={3} initialRange="1T" />)
     // "Średnia 30d" should NOT appear
     expect(screen.queryByText('Średnia 30d')).toBeNull()
+  })
+
+  // AC-2: selecting a range wider than the loaded window triggers a re-fetch
+  test('11. selecting a range wider than the loaded window fetches /api/price-history', async () => {
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue({
+      json: async () => ({ success: true, data: mockData }),
+    } as Response)
+
+    render(<PriceChart data={mockData} gameId={7} initialRange="3M" />)
+    fireEvent.click(screen.getByText('6M'))
+
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledOnce())
+    const [url] = fetchSpy.mock.calls[0] as [string]
+    expect(url).toBe('/api/price-history?gameId=7&range=6M')
+  })
+
+  // AC-2: selecting a range within the loaded window never hits the network
+  test('12. selecting a range within the loaded window does not fetch', () => {
+    const fetchSpy = vi.spyOn(global, 'fetch')
+    render(<PriceChart data={mockData} gameId={7} initialRange="3M" />)
+    fireEvent.click(screen.getByText('2T'))
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  // AC-2: loading indicator shows only while the wider-range fetch is in flight
+  test('13. loading indicator appears during range re-fetch and clears once resolved', async () => {
+    let resolveFetch!: (value: unknown) => void
+    const pending = new Promise((resolve) => {
+      resolveFetch = resolve
+    })
+    vi.spyOn(global, 'fetch').mockReturnValue(pending as Promise<Response>)
+
+    const { container } = render(<PriceChart data={mockData} gameId={7} initialRange="3M" />)
+    fireEvent.click(screen.getByText('6M'))
+
+    await waitFor(() => {
+      expect(container.querySelector('[role="status"]')).toBeTruthy()
+    })
+
+    resolveFetch({ json: async () => ({ success: true, data: mockData }) })
+
+    await waitFor(() => {
+      expect(container.querySelector('[role="status"]')).toBeNull()
+    })
+  })
+
+  // AC-2: a failed re-fetch doesn't crash and keeps the previously-loaded data
+  test('14. failed range re-fetch keeps previous data, no crash, loading clears', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(global, 'fetch').mockRejectedValue(new Error('network down'))
+
+    const { container } = render(<PriceChart data={mockData} gameId={7} initialRange="3M" />)
+    fireEvent.click(screen.getByText('6M'))
+
+    await waitFor(() => {
+      expect(container.querySelector('[role="status"]')).toBeNull()
+    })
+
+    // Previous data (legend) still rendered — no crash, nothing wiped out
+    expect(screen.getByText('AlePlanszowki')).toBeTruthy()
+    consoleErrorSpy.mockRestore()
+  })
+
+  // Unlock heuristic: a range wider than the loaded window is optimistically
+  // enabled (clickable) so it can be fetched, rather than falsely locked — the
+  // counterpart to test #8's span-locked case.
+  test('15. a range wider than the loaded window renders enabled', () => {
+    // 3M loaded (90d), mockData spans ~28d → 6M (180d) is wider than loaded, so it
+    // must render enabled even though no fetch has happened yet.
+    const { container } = render(<PriceChart data={mockData} gameId={7} initialRange="3M" />)
+    const sixMonthBtn = Array.from(container.querySelectorAll('button'))
+      .find(b => b.textContent === '6M') as HTMLButtonElement
+    expect(sixMonthBtn).toBeTruthy()
+    expect(sixMonthBtn.disabled).toBe(false)
+    expect(sixMonthBtn.style.cursor).toBe('pointer')
   })
 })

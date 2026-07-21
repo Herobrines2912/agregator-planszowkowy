@@ -1119,7 +1119,8 @@ So that I always understand the state of the page and what action I can take.
 | 4.3   | Dev A | po 4.5                |
 | 4.4   | Dev A | po 4.3                |
 | 4.5   | Dev B | po Epic 2 (dane w DB) |
-| 4.6   | Dev A | po 4.2 + 4.5          |
+| 4.5b  | Dev B | po 4.5                |
+| 4.6   | Dev A | po 4.2 + 4.5b         |
 
 ---
 
@@ -1303,10 +1304,50 @@ So that the page makes minimal round-trips to the database.
 
 ---
 
+### Story 4.5b: Parent Game BGG Link Resolution
+
+**Dev: Dev B (Scraper/Infra)** — _pliki: `scraper/utils/bgg_client.py`, `scraper/utils/bgg_enrichment.py`, `web/src/db/schema.ts`, `db/migrations/000X_*.sql`, `web/src/db/queries/game-passport.ts`_
+_(po 4.5 — koryguje schema gap udokumentowany w Story 4.5 Dev Notes: `base_game` był hardcoded na `null`, bo `games` nie ma kolumny łączącej dodatek z grą bazową)_
+
+As a **developer**,
+I want the BGG enrichment job to capture and resolve an expansion's base-game relationship, and `getGameBySlug()` to expose it,
+So that Story 4.6 (`DlcWarning`) can render a real base game instead of always receiving `null`.
+
+**Acceptance Criteria:**
+
+**Given** `games` table in `schema.ts`
+**When** migration is generated and applied
+**Then** a new nullable self-referencing column `parent_game_id: integer` exists, FK → `games.id`, no cascade delete (orphaning a child on parent removal is acceptable — just leaves `parent_game_id` pointing nowhere until next enrichment cycle re-resolves it)
+
+**Given** a BGG `thing` XML response for an item with `type="boardgameexpansion"`
+**When** `BggClient._parse_thing()` parses it
+**Then** it extracts the base game's BGG numeric ID from `<link type="boardgameexpansion">` elements **excluding** any with `inbound="true"` (inbound links point the other direction — base game → its expansions — and must not be used)
+**And** if multiple non-inbound links exist, the first is used (FR-9 assumes a single base game)
+**And** the result dict gains a new key `base_game_bgg_id: int | None`
+
+**Given** `run_enrichment()` processing a game where `base_game_bgg_id` is present
+**When** the base game's `bgg_id` already exists as a row in local `games`
+**Then** `games.parent_game_id` is set to that row's local `id`
+
+**Given** `run_enrichment()` processing a game where `base_game_bgg_id` is present but no local `games` row has that `bgg_id` yet (base game not scraped/deduplicated yet)
+**When** enrichment writes the game
+**Then** `parent_game_id` is left `NULL` — no placeholder game row is created; the link resolves on a later enrichment cycle once the base game exists locally
+
+**Given** `getGameBySlug()` in `web/src/db/queries/game-passport.ts`
+**When** the game row has a non-null `parent_game_id`
+**Then** the query joins to the parent `games` row and its cheapest in-stock product, and returns `base_game: { name, slug, bgg_id, current_min_price }` — `current_min_price` is the parent's lowest `price` where `in_stock = true`, or `null` if the parent has no in-stock products
+**And** `current_min_price` is returned as a string, never `float` (CLAUDE.md rule)
+
+**Given** a game with `parent_game_id = null` (non-expansion, or orphan expansion with no resolvable parent)
+**When** `getGameBySlug()` runs
+**Then** `base_game` remains `null` and no extra join/round-trip is executed
+
+---
+
 ### Story 4.6: DLC Dependency Warning
 
 **Dev: Dev A (Web)** — _pliki: `components/DlcWarning.tsx`_
-_(po 4.2 + 4.5 — wymaga `base_game` danych z query Dev B)_
+_(po 4.2 + 4.5b — wymaga `base_game` danych z query Dev B, dostarczonych realnie przez Story 4.5b)_
 
 As a **user**,
 I want to see a clear warning when a game is an expansion that requires a base game,
@@ -1352,6 +1393,7 @@ Story 5.2 można zacząć z mock data równolegle z 5.1. Story 5.3 wymaga gotowe
 | 5.1   | Dev B | po 4.5       | ❌ potrzebne dane |
 | 5.2   | Dev A | po 4.1       | ✅ tak            |
 | 5.3   | Dev A | po 5.1 + 5.2 | ❌ wymaga danych  |
+| 5.3b  | Dev A | po 5.3       | ⚠️ technicznie tak, sensownie dopiero po 5.3 |
 | 5.4   | Dev A | po 4.1       | ✅ tak            |
 | 5.5   | Dev A | po 4.1       | ✅ tak            |
 | 5.6   | Dev A | po 4.1       | ✅ tak            |
@@ -1472,6 +1514,42 @@ So that the price trends I see are accurate and current.
 **Given** a Scrape Cycle completes and ISR revalidation fires
 **When** user reloads the Game Passport page
 **Then** chart reflects data up to the last scrape cycle — max staleness 2h (ADR-003 fallback TTL)
+
+---
+
+### Story 5.3b: PriceChart Accessible Table Fallback
+
+**Dev: Dev A (Web)** — _pliki: `components/PriceChart.tsx` (rozszerzenie)_
+_(po 5.3 — potrzebuje realnych danych, żeby tabela miała sens; odnotowane jako "Out of Scope" w Story 5.2 i celowo pominięte w AC Story 5.3 — UX-DR12 wymaga tego dla wykresu cen, ale nie zostało dotąd zaimplementowane)_
+
+As a **user korzystający z czytnika ekranu**,
+I want dostęp do tych samych danych historii cen co widoczne na wykresie, w formie dostępnej tabeli,
+So that mogę korzystać z serwisu niezależnie od tego, czy widzę wykres SVG (UX-DR12 accessibility floor).
+
+**Acceptance Criteria:**
+
+**Given** `PriceChart` renderowany z danymi
+**When** wyświetlany
+**Then** `<svg>` ma dynamiczny `aria-label` opisujący aktualne dane cenowe (np. "Wykres historii cen: aktualna cena {stats.current}, zakres {selectedRange}"), nie statyczny tekst "Wykres historii cen" jak obecnie
+**And** gdy brak danych w zakresie, `aria-label` opisuje ten stan (np. "Wykres historii cen: brak danych dla wybranego zakresu")
+
+**Given** `PriceChart` z niepustym `filteredData` dla wybranego zakresu
+**When** renderowany
+**Then** obok `<svg>` renderowana jest wizualnie ukryta (`sr-only`, NIE `display: none` — musi pozostać w accessibility tree) `<table>` z jednym wierszem na widoczny punkt danych: kolumny Data (`formatDateMedium`), Sklep, Cena (`formatPrice`)
+**And** tabela ma `<caption>` opisujący kontekst (nazwa gry/zakres)
+**And** technika ukrycia: `position: absolute; width: 1px; height: 1px; overflow: hidden; clipPath: 'inset(50%)'; whiteSpace: 'nowrap'; border: 0` (standardowy wzorzec sr-only — nie ma jeszcze odpowiednika w tym projekcie, więc definiowany lokalnie w komponencie)
+
+**Given** użytkownik ukrywa sklep przez legendę (klik)
+**When** tabela się przerenderowuje
+**Then** wiersze ukrytego sklepu znikają z tabeli — parytet z linią na wykresie, która też się ukrywa
+
+**Given** `filteredData.length === 0` (stan pusty, komunikat "Za mało danych")
+**When** renderowany
+**Then** tabela nie jest renderowana w ogóle — sam komunikat jest już tekstem czytelnym dla czytnika ekranu, dodatkowa pusta tabela nic by nie wniosła
+
+**Given** `PriceChart.test.tsx`
+**When** uruchamiane
+**Then** pokrywa: liczba wierszy tabeli = liczba widocznych punktów danych; ukrycie sklepu przez legendę usuwa jego wiersze z tabeli; `aria-label` na `<svg>` zawiera aktualną cenę; `filteredData=[]` → brak `<table>` w DOM
 
 ---
 

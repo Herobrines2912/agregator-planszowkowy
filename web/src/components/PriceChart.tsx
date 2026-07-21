@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { formatPrice, formatDateMedium } from '@/lib/format'
 import { TimeRangeSelector, type Range, RANGE_DAYS, ALL_RANGES } from './TimeRangeSelector'
+import type { ApiResponse } from '@/types/api'
 
 export interface PriceDataPoint {
   date: string       // ISO date string "YYYY-MM-DD"
@@ -51,17 +52,21 @@ function filterByRange(data: PriceDataPoint[], range: Range): PriceDataPoint[] {
   return data.filter(d => new Date(d.date) >= cutoff)
 }
 
-function computeUnlockedRanges(data: PriceDataPoint[]): Set<Range> {
+// `loadedRangeDays` is how far back the currently-held `data` was actually fetched for.
+// Ranges within that window are locked/unlocked based on the real data span (as before).
+// Ranges beyond it (wider than what's loaded) can't be judged yet — treat them as
+// unlocked so a click can fetch and find out, rather than falsely locking a range
+// that may well have data. See Story 5.3 Dev Notes — "Unlock Heuristic for
+// Partially-Loaded Data".
+function computeUnlockedRanges(data: PriceDataPoint[], loadedRangeDays: number): Set<Range> {
   const unlocked = new Set<Range>()
-  if (data.length === 0) {
-    unlocked.add('1T')
-    return unlocked
-  }
   const dates = data.map(d => new Date(d.date).getTime())
-  const minTs = Math.min(...dates)
-  const spanDays = (Date.now() - minTs) / (1000 * 60 * 60 * 24)
+  const minTs = dates.length > 0 ? Math.min(...dates) : null
+  const spanDays = minTs !== null ? (Date.now() - minTs) / (1000 * 60 * 60 * 24) : 0
+
   for (const range of ALL_RANGES) {
-    if (spanDays >= RANGE_DAYS[range]) unlocked.add(range)
+    const days = RANGE_DAYS[range]
+    if (days > loadedRangeDays || spanDays >= days) unlocked.add(range)
   }
   // Always unlock 1T as the minimum useful range
   unlocked.add('1T')
@@ -184,21 +189,34 @@ interface TooltipState {
   date: string
 }
 
-export function PriceChart({ data, gameId: _gameId, initialRange = '1T' }: PriceChartProps) {
-  const unlockedRanges = computeUnlockedRanges(data)
+export function PriceChart({ data, gameId, initialRange = '1T' }: PriceChartProps) {
+  // `chartData` starts as whatever was passed in (server-fetched for `initialRange`);
+  // it's replaced wholesale when a range wider than `loadedRangeDays` is selected (AC-2).
+  const [chartData, setChartData] = useState<PriceDataPoint[]>(data)
+  const [loadedRangeDays, setLoadedRangeDays] = useState<number>(RANGE_DAYS[initialRange])
+  const [loading, setLoading] = useState(false)
+
+  const availableRanges = computeUnlockedRanges(chartData, loadedRangeDays)
 
   // Pick best default range from what's unlocked
-  const defaultRange: Range = unlockedRanges.has(initialRange)
+  const defaultRange: Range = availableRanges.has(initialRange)
     ? initialRange
-    : (ALL_RANGES.find(r => unlockedRanges.has(r)) ?? '1T')
+    : (ALL_RANGES.find(r => availableRanges.has(r)) ?? '1T')
 
   const [selectedRange, setSelectedRange] = useState<Range>(defaultRange)
+
+  // The range currently being viewed must stay visually available: once a wider
+  // fetch resolves, its real span may be too short to "unlock" it by the heuristic,
+  // which would otherwise render the active button as disabled with a misleading
+  // "collect N days" tooltip even though its data is already loaded and on screen.
+  const unlockedRanges = new Set(availableRanges).add(selectedRange)
   const [hiddenStores, setHiddenStores] = useState<Set<number>>(new Set())
   const [tooltip, setTooltip] = useState<TooltipState | null>(null)
   const [isMobile, setIsMobile] = useState(false)
 
   const svgRef = useRef<SVGSVGElement>(null)
   const tooltipRef = useRef<HTMLDivElement>(null)
+  const fetchAbortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768)
@@ -207,20 +225,61 @@ export function PriceChart({ data, gameId: _gameId, initialRange = '1T' }: Price
     return () => window.removeEventListener('resize', check)
   }, [])
 
-  // Stable store insertion order — derived synchronously from full data
+  // Abort any in-flight range fetch on unmount
+  useEffect(() => {
+    return () => fetchAbortRef.current?.abort()
+  }, [])
+
+  const handleRangeChange = useCallback(async (range: Range) => {
+    setSelectedRange(range)
+    setHiddenStores(new Set())
+
+    if (RANGE_DAYS[range] <= loadedRangeDays) return // already covered by loaded data — client-side filter only
+
+    fetchAbortRef.current?.abort()
+    const controller = new AbortController()
+    fetchAbortRef.current = controller
+    // Hard timeout so a stalled connection can't leave the shimmer up until the
+    // browser's own (minutes-long) network timeout — same shape as AlertSubscribeForm.
+    const timeout = setTimeout(() => controller.abort(), 15000)
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/price-history?gameId=${gameId}&range=${range}`, {
+        signal: controller.signal,
+      })
+      const body: ApiResponse<PriceDataPoint[]> = await res.json()
+      if (body.success) {
+        setChartData(body.data)
+        setLoadedRangeDays(RANGE_DAYS[range])
+      } else {
+        console.error('[PriceChart] price-history fetch failed', body.error)
+      }
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        console.error('[PriceChart] price-history fetch failed', err)
+      }
+    } finally {
+      clearTimeout(timeout)
+      if (fetchAbortRef.current === controller) {
+        setLoading(false)
+      }
+    }
+  }, [gameId, loadedRangeDays])
+
+  // Stable store insertion order — derived synchronously from currently-loaded data
   const storeOrder = useMemo(() => {
     const seen = new Set<number>()
     const order: number[] = []
-    for (const d of data) {
+    for (const d of chartData) {
       if (!seen.has(d.storeId)) {
         order.push(d.storeId)
         seen.add(d.storeId)
       }
     }
     return order
-  }, [data])
+  }, [chartData])
 
-  const filteredData = filterByRange(data, selectedRange)
+  const filteredData = filterByRange(chartData, selectedRange)
 
   // Compute price/date bounds from filtered data
   const allPrices = filteredData.map(d => parseFloat(d.price))
@@ -329,10 +388,7 @@ export function PriceChart({ data, gameId: _gameId, initialRange = '1T' }: Price
         <TimeRangeSelector
           selected={selectedRange}
           unlockedRanges={unlockedRanges}
-          onChange={(r) => {
-            setSelectedRange(r)
-            setHiddenStores(new Set())
-          }}
+          onChange={handleRangeChange}
         />
 
         {/* Legend */}
@@ -507,6 +563,23 @@ export function PriceChart({ data, gameId: _gameId, initialRange = '1T' }: Price
             />
           )}
         </svg>
+
+        {/* Loading overlay — shown only while re-fetching a wider range (AC-2); TimeRangeSelector/legend stay outside this and remain interactive */}
+        {loading && (
+          <div
+            className="shimmer-box"
+            role="status"
+            aria-label="Wczytywanie danych wykresu"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: svgHeight,
+              borderRadius: '8px',
+            }}
+          />
+        )}
 
         {/* Tooltip overlay */}
         {tooltip && (() => {
