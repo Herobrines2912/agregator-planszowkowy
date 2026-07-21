@@ -2,7 +2,8 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { formatPrice, formatDateMedium } from '@/lib/format'
-import { TimeRangeSelector, type Range, RANGE_DAYS, ALL_RANGES } from './TimeRangeSelector'
+import { TimeRangeSelector } from './TimeRangeSelector'
+import { type Range, RANGE_DAYS, ALL_RANGES } from '@/lib/price-range'
 import type { ApiResponse } from '@/types/api'
 
 export interface PriceDataPoint {

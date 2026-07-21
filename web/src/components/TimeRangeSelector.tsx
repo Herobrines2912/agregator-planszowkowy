@@ -1,16 +1,6 @@
 'use client'
 
-export type Range = '1T' | '2T' | '1M' | '3M' | '6M'
-
-export const RANGE_DAYS: Record<Range, number> = {
-  '1T': 7,
-  '2T': 14,
-  '1M': 30,
-  '3M': 90,
-  '6M': 180,
-}
-
-export const ALL_RANGES: Range[] = ['1T', '2T', '1M', '3M', '6M']
+import { type Range, RANGE_DAYS, ALL_RANGES } from '@/lib/price-range'
 
 export interface TimeRangeSelectorProps {
   selected: Range

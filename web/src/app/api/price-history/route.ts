@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server'
 import { getPriceHistory, type PriceDataPoint } from '@/db/queries/price-history'
-import { ALL_RANGES, type Range } from '@/components/TimeRangeSelector'
+import { ALL_RANGES, type Range } from '@/lib/price-range'
 import type { ApiResponse } from '@/types/api'
 
 const POSTGRES_INT4_MAX = 2147483647

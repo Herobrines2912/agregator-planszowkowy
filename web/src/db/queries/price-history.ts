@@ -1,7 +1,7 @@
 import { getDb } from '@/db/index'
 import { sql } from 'drizzle-orm'
 import { unstable_cache } from 'next/cache'
-import { RANGE_DAYS, type Range } from '@/components/TimeRangeSelector'
+import { RANGE_DAYS, type Range } from '@/lib/price-range'
 
 export type PriceDataPoint = {
   date: string
