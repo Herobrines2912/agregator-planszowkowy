@@ -6,7 +6,8 @@ import {
   findActiveAlertsMissingConsent,
 } from './alerts'
 import { priceAlerts, consentLog, emailSuppressions } from '@/db/schema'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, type SQL } from 'drizzle-orm'
+import { PgDialect } from 'drizzle-orm/pg-core'
 
 type Chain = {
   from: ReturnType<typeof vi.fn>
@@ -47,6 +48,15 @@ function sqlParams(value: unknown): unknown[] {
     if ((c as { queryChunks?: unknown[] }).queryChunks) return sqlParams(c)
     return []
   })
+}
+
+// Renders a drizzle sql`...` fragment to the SQL Postgres would actually receive, with columns
+// resolved and values bound. Stronger than inspecting queryChunks: it verifies the built
+// statement rather than the pieces it was assembled from.
+const dialect = new PgDialect()
+function renderSql(fragment: unknown): { text: string; params: unknown[] } {
+  const { sql: text, params } = dialect.sqlToQuery(fragment as SQL)
+  return { text: text.replace(/\s+/g, ' ').trim(), params }
 }
 
 function chain(result: unknown): Chain {
@@ -150,6 +160,7 @@ describe('subscribeAlert', () => {
     }
     expect(Object.keys(conflictArg.set).sort()).toEqual([
       'confirmation_token',
+      'confirmed_at',
       'status',
       'target_price',
       'token_issued_at',
@@ -159,19 +170,35 @@ describe('subscribeAlert', () => {
     expect(conflictArg.set.target_price).toBe('89.99')
     expect(conflictArg.set.type_b_enabled).toBe(true)
 
-    // status/confirmation_token/token_issued_at are conditional CASE fragments, not plain
-    // values. The condition has to cover BOTH dead ends: a cancelled alert, and a pending one
-    // whose token has aged out — either would otherwise keep a token confirmAlert always
-    // rejects, leaving the user unable to opt in no matter how often they resubmit.
-    for (const key of ['status', 'confirmation_token', 'token_issued_at']) {
-      const fragment = sqlText(conflictArg.set[key])
-      expect(fragment, `${key} must be conditional on cancelled`).toContain('cancelled')
-      expect(fragment, `${key} must also cover an aged-out pending token`).toContain('pending_doi')
-      expect(fragment, `${key} must compare against the token issue time`).toContain('interval')
-    }
-    // The 48h window is bound as a parameter so the constant lives only in TypeScript and
-    // cannot drift from the one confirmAlert enforces.
-    expect(sqlParams(conflictArg.set.token_issued_at)).toContain(48 * 60 * 60 * 1000)
+    // The remaining four are conditional CASE fragments. Render them as real SQL and compare
+    // exactly rather than substring-matching: the whole correctness of this upsert lives in the
+    // comparison direction, and `<` flipped to `>` — rotating fresh tokens while leaving expired
+    // ones alone, i.e. the original bug inverted — passes any "contains 'pending_doi'" check.
+    const ROTATE_WHEN =
+      `( "price_alerts"."status" = 'cancelled' ` +
+      `OR ( "price_alerts"."status" = 'pending_doi' ` +
+      `AND "price_alerts"."token_issued_at" < now() - $1 * interval '1 millisecond' ) )`
+
+    expect(renderSql(conflictArg.set.token_issued_at)).toEqual({
+      text: `CASE WHEN ${ROTATE_WHEN} THEN now() ELSE "price_alerts"."token_issued_at" END`,
+      // The 48h window is bound as a parameter, so the constant lives only in TypeScript and
+      // cannot drift from the one confirmAlert enforces.
+      params: [48 * 60 * 60 * 1000],
+    })
+    expect(renderSql(conflictArg.set.status).text).toBe(
+      `CASE WHEN ${ROTATE_WHEN} THEN 'pending_doi' ELSE "price_alerts"."status" END`,
+    )
+    expect(renderSql(conflictArg.set.confirmed_at).text).toBe(
+      `CASE WHEN ${ROTATE_WHEN} THEN NULL ELSE "price_alerts"."confirmed_at" END`,
+    )
+    // The token itself rotates to the freshly generated value under the same condition. All four
+    // fields must share one condition — the original bug was precisely a token that rotated
+    // while its timestamp did not.
+    const tokenFragment = renderSql(conflictArg.set.confirmation_token)
+    expect(tokenFragment.text).toBe(
+      `CASE WHEN ${ROTATE_WHEN} THEN $2 ELSE "price_alerts"."confirmation_token" END`,
+    )
+    expect(tokenFragment.params[1]).toMatch(/^[0-9a-f]{64}$/)
   })
 
   test('email_suppressions hit: returns suppressed, zero writes to price_alerts or consent_log', async () => {

@@ -55,7 +55,7 @@ The epics AC text (`_bmad-output/planning-artifacts/epics.md` lines 1719–1749)
 
 | Lookup result | Action |
 |---|---|
-| No row for `confirmation_token = token` | → `{ outcome: 'expired', gameSlug: null }` — never leak whether a token "almost" matched |
+| No row for `confirmation_token = token` | → `{ outcome: 'expired', gameSlug: null }` — no slug to show, since no row was found (see note below on why this is not an anti-enumeration guarantee) |
 | Row found, `status = 'active'` | → `{ outcome: 'already_confirmed' }` — **no** new `consent_log` write (AC-3: idempotent, not a fresh confirmation event) |
 | Row found, `status = 'cancelled'` | → `{ outcome: 'expired', gameSlug: row.gameSlug }` — a cancelled alert must never be silently reactivated by replaying an old confirm link (security: this is the only place a stale link could resurrect an unsubscribed user) |
 | Row found, `status = 'pending_doi'`, `created_at` > 48h ago | → `{ outcome: 'expired', gameSlug: row.gameSlug }` |
@@ -68,6 +68,14 @@ Compute the 48h check in JS (`Date.now() - row.created_at.getTime() > 48 * 60 * 
 The epics AC says the confirm route "redirects to `/alerts/confirmed`" with no query params specified, but the same epic also requires that page to echo the game name and target price. There is no other way for that page (a fresh page load from an email client, zero client state) to know which alert to show. Resolution: redirect with `?token=<value>` and have the `/alerts/confirmed` page re-look-up the alert by token (`getAlertSummaryByToken`, scoped to `status = 'active'` rows only — read-only, no side effects, safe to call on every repeat visit). This keeps the confirmation token as the single identifier throughout the flow instead of introducing a new leaky identifier (e.g. a raw numeric `price_alerts.id` in the URL, which would let anyone enumerate other users' game+price choices).
 
 `/alerts/expired` gets `?slug=` (not `?token=`) because by definition its whole point is "this token is no longer valid" — passing the dead token to it serves no purpose. The slug is pass-through display data only (not sensitive), safe to put in a URL.
+
+### The `?slug=` presence oracle is accepted, not a defect
+
+Because the slug is appended only when the token *was* found, its presence tells the visitor whether a token exists in the database. An earlier draft of these notes called that a leak to be avoided; **that was wrong and is retired here** (decision 2026-07-22, after code review flagged the contradiction with AC-2).
+
+Anti-enumeration matters when the identifier is guessable. It is not here: the token is 32 random bytes, so reaching the oracle at all requires already holding a valid token — and anyone holding a *live* one already learns strictly more from `/alerts/confirmed`, which echoes the game name and target price. Removing the slug would buy nothing while breaking the common, legitimate path: expiry is frequent with a 48h window, and the slug is what lets a late clicker return to `/gra/{slug}` and re-subscribe in one click instead of hunting for the game from the home page.
+
+Where the anti-enumeration rule genuinely applies in this codebase is `subscribeAlert`, which hides whether an **email address** is suppressed — a guessable identifier. That is implemented and must stay.
 
 ### Why this route does not return `ApiResponse<T>`
 

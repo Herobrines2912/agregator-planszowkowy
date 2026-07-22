@@ -92,6 +92,11 @@ export async function subscribeAlert(input: SubscribeAlertInput): Promise<Subscr
         // The new token starts its own 48h clock; without this it would inherit the old one's
         // and arrive already expired.
         token_issued_at: sql`CASE WHEN ${tokenIsUnusable} THEN now() ELSE ${priceAlerts.token_issued_at} END`,
+        // A revived row goes back to pending_doi, so the confirmation timestamp of its previous
+        // life must go with it — otherwise an unconfirmed alert carries proof of a confirmation
+        // that no longer applies, which is exactly the kind of claim consent_log exists to keep
+        // honest.
+        confirmed_at: sql`CASE WHEN ${tokenIsUnusable} THEN NULL ELSE ${priceAlerts.confirmed_at} END`,
       },
     })
     .returning({ id: priceAlerts.id })
@@ -138,8 +143,10 @@ export async function confirmAlert(token: string, ipHash: string): Promise<Confi
     .limit(1)
 
   const alert = rows[0]
-  // An unknown token gets the same dead-end as an expired one, and carries no slug —
-  // the expired page must not hint that a token "almost" matched something real.
+  // An unknown token dead-ends like an expired one, just without a slug — there is no row to
+  // take one from. The resulting difference on /alerts/expired is an accepted trade, not a
+  // leak: reaching it at all requires already holding a 32-byte random token, and a live one
+  // reveals more via /alerts/confirmed anyway. See the story's Dev Notes.
   if (!alert) return { outcome: 'expired', gameSlug: null }
 
   switch (alert.status) {

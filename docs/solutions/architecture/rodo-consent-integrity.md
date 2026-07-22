@@ -181,8 +181,9 @@ Przegląd 11 recenzentów na gotowej implementacji 6.2. Rzeczy istotne dla RODO,
 analiza nie objęła:
 
 - ~~**Ponowny zapis nie odświeża `created_at` — token rodzi się wygasły (P1).**~~ **NAPRAWIONE 2026-07-22.**
-  Rozwiązanie: kolumna `price_alerts.token_issued_at` (`NOT NULL DEFAULT now()`, dodana ręcznie na
-  Neonie — tabela była pusta, więc bez backfillu) niesie TTL zamiast `created_at`, a `ON CONFLICT`
+  Rozwiązanie: kolumna `price_alerts.token_issued_at` (`NOT NULL DEFAULT now()`, migracja
+  `0004_price_alerts_token_issued_at.sql` — backfill z `created_at`, nie z `now()`, żeby dawno
+  martwe linki nie ożyły na kolejne 48h) niesie TTL zamiast `created_at`, a `ON CONFLICT`
   rotuje token wtedy i tylko wtedy, gdy obecny jest bezużyteczny: wiersz `cancelled` **albo**
   `pending_doi` z tokenem starszym niż 48h. Świeży `pending_doi` zostaje nietknięty, żeby korekta
   progu nie unieważniała linku, którego użytkownik może mieć otwartego w skrzynce; `active` nie
@@ -206,13 +207,12 @@ analiza nie objęła:
   (przekazany mail, historia przeglądarki, logi), ten w każdej chwili odczyta nazwę gry i cenę
   progową z `/alerts/confirmed`. Rozważyć rotację lub wyzerowanie `confirmation_token` przy
   aktywacji i osobny token dla 6.3.
-- **`?slug=` na `/alerts/expired` odróżnia nieznany token od prawdziwego martwego.** To sprzeczność
-  wewnątrz samej story 6.2: AC-2 nakazuje slug, lista inwariantów zakazuje rozróżnialności.
-  Rekomendacja: **zostawić slug, wycofać inwariant** — przy 256-bitowym tokenie oracle jest
-  bezużyteczny (trzeba już mieć token), a aktywny token i tak ujawnia więcej przez
-  `/alerts/confirmed`; usunięcie sluga psuje częstą, legalną ścieżkę powrotu na stronę gry.
-  Inwariant anty-enumeracyjny ma sens tam, gdzie identyfikator jest zgadywalny — czyli przy
-  adresach e-mail w `subscribeAlert`, i tam jest poprawnie wdrożony.
+- ~~**`?slug=` na `/alerts/expired` odróżnia nieznany token od prawdziwego martwego.**~~
+  **ROZSTRZYGNIĘTE 2026-07-22: zostawiamy slug, inwariant wycofany.** Przy 32-bajtowym losowym
+  tokenie oracle jest bezużyteczny (trzeba już mieć token), a token aktywny i tak ujawnia więcej
+  przez `/alerts/confirmed`; usunięcie sluga psułoby częstą, legalną ścieżkę powrotu na stronę
+  gry przy 48-godzinnym oknie. Inwariant anty-enumeracyjny obowiązuje tam, gdzie identyfikator
+  jest zgadywalny — czyli przy adresach e-mail w `subscribeAlert`, i tam zostaje.
 - **Surowy token może trafić do logów.** `DrizzleQueryError` wkleja treść zapytania i parametry do
   komunikatu (`drizzle-orm/errors.js:12`), a route loguje `err` w całości. Ten sam problem dotyczy
   `subscribe/route.ts`, gdzie parametrem jest adres e-mail.
@@ -226,13 +226,19 @@ analiza nie objęła:
   (komentarz w `web/src/app/api/alerts/subscribe/route.ts`). Trafia do audytu jako
   kontekst, nigdy jako podstawa kontroli dostępu.
 - **`price_alerts.created_at` jest nullable** (`defaultNow()` bez `notNull()`; ten sam
-  wzorzec dotyczy 6 kolumn `created_at` w `schema.ts`). Wiek tokenu potwierdzającego
-  opiera się na tej kolumnie, więc `confirmAlert()` traktuje NULL jako **wygasły**
-  (odmowa zamiast akceptacji tokenu o niesprawdzalnym wieku). Docelowo: `notNull()`.
-- **Brak katalogu migracji.** `web/drizzle.config.ts` wskazuje `out: '../db/migrations'`,
-  a katalog nie istnieje i nie ma ani jednego pliku `.sql`. Każda zmiana schematu jest
-  dziś **ręczną operacją na Neonie** — to podnosi koszt każdego „poprawmy schemat" i było
-  argumentem za odłożeniem `created_at NOT NULL`.
+  wzorzec dotyczy 6 kolumn `created_at` w `schema.ts`). Od 2026-07-22 TTL tokenu opiera się
+  na `token_issued_at` (`NOT NULL`), więc nullowalność `created_at` nie dotyka już ścieżki
+  potwierdzenia. Docelowo i tak `notNull()`.
+- **Migracje: katalog `db/migrations/` ISTNIEJE i jest żywy.** ⚠️ Wcześniejsza wersja tego
+  dokumentu twierdziła, że go nie ma — **to było błędne** i doprowadziło do wykonania DDL
+  ręcznie na produkcji z pominięciem workflow. Stan faktyczny: `db/migrations/` w korzeniu
+  repo (`web/drizzle.config.ts` → `out: '../db/migrations'`), migracje `0000`–`0004`, journal
+  w `meta/_journal.json`, a tabela `drizzle.__drizzle_migrations` na Neonie ma odpowiadające
+  wpisy. Migracje `0002`/`0003` są pisane ręcznie (bez snapshotów w `meta/`), więc
+  `drizzle-kit generate` policzyłby diff względem snapshotu `0001` i wypluł nadmiarowe
+  statementy — **wzorzec tego repo to ręcznie pisany plik `.sql` + wpis w journalu**, nie
+  `generate`. Każda zmiana `schema.ts` musi mieć towarzyszący plik migracji w tym samym
+  commicie.
 - **Alert `cancelled` nie może zmartwychwstać.** Replay starego linku potwierdzającego na
   anulowanym alercie musi kończyć się jak wygasły — to jedyne miejsce, gdzie stary link
   mógłby cofnąć wypisanie się użytkownika.
@@ -266,7 +272,7 @@ analiza nie objęła:
 | TTL liczony od `created_at`, którego ponowny zapis nie odświeża | **Wdrożone** 2026-07-22 — kolumna `token_issued_at` + rotacja tokenu gdy jest bezużyteczny |
 | Odwrócona kolejność / dodatkowa warstwa zapisu | **Odrzucone** — uzasadnienie wyżej |
 | Skanery linków (GET vs POST-confirm) | **Otwarte** — chwilowo skłaniamy się do (b), decyzja w osobnej sesji |
-| `created_at NOT NULL` w `price_alerts` | **Odłożone** — brak katalogu migracji podnosi koszt; gałąź obronna zostaje |
+| `created_at NOT NULL` w `price_alerts` | **Do ponownej oceny** — pierwotny argument („brak katalogu migracji") był błędny; migracje istnieją, więc koszt jest niski |
 | Rate limiting na `/api/alerts/*` | **Nieporuszone** — brak dziś, warto ocenić przy okazji |
 | Zmiana drivera na `neon-serverless` (prawdziwe transakcje) | **Odrzucone w tym zakresie** — zmiana infrastrukturalna dotykająca wszystkich zapytań; do rozważenia osobno, jeśli sparowanych zapisów przybędzie |
 
