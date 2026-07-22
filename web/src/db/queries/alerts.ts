@@ -2,7 +2,11 @@ import { randomBytes } from 'crypto'
 import { getDb } from '@/db/index'
 import { consentLog, emailSuppressions, games, priceAlerts } from '@/db/schema'
 import { sha256Hex } from '@/lib/crypto'
-import { eq, sql } from 'drizzle-orm'
+import { assertNever } from '@/lib/utils'
+import { and, eq, sql } from 'drizzle-orm'
+
+/** Confirmation links stay valid for 48h — the window promised to the user in the DOI email. */
+const CONFIRMATION_TOKEN_TTL_MS = 48 * 60 * 60 * 1000
 
 export type SubscribeAlertInput = {
   email: string
@@ -97,4 +101,153 @@ export async function subscribeAlert(input: SubscribeAlertInput): Promise<Subscr
   }
 
   return { outcome: 'subscribed' }
+}
+
+export type ConfirmAlertResult =
+  | { outcome: 'confirmed' }
+  | { outcome: 'already_confirmed' }
+  | { outcome: 'expired'; gameSlug: string | null }
+
+export async function confirmAlert(token: string, ipHash: string): Promise<ConfirmAlertResult> {
+  const db = getDb()
+
+  const rows = await db
+    .select({
+      id: priceAlerts.id,
+      status: priceAlerts.status,
+      createdAt: priceAlerts.created_at,
+      gameSlug: games.slug,
+    })
+    .from(priceAlerts)
+    .innerJoin(games, eq(priceAlerts.game_id, games.id))
+    .where(eq(priceAlerts.confirmation_token, token))
+    .limit(1)
+
+  const alert = rows[0]
+  // An unknown token gets the same dead-end as an expired one, and carries no slug —
+  // the expired page must not hint that a token "almost" matched something real.
+  if (!alert) return { outcome: 'expired', gameSlug: null }
+
+  switch (alert.status) {
+    case 'active':
+      // Idempotent replay of the email link, not an error: the alert is already on and
+      // the original opt_in_confirmed entry already exists, so nothing is written.
+      return { outcome: 'already_confirmed' }
+
+    case 'cancelled':
+      // The user explicitly unsubscribed. Replaying an old confirm link is the one path
+      // that could silently resurrect them, so it dead-ends like an expired token.
+      return { outcome: 'expired', gameSlug: alert.gameSlug }
+
+    case 'pending_doi': {
+      // A null created_at means the row's age cannot be verified — refuse rather than
+      // treat an unbounded-age token as fresh.
+      if (
+        alert.createdAt === null ||
+        Date.now() - alert.createdAt.getTime() > CONFIRMATION_TOKEN_TTL_MS
+      ) {
+        return { outcome: 'expired', gameSlug: alert.gameSlug }
+      }
+
+      // Activation and its consent_log entry are ONE statement on purpose. The neon-http
+      // driver has no transactions (db.transaction() throws), so two statements would leave a
+      // window where the alert is active with no proof of consent — and because consent_log is
+      // append-only (CLAUDE.md, architecture L-4) that gap could never be repaired afterwards.
+      // A single data-modifying CTE is atomic by definition: both rows land or neither does,
+      // and a failure leaves the alert pending_doi so the next click retries cleanly.
+      //
+      // The same statement also settles concurrency. The UPDATE re-checks the status, takes the
+      // row lock and re-evaluates its WHERE after a competing commit; the loser matches no row,
+      // `updated` comes back empty, and the INSERT selecting from it writes nothing. No separate
+      // guard is needed. See docs/solutions/architecture/rodo-consent-integrity.md.
+      let confirmed
+      try {
+        confirmed = await db.execute(sql`
+          WITH updated AS (
+            UPDATE ${priceAlerts}
+            SET status = 'active', confirmed_at = now()
+            WHERE ${priceAlerts.id} = ${alert.id} AND ${priceAlerts.status} = 'pending_doi'
+            RETURNING id, email_hash
+          )
+          INSERT INTO ${consentLog} (email_hash, action, source, ip_hash, token_id)
+          SELECT email_hash, 'opt_in_confirmed', 'user', ${ipHash}, id FROM updated
+          RETURNING id
+        `)
+      } catch (err) {
+        console.error(
+          `[confirmAlert] activation failed for price_alerts.id=${alert.id} — alert left pending_doi, no consent recorded`,
+          err,
+        )
+        throw err
+      }
+
+      // Zero rows means the UPDATE matched nothing, i.e. another request confirmed this alert
+      // first. Idempotent replay, not an error.
+      if (confirmed.rows.length === 0) return { outcome: 'already_confirmed' }
+
+      return { outcome: 'confirmed' }
+    }
+
+    default:
+      return assertNever(alert.status)
+  }
+}
+
+/**
+ * Reconciliation check for the RODO invariant in architecture L-4: an active alert must always
+ * have a matching opt_in_confirmed entry proving the subscriber consented.
+ *
+ * This is the safety layer for the paired write in confirmAlert — a detector, not a second
+ * writer. Adding another INSERT "just in case" would duplicate rows in an append-only table on
+ * every successful confirmation; a single atomic statement cannot leave half a write behind, so
+ * there is nothing for a compensating write to catch. What IS worth having is proof of that,
+ * which is what this query provides.
+ *
+ * Expected to return an empty array. A non-empty result means some path activated an alert
+ * without recording consent and needs investigating — it cannot be auto-repaired, because a
+ * consent entry written after the fact would not be evidence of anything.
+ */
+export async function findActiveAlertsMissingConsent(): Promise<number[]> {
+  const db = getDb()
+
+  const result = await db.execute<{ id: number }>(sql`
+    SELECT alert.id
+    FROM ${priceAlerts} AS alert
+    WHERE alert.status = 'active'
+      AND NOT EXISTS (
+        SELECT 1 FROM ${consentLog} AS entry
+        WHERE entry.token_id = alert.id AND entry.action = 'opt_in_confirmed'
+      )
+    ORDER BY alert.id
+  `)
+
+  return result.rows.map((row) => row.id)
+}
+
+export type AlertSummary = {
+  gameName: string
+  gameSlug: string
+  targetPrice: string | null
+}
+
+/**
+ * Read-only lookup backing the /alerts/confirmed page, which reloads from an email client
+ * with zero client state and only the token to go on. Scoped to active alerts so a token
+ * that has not been confirmed (or was cancelled) shows nothing game-specific.
+ */
+export async function getAlertSummaryByToken(token: string): Promise<AlertSummary | null> {
+  const db = getDb()
+
+  const rows = await db
+    .select({
+      gameName: games.name,
+      gameSlug: games.slug,
+      targetPrice: priceAlerts.target_price,
+    })
+    .from(priceAlerts)
+    .innerJoin(games, eq(priceAlerts.game_id, games.id))
+    .where(and(eq(priceAlerts.confirmation_token, token), eq(priceAlerts.status, 'active')))
+    .limit(1)
+
+  return rows[0] ?? null
 }

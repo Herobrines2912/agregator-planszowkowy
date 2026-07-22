@@ -26,8 +26,8 @@ Konwencje i granice dla agentów AI i deweloperów.
 
 ```
 POST /api/alerts/subscribe          ← tworzy alert (Zod validation)
-POST /api/alerts/confirm/[token]    ← double opt-in
-GET  /api/alerts/unsubscribe/[token] ← anuluje (GET bo email link)
+GET  /api/alerts/confirm?token=     ← double opt-in (GET bo email link; 302 redirect, nie ApiResponse<T>)
+GET  /api/alerts/unsubscribe?token= ← anuluje (GET bo email link; 302 redirect, nie ApiResponse<T>)
 POST /api/revalidate                ← ISR revalidation (REVALIDATION_SECRET)
 POST /api/webhooks/brevo            ← HMAC-SHA256, hard_bounce + complaint
 ```
