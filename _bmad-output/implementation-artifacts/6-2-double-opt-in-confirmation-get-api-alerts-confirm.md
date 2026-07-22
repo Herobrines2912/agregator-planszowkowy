@@ -185,10 +185,9 @@ an error), assertions on the query predicates the chain mock had left unverified
 
 Open, deliberately not in this commit:
 
-- **`created_at` is never refreshed on re-subscribe (P1).** `subscribeAlert`'s ON CONFLICT rotates
-  the token for a cancelled row but keeps the original `created_at`, which is what the TTL is
-  measured from — so a re-issued token for a row older than 48h is born expired and the user can
-  never confirm. Next commit; touches Story 6.1b's upsert.
+- ~~**`created_at` is never refreshed on re-subscribe (P1).**~~ Fixed 2026-07-22 in a follow-up
+  commit: new `price_alerts.token_issued_at` column carries the TTL, and the upsert rotates the
+  token exactly when the current one is unusable (cancelled, or a `pending_doi` token past 48h).
 - `?slug=` on `/alerts/expired` makes an unknown token distinguishable from a real dead one.
   AC-2 mandates it, the Dev Notes invariant forbids it — a contradiction in the story that needs a
   decision, not a code fix.

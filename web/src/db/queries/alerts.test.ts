@@ -22,19 +22,31 @@ type Chain = {
 
 // Extracts the literal text of a drizzle sql`...` fragment's StringChunks, ignoring
 // column/param chunks — avoids JSON.stringify's circular-reference crash on PgTable refs.
+// Recurses into nested fragments: a sql`` interpolated into another sql`` keeps its own
+// queryChunks, so without this a composed condition reads back as an empty gap.
 function sqlText(value: unknown): string {
-  const chunks = (value as { queryChunks?: { value?: unknown }[] } | undefined)?.queryChunks ?? []
+  const chunks = (value as { queryChunks?: unknown[] } | undefined)?.queryChunks ?? []
   return chunks
-    .map(c => (Array.isArray(c.value) ? c.value.join('') : ''))
+    .map(c => {
+      const chunk = c as { value?: unknown; queryChunks?: unknown[] } | null
+      if (Array.isArray(chunk?.value)) return chunk.value.join('')
+      if (chunk?.queryChunks) return sqlText(chunk)
+      return ''
+    })
     .join(' ')
 }
 
 // Values interpolated into a drizzle sql`...` fragment, in order. They sit in queryChunks as
 // bare primitives (Param wrapping happens later, at query-build time), whereas literal text,
 // tables and columns are all objects — so keeping the primitives isolates the bound values.
+// Nested fragments are flattened for the same reason as above.
 function sqlParams(value: unknown): unknown[] {
   const chunks = (value as { queryChunks?: unknown[] } | undefined)?.queryChunks ?? []
-  return chunks.filter(c => c === null || typeof c !== 'object')
+  return chunks.flatMap(c => {
+    if (c === null || typeof c !== 'object') return [c]
+    if ((c as { queryChunks?: unknown[] }).queryChunks) return sqlParams(c)
+    return []
+  })
 }
 
 function chain(result: unknown): Chain {
@@ -121,7 +133,7 @@ describe('subscribeAlert', () => {
     )
   })
 
-  test('existing alert (conflict): target_price/type_b_enabled always updated; status/confirmation_token only change if the existing row was cancelled', async () => {
+  test('existing alert (conflict): threshold always updated; token rotates only when the current one is unusable', async () => {
     mockSelect.mockReturnValueOnce(chain([{ id: 42 }])).mockReturnValueOnce(chain([]))
     mockInsert.mockImplementation((table: unknown) => {
       if (table === priceAlerts) return chain([{ id: 7 }])
@@ -140,19 +152,26 @@ describe('subscribeAlert', () => {
       'confirmation_token',
       'status',
       'target_price',
+      'token_issued_at',
       'type_b_enabled',
     ])
     // target_price/type_b_enabled are plain pass-through values (unconditional update)
     expect(conflictArg.set.target_price).toBe('89.99')
     expect(conflictArg.set.type_b_enabled).toBe(true)
-    // status/confirmation_token are conditional SQL fragments (CASE ... WHEN existing status
-    // = 'cancelled'), not plain values — the whole point is they only take effect for a
-    // cancelled row, leaving an active/pending_doi row's status/token untouched (AC-4).
-    const statusSql = sqlText(conflictArg.set.status)
-    expect(statusSql).toContain('cancelled')
-    expect(statusSql).toContain('pending_doi')
-    const tokenSql = sqlText(conflictArg.set.confirmation_token)
-    expect(tokenSql).toContain('cancelled')
+
+    // status/confirmation_token/token_issued_at are conditional CASE fragments, not plain
+    // values. The condition has to cover BOTH dead ends: a cancelled alert, and a pending one
+    // whose token has aged out — either would otherwise keep a token confirmAlert always
+    // rejects, leaving the user unable to opt in no matter how often they resubmit.
+    for (const key of ['status', 'confirmation_token', 'token_issued_at']) {
+      const fragment = sqlText(conflictArg.set[key])
+      expect(fragment, `${key} must be conditional on cancelled`).toContain('cancelled')
+      expect(fragment, `${key} must also cover an aged-out pending token`).toContain('pending_doi')
+      expect(fragment, `${key} must compare against the token issue time`).toContain('interval')
+    }
+    // The 48h window is bound as a parameter so the constant lives only in TypeScript and
+    // cannot drift from the one confirmAlert enforces.
+    expect(sqlParams(conflictArg.set.token_issued_at)).toContain(48 * 60 * 60 * 1000)
   })
 
   test('email_suppressions hit: returns suppressed, zero writes to price_alerts or consent_log', async () => {
@@ -222,7 +241,7 @@ describe('confirmAlert', () => {
   const makeRow = (overrides: Record<string, unknown> = {}) => ({
     id: 7,
     status: 'pending_doi',
-    createdAt: new Date(Date.now() - HOUR),
+    tokenIssuedAt: new Date(Date.now() - HOUR),
     gameSlug: 'brass-birmingham',
     ...overrides,
   })
@@ -291,7 +310,7 @@ describe('confirmAlert', () => {
   })
 
   test('pending_doi older than 48h: expired with the game slug, no writes', async () => {
-    mockSelect.mockReturnValueOnce(chain([makeRow({ createdAt: new Date(Date.now() - 49 * HOUR) })]))
+    mockSelect.mockReturnValueOnce(chain([makeRow({ tokenIssuedAt: new Date(Date.now() - 49 * HOUR) })]))
 
     const result = await confirmAlert('tok-old', IP_HASH)
 
@@ -306,7 +325,7 @@ describe('confirmAlert', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-07-21T12:00:00.000Z'))
     try {
-      mockSelect.mockReturnValueOnce(chain([makeRow({ createdAt: new Date(Date.now() - 48 * HOUR) })]))
+      mockSelect.mockReturnValueOnce(chain([makeRow({ tokenIssuedAt: new Date(Date.now() - 48 * HOUR) })]))
       mockExecute.mockResolvedValue({ rows: [{ id: 99 }] })
 
       const result = await confirmAlert('tok-boundary', IP_HASH)
@@ -322,7 +341,7 @@ describe('confirmAlert', () => {
     vi.setSystemTime(new Date('2026-07-21T12:00:00.000Z'))
     try {
       mockSelect.mockReturnValueOnce(
-        chain([makeRow({ createdAt: new Date(Date.now() - 48 * HOUR - 1) })]),
+        chain([makeRow({ tokenIssuedAt: new Date(Date.now() - 48 * HOUR - 1) })]),
       )
 
       const result = await confirmAlert('tok-just-expired', IP_HASH)
@@ -334,13 +353,21 @@ describe('confirmAlert', () => {
     }
   })
 
-  test('pending_doi with a null created_at: treated as expired (age cannot be verified), no writes', async () => {
-    mockSelect.mockReturnValueOnce(chain([makeRow({ createdAt: null })]))
+  // A row created long ago but re-subscribed recently must confirm: the TTL follows the token,
+  // not the row. Measuring from created_at is what made a re-issued token arrive dead on
+  // arrival, with no way out for the user however many times they resubmitted.
+  test('old alert re-subscribed recently: the freshly issued token is accepted', async () => {
+    mockSelect.mockReturnValueOnce(
+      chain([
+        makeRow({
+          createdAt: new Date(Date.now() - 90 * 24 * HOUR),
+          tokenIssuedAt: new Date(Date.now() - HOUR),
+        }),
+      ]),
+    )
+    mockExecute.mockResolvedValue({ rows: [{ id: 99 }] })
 
-    const result = await confirmAlert('tok-no-date', IP_HASH)
-
-    expect(result).toEqual({ outcome: 'expired', gameSlug: 'brass-birmingham' })
-    expect(mockExecute).not.toHaveBeenCalled()
+    expect(await confirmAlert('tok-reissued', IP_HASH)).toEqual({ outcome: 'confirmed' })
   })
 
   test('concurrent double-confirm: the guarded UPDATE matches no row, so the statement inserts no consent row', async () => {

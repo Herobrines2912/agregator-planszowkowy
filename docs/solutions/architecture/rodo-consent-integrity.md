@@ -180,7 +180,17 @@ route API), więc decyzja powinna zapaść **przed** implementacją 6.3.
 Przegląd 11 recenzentów na gotowej implementacji 6.2. Rzeczy istotne dla RODO, których wcześniejsza
 analiza nie objęła:
 
-- **Ponowny zapis nie odświeża `created_at` — token rodzi się wygasły (P1, potwierdzone w kodzie).**
+- ~~**Ponowny zapis nie odświeża `created_at` — token rodzi się wygasły (P1).**~~ **NAPRAWIONE 2026-07-22.**
+  Rozwiązanie: kolumna `price_alerts.token_issued_at` (`NOT NULL DEFAULT now()`, dodana ręcznie na
+  Neonie — tabela była pusta, więc bez backfillu) niesie TTL zamiast `created_at`, a `ON CONFLICT`
+  rotuje token wtedy i tylko wtedy, gdy obecny jest bezużyteczny: wiersz `cancelled` **albo**
+  `pending_doi` z tokenem starszym niż 48h. Świeży `pending_doi` zostaje nietknięty, żeby korekta
+  progu nie unieważniała linku, którego użytkownik może mieć otwartego w skrzynce; `active` nie
+  jest ruszany nigdy (AC-4). Stała TTL jest przekazywana z TS jako parametr, więc nie może
+  rozjechać się z tą, którą egzekwuje `confirmAlert`. Opis problemu zostawiony poniżej jako
+  kontekst.
+
+  Pierwotny opis: 
   `subscribeAlert` w `ON CONFLICT DO UPDATE` rotuje token dla wiersza `cancelled`, ale **nigdy nie
   ustawia `created_at`** — a to od niego liczy się TTL. Alert anulowany dawniej niż 48h temu po
   ponownym zapisie dostaje świeży token, który `confirmAlert` natychmiast uznaje za wygasły.
@@ -253,7 +263,7 @@ analiza nie objęła:
 | Sparowany zapis jako jeden statement (CTE) w `confirmAlert` | **Wdrożone** 2026-07-22 |
 | Zapytanie kontrolne wykrywające `active` bez zgody | **Wdrożone** 2026-07-22 — `findActiveAlertsMissingConsent()` |
 | `ip_hash` przy `opt_in_confirmed` | **Wdrożone** 2026-07-22 (znalezione w code review) |
-| TTL liczony od `created_at`, którego ponowny zapis nie odświeża | **Otwarte, P1** — patrz niżej, następny commit |
+| TTL liczony od `created_at`, którego ponowny zapis nie odświeża | **Wdrożone** 2026-07-22 — kolumna `token_issued_at` + rotacja tokenu gdy jest bezużyteczny |
 | Odwrócona kolejność / dodatkowa warstwa zapisu | **Odrzucone** — uzasadnienie wyżej |
 | Skanery linków (GET vs POST-confirm) | **Otwarte** — chwilowo skłaniamy się do (b), decyzja w osobnej sesji |
 | `created_at NOT NULL` w `price_alerts` | **Odłożone** — brak katalogu migracji podnosi koszt; gałąź obronna zostaje |

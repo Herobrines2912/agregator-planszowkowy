@@ -130,6 +130,11 @@ export const priceAlerts = pgTable(
       .notNull()
       .default('pending_doi'),
     confirmation_token: text('confirmation_token').notNull(),
+    // Stamped every time a confirmation token is issued — on insert and on every rotation.
+    // The 48h DOI window is measured from here, never from created_at: re-subscribing to a
+    // cancelled or long-expired alert issues a fresh token, and a fresh token has to start a
+    // fresh clock or it would arrive already expired.
+    token_issued_at: timestamptz('token_issued_at').notNull().defaultNow(),
     confirmed_at: timestamptz('confirmed_at'),
     created_at: timestamptz('created_at').defaultNow(),
   },

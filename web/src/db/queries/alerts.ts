@@ -52,6 +52,24 @@ export async function subscribeAlert(input: SubscribeAlertInput): Promise<Subscr
 
   const confirmationToken = randomBytes(32).toString('hex')
 
+  // A re-subscribe gets a fresh token only when the existing one can no longer be used: the
+  // alert was cancelled, or its pending token has aged out of the 48h window. Both cases are
+  // otherwise dead ends — the row keeps a token that confirmAlert will always reject, so the
+  // user could never complete the opt-in no matter how often they resubmit.
+  //
+  // A still-valid pending token is deliberately left alone. Rotating it on every threshold
+  // tweak would silently kill the link in the email the user may already have open. An 'active'
+  // alert is never touched at all (AC-4: resetting a confirmed subscriber to pending_doi would
+  // stop their notifications). Unqualified column refs in an ON CONFLICT DO UPDATE SET clause
+  // read the pre-conflict (existing) row, not the values being inserted.
+  const tokenIsUnusable = sql`(
+    ${priceAlerts.status} = 'cancelled'
+    OR (
+      ${priceAlerts.status} = 'pending_doi'
+      AND ${priceAlerts.token_issued_at} < now() - ${CONFIRMATION_TOKEN_TTL_MS} * interval '1 millisecond'
+    )
+  )`
+
   const [alert] = await db
     .insert(priceAlerts)
     .values({
@@ -69,15 +87,11 @@ export async function subscribeAlert(input: SubscribeAlertInput): Promise<Subscr
       set: {
         target_price: input.targetPrice,
         type_b_enabled: input.typeBEnabled,
-        // An 'active' or still-'pending_doi' alert keeps its status/token untouched on a
-        // threshold update (AC-4: resetting a confirmed subscriber to pending_doi on every
-        // price tweak would silently stop their notifications). A 'cancelled' alert is
-        // different — the user explicitly opted out, so resubmitting the form is a fresh
-        // subscribe intent and must be treated like one: reactivate to pending_doi with a
-        // new token. Unqualified column refs in an ON CONFLICT DO UPDATE SET clause read
-        // the pre-conflict (existing) row, not the values being inserted.
-        status: sql`CASE WHEN ${priceAlerts.status} = 'cancelled' THEN 'pending_doi' ELSE ${priceAlerts.status} END`,
-        confirmation_token: sql`CASE WHEN ${priceAlerts.status} = 'cancelled' THEN ${confirmationToken} ELSE ${priceAlerts.confirmation_token} END`,
+        status: sql`CASE WHEN ${tokenIsUnusable} THEN 'pending_doi' ELSE ${priceAlerts.status} END`,
+        confirmation_token: sql`CASE WHEN ${tokenIsUnusable} THEN ${confirmationToken} ELSE ${priceAlerts.confirmation_token} END`,
+        // The new token starts its own 48h clock; without this it would inherit the old one's
+        // and arrive already expired.
+        token_issued_at: sql`CASE WHEN ${tokenIsUnusable} THEN now() ELSE ${priceAlerts.token_issued_at} END`,
       },
     })
     .returning({ id: priceAlerts.id })
@@ -115,7 +129,7 @@ export async function confirmAlert(token: string, ipHash: string): Promise<Confi
     .select({
       id: priceAlerts.id,
       status: priceAlerts.status,
-      createdAt: priceAlerts.created_at,
+      tokenIssuedAt: priceAlerts.token_issued_at,
       gameSlug: games.slug,
     })
     .from(priceAlerts)
@@ -140,12 +154,9 @@ export async function confirmAlert(token: string, ipHash: string): Promise<Confi
       return { outcome: 'expired', gameSlug: alert.gameSlug }
 
     case 'pending_doi': {
-      // A null created_at means the row's age cannot be verified — refuse rather than
-      // treat an unbounded-age token as fresh.
-      if (
-        alert.createdAt === null ||
-        Date.now() - alert.createdAt.getTime() > CONFIRMATION_TOKEN_TTL_MS
-      ) {
+      // Measured from when this token was issued, not when the row was created — a re-subscribe
+      // rotates the token and restarts this clock (see subscribeAlert).
+      if (Date.now() - alert.tokenIssuedAt.getTime() > CONFIRMATION_TOKEN_TTL_MS) {
         return { outcome: 'expired', gameSlug: alert.gameSlug }
       }
 
