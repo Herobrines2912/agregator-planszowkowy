@@ -66,3 +66,12 @@ Coverage: **100%** — well above the 50% threshold.
 BGG ID field in response: `bgg_info[0].id` — the deduplication pipeline in Story 2.2 must read this field.
 
 API key for Story 2.2 implementation: read from env var `GAMEUPC_API_KEY`. The test key `test_test_test_test_test` (public, from gameupc.com/demo.html) suffices for development; a production key may be needed for production load.
+
+## Addendum (2026-07-21) — two callouts from this spike were never carried into Story 2.2's implementation
+
+Confirmed via a production-incident investigation (`_bmad-output/implementation-artifacts/investigations/gameupc-sandbox-key-cross-contamination-investigation.md`) that two things this spike flagged did not make it into `scraper/scraper/pipelines/deduplication.py` as shipped:
+
+1. **"a production key may be needed for production load"** (above) — correct, and understated: `GAMEUPC_API_KEY` was never actually provisioned anywhere (not even as a secret), so production ran on the `test` demo key the entire time. Worse than a load problem — the demo key doesn't do real per-EAN lookups at all (see the investigation for the live-reproduction evidence). Production-key access research: `docs/research/gameupc-api-registration.md`.
+2. **`bgg_info_status` validation** (this file's earlier note under "Notes on `bgg_info_status`": *"the pipeline should store the BGG ID and rely on the existing BGG title-match logic for final validation"*) — this was never implemented. `_try_ean_path` in `deduplication.py` takes `bgg_info[0].id` unconditionally and never reads `bgg_info_status`; the "existing BGG title-match logic" (`_try_name_path`) only runs as a fallback when the EAN path finds nothing, never as a cross-check on an EAN-path hit.
+
+Both are being fixed together in Story 2.2b (`_bmad-output/implementation-artifacts/2-2b-gameupc-key-hardening-data-cleanup.md`). Noting here so a future reader of this spike doesn't assume either recommendation was already acted on just because it's written above.

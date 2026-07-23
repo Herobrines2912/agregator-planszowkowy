@@ -32,6 +32,13 @@ jobs:
       - name: Step 1 — Run all spiders
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          # DeduplicationPipeline runs inside the spiders and needs both match paths.
+          # Without BGG_API_TOKEN here _try_name_path is disabled, so with the GameUPC
+          # demo-key fallback removed the pipeline would have no way to match at all.
+          BGG_API_TOKEN: ${{ secrets.BGG_API_TOKEN }}
+          # Unset secret expands to '' — falsy, so the EAN path stays hard-disabled
+          # until a real /v1 key is provisioned. See Story 2.2b Manual prerequisite.
+          GAMEUPC_API_KEY: ${{ secrets.GAMEUPC_API_KEY }}
         run: |
           cd scraper
           SPIDERS=$(uv run python -c "from scraper.spiders.__manifest__ import SPIDERS; print(' '.join(SPIDERS))")

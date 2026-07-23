@@ -11,11 +11,14 @@ from rapidfuzz import fuzz
 
 logger = logging.getLogger(__name__)
 
-GAMEUPC_BASE = "https://api.gameupc.com/test/upc"
+# The /test tier is the public demo (canned data, periodically wiped); /v1 is the
+# real production dataset and needs its own key. A demo key 403s on /v1. The base
+# is chosen at runtime from key presence (see open_spider) so a real key never gets
+# sent to /test. See docs/research/gameupc-api-registration.md.
+GAMEUPC_BASE_TEST = "https://api.gameupc.com/test/upc"
+GAMEUPC_BASE_PROD = "https://api.gameupc.com/v1/upc"
 BGG_SEARCH_URL = "https://boardgamegeek.com/xmlapi2/search"
 FUZZY_THRESHOLD = 85
-
-_GAMEUPC_DEMO_KEY = "test_test_test_test_test"
 
 _EDITION_PATTERNS = [
     r"\s*\(edycja polska\)",
@@ -39,15 +42,40 @@ def _normalise_name(name: str) -> str:
     return result.strip()
 
 
+def _name_match_score(scraped: str, candidate: str) -> int:
+    """Score a GameUPC candidate title against the scraped product name.
+
+    Uses ``token_sort_ratio`` rather than ``WRatio``: WRatio awards partial-ratio
+    credit when the two strings differ in length, so an expansion ("Catan: Miasta i
+    Rycerze") scores ~90 against its base game ("Catan") and would be wrongly accepted
+    — exactly the cross-contamination this guard exists to prevent. token_sort_ratio
+    gives no substring credit. Candidates shorter than 8 normalised chars are treated
+    as no-match: a 4-char canned name like "Gier" is too easily reached by unrelated
+    titles, and any genuinely short-named game is still recoverable via _try_name_path.
+    """
+    a, b = _normalise_name(scraped), _normalise_name(candidate)
+    if len(a) < 8 or len(b) < 8:
+        return 0
+    return int(fuzz.token_sort_ratio(a, b))
+
+
 class DeduplicationPipeline:
     _http: httpx.Client | None = None
     _pool: psycopg2.pool.ThreadedConnectionPool | None = None
 
     def open_spider(self, spider) -> None:
         load_dotenv()
-        self._gameupc_key = os.getenv("GAMEUPC_API_KEY", _GAMEUPC_DEMO_KEY)
-        if self._gameupc_key == _GAMEUPC_DEMO_KEY:
-            logger.warning("GAMEUPC_API_KEY not set — using rate-limited sandbox key")
+        self._gameupc_key = os.getenv("GAMEUPC_API_KEY")
+        # A real key targets the /v1 production dataset; the EAN path is disabled
+        # entirely without one, so the /test base is never actually reached in that case.
+        self._gameupc_base = GAMEUPC_BASE_PROD if self._gameupc_key else GAMEUPC_BASE_TEST
+        if not self._gameupc_key:
+            logger.warning(
+                "GAMEUPC_API_KEY not set — EAN match path disabled (the public demo "
+                "key returns canned example data for any input EAN and will silently "
+                "cross-contaminate unrelated products, not just rate-limit); falling "
+                "back to BGG name-fuzzy-match only"
+            )
         self._bgg_token = os.getenv("BGG_API_TOKEN")
         if not self._bgg_token:
             logger.warning(
@@ -68,7 +96,7 @@ class DeduplicationPipeline:
         bgg_id: int | None = None
 
         if ean:
-            bgg_id = self._try_ean_path(ean)
+            bgg_id = self._try_ean_path(ean, item.get("name", ""))
 
         if bgg_id is None:
             bgg_id = self._try_name_path(item.get("name", ""))
@@ -106,11 +134,13 @@ class DeduplicationPipeline:
     # Private helpers
     # -------------------------------------------------------------------------
 
-    def _try_ean_path(self, ean: str) -> int | None:
+    def _try_ean_path(self, ean: str, name: str) -> int | None:
+        if not self._gameupc_key:
+            return None
         if not re.fullmatch(r"\d{8,14}", ean):
             logger.warning("Skipping invalid EAN format: %r", ean)
             return None
-        url = f"{GAMEUPC_BASE}/{ean}"
+        url = f"{self._gameupc_base}/{ean}"
         try:
             response = self._http.get(url, headers={"x-api-key": self._gameupc_key})
             if response.status_code == 404:
@@ -118,14 +148,46 @@ class DeduplicationPipeline:
             response.raise_for_status()
             data = response.json()
             bgg_info = data.get("bgg_info") or []
-            if bgg_info:
-                raw_id = bgg_info[0].get("id")
+            if not bgg_info:
+                return None
+
+            # GameUPC returns bgg_info as a candidate list (status
+            # "choose_from_bgg_info_or_search" on all real matches in the 1.6 spike),
+            # so evaluate every candidate and keep the best name match — mirroring
+            # _try_name_path — rather than trusting bgg_info[0] blindly.
+            best_score = 0
+            best_bgg_id: int | None = None
+            best_name = ""
+            for candidate in bgg_info:
+                raw_id = candidate.get("id")
                 if not raw_id:
-                    logger.warning("GameUPC bgg_info missing 'id' for EAN %s", ean)
-                    return None
-                bgg_id = int(raw_id)
-                logger.debug("EAN %s → bgg_id=%d via GameUPC", ean, bgg_id)
-                return bgg_id
+                    continue
+                candidate_name = candidate.get("name", "")
+                score = _name_match_score(name, candidate_name)
+                if score > best_score:
+                    best_score = score
+                    best_bgg_id = int(raw_id)
+                    best_name = candidate_name
+
+            if best_bgg_id is None:
+                logger.warning("GameUPC bgg_info had no usable 'id' for EAN %s", ean)
+                return None
+            # TODO(korpus BGG): a Polish store title vs an English BGG name is a weak
+            # comparison — token_sort_ratio here only blocks obvious wrong-merges
+            # (e.g. an expansion onto its base game). Real PL<->EN matching belongs in
+            # the planned BGG-corpus story (match on BGG alternate names + expansion
+            # type/links), not string similarity. See docs/spike-results/.
+            if best_score < FUZZY_THRESHOLD:
+                logger.debug(
+                    "GameUPC candidate rejected for EAN %s: scraped=%r best_candidate=%r "
+                    "bgg_id=%s score=%d (< %d)",
+                    ean, name, best_name, best_bgg_id, best_score, FUZZY_THRESHOLD,
+                )
+                return None
+            logger.debug(
+                "EAN %s → bgg_id=%d via GameUPC (score=%d)", ean, best_bgg_id, best_score
+            )
+            return best_bgg_id
         except httpx.HTTPStatusError as exc:
             logger.warning("GameUPC HTTP %d for EAN %s", exc.response.status_code, ean)
         except Exception as exc:

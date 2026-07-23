@@ -1,5 +1,5 @@
 # generated: 2026-07-20
-# last_updated: 2026-07-21
+# last_updated: 2026-07-23
 # project: board_games_app
 # project_key: NOKEY
 # tracking_system: file-system
@@ -37,7 +37,7 @@
 #   fully completed story or fix (see CLAUDE.md "Sprint status" section)
 
 generated: 2026-07-20
-last_updated: 2026-07-21
+last_updated: 2026-07-23
 project: board_games_app
 project_key: NOKEY
 tracking_system: file-system
@@ -55,13 +55,15 @@ development_status:
   1-2b-pydantic-models-sync: done
   epic-1-retrospective: optional
 
-  epic-2: done
+  epic-2: in-progress
   2-1-scrapy-spiders-three-trolle-ale-planszowki: done
   2-2-product-deduplication-pipeline: done
   2-3-price-history-recording-database-pipeline: done
   2-4-bgg-data-enrichment-background-job: done
   2-5-scraper-github-actions-workflow: done
   2-6-operator-monitoring-selector-health-tests: done
+  2-2b-gameupc-key-hardening-data-cleanup: review
+  2-7-bgg-corpus-title-matching: backlog  # DRAFT follow-up from 2.2b review (spike first)
   epic-2-retrospective: optional
 
   epic-3: done
@@ -95,7 +97,7 @@ development_status:
 
   epic-6: in-progress
   6-1-alertform-post-api-alerts-zapis-powiadomienia: done
-  6-2-double-opt-in-confirmation-get-api-alerts-confirm: backlog
+  6-2-double-opt-in-confirmation-get-api-alerts-confirm: done
   6-3-wylaczanie-powiadomien: backlog
   6-4-brevo-client-szablon-emaila-doi: done
   6-5-alert-engine-wykrywanie-spadku-ceny: backlog

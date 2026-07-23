@@ -4,7 +4,7 @@ baseline_commit: 9358c7ef32d5a3934d2c4e33a2eb1fd97323fd28
 
 # Story 6.2: Double Opt-In Confirmation — GET /api/alerts/confirm
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -58,10 +58,12 @@ The epics AC text (`_bmad-output/planning-artifacts/epics.md` lines 1719–1749)
 | No row for `confirmation_token = token` | → `{ outcome: 'expired', gameSlug: null }` — no slug to show, since no row was found (see note below on why this is not an anti-enumeration guarantee) |
 | Row found, `status = 'active'` | → `{ outcome: 'already_confirmed' }` — **no** new `consent_log` write (AC-3: idempotent, not a fresh confirmation event) |
 | Row found, `status = 'cancelled'` | → `{ outcome: 'expired', gameSlug: row.gameSlug }` — a cancelled alert must never be silently reactivated by replaying an old confirm link (security: this is the only place a stale link could resurrect an unsubscribed user) |
-| Row found, `status = 'pending_doi'`, `created_at` > 48h ago | → `{ outcome: 'expired', gameSlug: row.gameSlug }` |
-| Row found, `status = 'pending_doi'`, `created_at` ≤ 48h ago | UPDATE `status = 'active'`, `confirmed_at = now()` → INSERT `consent_log` (`action = 'opt_in_confirmed'`, `source = 'user'`, `email_hash = row.email_hash`, `token_id = row.id`) → `{ outcome: 'confirmed' }` |
+| Row found, `status = 'pending_doi'`, `token_issued_at` > 48h ago | → `{ outcome: 'expired', gameSlug: row.gameSlug }` |
+| Row found, `status = 'pending_doi'`, `token_issued_at` ≤ 48h ago | activate + record consent in ONE statement (see below) → `{ outcome: 'confirmed' }` |
 
-Compute the 48h check in JS (`Date.now() - row.created_at.getTime() > 48 * 60 * 60 * 1000`) — `created_at` comes back as a JS `Date` from the `timestamptz` column via Drizzle, same as every other timestamp read in this codebase. No new SQL interval logic needed.
+> **Updated post-implementation:** the TTL is measured from `token_issued_at`, not `created_at` — a re-subscribe rotates the token and restarts that clock, so measuring from row creation made a re-issued token arrive already expired (P1 found in review, fixed in `f683dc9`). Activation and its `consent_log` INSERT run as a single data-modifying CTE, not two statements, because the neon-http driver has no transactions and the pairing must be atomic — see `docs/solutions/architecture/rodo-consent-integrity.md`.
+
+Compute the 48h check in JS (`Date.now() - row.token_issued_at.getTime() > 48 * 60 * 60 * 1000`) — `token_issued_at` comes back as a JS `Date` from the `timestamptz` column via Drizzle, same as every other timestamp read in this codebase.
 
 ### Why `/alerts/confirmed` and `/alerts/expired` carry `?token=` / `?slug=`, not raw game data
 
