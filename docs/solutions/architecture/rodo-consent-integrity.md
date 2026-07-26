@@ -289,9 +289,15 @@ analiza nie objęła:
   dwa zapisy i jest mierzalnie szybsza od „subscribed", mimo identycznej odpowiedzi.
   Ryzyko przyjęte świadomie (wymaga wielu żądań, brak rate limitingu czyni to
   teoretycznie wykonalnym) — udokumentowane w kodzie.
-- **Route'y token-driven nie zwracają `ApiResponse<T>`** — świadomy wyjątek od reguły
+- ~~**Route'y token-driven nie zwracają `ApiResponse<T>`** — świadomy wyjątek od reguły
   z `CLAUDE.md`: są klikane z maila, nigdy `fetch()`-owane, więc jedyną sensowną
-  odpowiedzią jest redirect.
+  odpowiedzią jest redirect.~~
+  **Częściowo cofnięte 2026-07-26 (correct-course 6.2):** wyjątek dotyczy tylko
+  `GET`-a klikanego z maila — a po korekcie ten `GET` jest już stroną, nie route'em API,
+  więc nie ma czego wyjątkować. `POST /api/alerts/confirm` jest teraz `fetch()`-owany z
+  własnej strony (przycisk „Potwierdzam"), więc **zwraca `ApiResponse<T>`** jak każdy inny
+  route. Ten sam kształt czeka 6.3 (`POST /api/alerts/unsubscribe`) jako greenfield mirror —
+  nie jako kolejny wyjątek.
 
 ## Gdzie to uderzy dalej
 

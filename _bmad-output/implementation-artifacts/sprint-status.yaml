@@ -98,7 +98,7 @@ development_status:
 
   epic-6: in-progress
   6-1-alertform-post-api-alerts-zapis-powiadomienia: done
-  6-2-double-opt-in-confirmation-get-api-alerts-confirm: done
+  6-2-double-opt-in-confirmation-get-api-alerts-confirm: in-progress  # correct-course 2026-07-26 — POST-confirm (RODO party-mode 2026-07-24)
   6-3-wylaczanie-powiadomien: backlog
   6-4-brevo-client-szablon-emaila-doi: done
   6-5-alert-engine-wykrywanie-spadku-ceny: backlog

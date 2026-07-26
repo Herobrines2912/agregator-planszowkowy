@@ -1716,23 +1716,33 @@ So that I'll be notified when the price drops to a level I'm willing to pay.
 
 ---
 
-### Story 6.2: Double Opt-In Confirmation — GET /api/alerts/confirm
+### Story 6.2: Double Opt-In Confirmation — GET /alerts/confirm (page) + POST /api/alerts/confirm
 
-**Dev: Dev A (Web)** — _pliki: `app/api/alerts/confirm/route.ts`, `app/alerts/confirmed/page.tsx`, `app/alerts/expired/page.tsx`_
+**Dev: Dev A (Web)** — _pliki: `app/alerts/confirm/page.tsx`, `components/AlertConfirmButton.tsx`, `app/api/alerts/confirm/route.ts`, `app/alerts/confirmed/page.tsx`, `app/alerts/expired/page.tsx`_
+
+> **Correct-course 2026-07-24 (party-mode RODO session):** the confirm link no longer mutates
+> state on `GET` — email security scanners (SafeLinks, Proofpoint) request every link in a
+> message before a human clicks, which would silently "confirm" alerts and fabricate consent
+> evidence. `GET` now renders a side-effect-free page with a "Potwierdzam" button; the button
+> click does a `POST`. Full rationale: `docs/solutions/architecture/rodo-consent-integrity.md`.
 
 As a **user**,
-I want clicking the confirmation link in my email to activate my price alert,
-So that I'm sure I'll receive notifications and no one can activate alerts using my email without my consent.
+I want clicking the confirmation link in my email to take me to a page where I explicitly confirm,
+So that I'm sure I'll receive notifications, no one (including an automated scanner) can activate alerts using my email without a real click from me.
 
 **Acceptance Criteria:**
 
-**Given** `GET /api/alerts/confirm?token=<uuid>`
-**When** called with a valid, unexpired token (48h window from creation)
-**Then** it updates `price_alerts.status = 'active'`, writes `consent_log` row with `action = 'opt_in_confirmed'`, redirects to `/alerts/confirmed`
+**Given** `GET /alerts/confirm?token=<value>` (a page, not an API route)
+**When** the token resolves to a `pending_doi` (any TTL) or `active` alert
+**Then** it renders — with zero DB writes — the game name, target price, and a large "Potwierdzam" button; clicking it fires `POST /api/alerts/confirm`
 
-**Given** `GET /api/alerts/confirm?token=<uuid>`
-**When** called with an expired token (> 48h) or token not found
-**Then** it redirects to `/alerts/expired` — warm message "Link wygasł lub jest nieprawidłowy", "Wróć do strony gry i spróbuj ponownie" link — no error code exposed to user
+**Given** `GET /alerts/confirm?token=<value>`
+**When** the token is missing, not found, `cancelled`, or an expired (> 48h) `pending_doi`
+**Then** it redirects (zero DB writes) to `/alerts/expired` — warm message "Link wygasł lub jest nieprawidłowy", "Wróć do strony gry i spróbuj ponownie" link — no error code exposed to user
+
+**Given** `POST /api/alerts/confirm` with `{ token }`
+**When** the token is valid (fresh `pending_doi` or already `active`)
+**Then** it updates `price_alerts.status = 'active'` and writes a `consent_log` row with `action = 'opt_in_confirmed'` only for a fresh confirmation (idempotent for an already-`active` alert), returning `ApiResponse<T>` — the client then navigates to `/alerts/confirmed`
 
 **Given** `/alerts/confirmed` page
 **When** rendered
@@ -1740,11 +1750,11 @@ So that I'm sure I'll receive notifications and no one can activate alerts using
 
 **Given** the confirmation token
 **When** stored in `price_alerts`
-**Then** it is a UUID v4, stored in `confirmation_token` column, never exposed in URL beyond the DOI link — not reusable after confirmation
+**Then** it is stored in the `confirmation_token` column, never exposed in URL beyond the DOI link — not reusable after confirmation
 
 **Given** a token used a second time (already confirmed)
-**When** `GET /api/alerts/confirm` fires
-**Then** it redirects to `/alerts/confirmed` (idempotent) — not an error
+**When** `POST /api/alerts/confirm` fires
+**Then** it returns a success `ApiResponse<T>` (idempotent) — not an error
 
 ---
 

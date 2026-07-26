@@ -2,33 +2,56 @@
 baseline_commit: 9358c7ef32d5a3934d2c4e33a2eb1fd97323fd28
 ---
 
-# Story 6.2: Double Opt-In Confirmation — GET /api/alerts/confirm
+# Story 6.2: Double Opt-In Confirmation — GET /alerts/confirm (page) + POST /api/alerts/confirm
 
-Status: done
+Status: in-progress
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
+
+> **Correct-course (2026-07-26):** the original implementation confirmed alerts on a plain
+> `GET`, which email security scanners (SafeLinks, Proofpoint, etc.) request automatically
+> before a human ever clicks — silently activating alerts and fabricating consent evidence
+> in the append-only `consent_log`. Party-mode session 2026-07-24 decided this must move to
+> a side-effect-free `GET` page + explicit `POST` on click. Full rationale and impact
+> analysis: `docs/solutions/architecture/rodo-consent-integrity.md` ("ROZSTRZYGNIĘTE:
+> skanery linków") and `_bmad-output/planning-artifacts/sprint-change-proposal-2026-07-26.md`.
+> Status reopened `done` → `in-progress`; Task 1–5 below are the **original** implementation
+> (kept for history, still largely valid — see notes inline), Task 6 is the correction.
 
 ## Story
 
 As a **user**,
-I want clicking the confirmation link in my email to activate my price alert,
-so that I'm sure I'll receive notifications and no one can activate alerts using my email without my consent.
+I want clicking the confirmation link in my email to take me to a page where I explicitly confirm, which then activates my price alert,
+so that I'm sure I'll receive notifications, no one (including an email scanner) can activate alerts using my email without a real click from me, and no one can activate alerts using my email without my consent.
 
-**Dev:** Dev A (Web) — _pliki: `app/api/alerts/confirm/route.ts`, `app/alerts/confirmed/page.tsx`, `app/alerts/expired/page.tsx`_
+**Dev:** Dev A (Web) — _pliki: `web/src/app/alerts/confirm/page.tsx`, `web/src/components/AlertConfirmButton.tsx`, `web/src/app/api/alerts/confirm/route.ts`, `web/src/app/alerts/confirmed/page.tsx`, `web/src/app/alerts/expired/page.tsx`_
 **Depends on:** Story 6.1 (done) — `price_alerts` table, `confirmation_token` column, `subscribeAlert()` conventions.
 
 ## Acceptance Criteria
 
-1. **Given** `GET /api/alerts/confirm?token=<value>` **When** called with a valid, unexpired token (created ≤48h ago, `status = 'pending_doi'`) **Then** it updates `price_alerts.status = 'active'` + `confirmed_at = now()`, writes one `consent_log` row (`action = 'opt_in_confirmed'`, `source = 'user'`, `email_hash` from the alert row, `token_id` = the `price_alerts.id`), and redirects (302) to `/alerts/confirmed?token=<value>`.
-2. **Given** `GET /api/alerts/confirm?token=<value>` **When** called with a token that is missing, not found, expired (>48h and still `pending_doi`), or belongs to a `cancelled` alert **Then** it redirects to `/alerts/expired` (with `?slug=<gameSlug>` appended only when the token *was* found in the DB, i.e. expired/cancelled cases — never for a genuinely unknown token) — no error code, no DB error message exposed to the user.
-3. **Given** `GET /api/alerts/confirm?token=<value>` **When** the token belongs to an alert that is already `status = 'active'` **Then** it redirects to `/alerts/confirmed?token=<value>` **without** writing a second `consent_log` row — idempotent, not an error (AC covers "confirmed twice").
-4. **Given** `/alerts/confirmed` page rendered with `?token=<value>` **When** the token resolves to an alert **Then** it shows: green confirmation message "Gotowe! Powiadomimy Cię gdy cena spadnie.", the game name and target price (via `formatPrice`) echoed back, a "Wróć do gry →" link to `/gra/{slug}`, and a "Zarządzaj alertami →" element rendered as a disabled placeholder (see Dev Notes — no destination page exists yet in any epic).
-5. **Given** `/alerts/confirmed` page **When** rendered with a missing/invalid `token` param (direct navigation, no game context available) **Then** it still shows the generic green confirmation message, omitting the game-specific summary card and the "Wróć do gry →" link — does not error or 404.
-6. **Given** `/alerts/expired` page **When** rendered **Then** it shows a warm message "Link wygasł lub jest nieprawidłowy" and a "Wróć do strony gry i spróbuj ponownie" link to `/gra/{slug}` **if** `?slug=` is present, otherwise a generic "Wróć do strony głównej i spróbuj ponownie" link to `/`.
-7. **Given** the confirmation token **Then** it is the existing `price_alerts.confirmation_token` value (already generated as 32 random bytes / hex in Story 6.1b) — this story only *consumes* it, never generates a new one.
-8. **Given** RODO/consent_log constraints (CLAUDE.md, architecture L-4) **Then** `consent_log` is only ever INSERTed, never UPDATEd/DELETEd, in this story's code paths.
+> AC 1–4 are the correct-course replacement for the original AC-1/AC-2/AC-3 (below, in that
+> order): a mail-clicked `GET` may never mutate state. AC 5–9 are the original AC-4/5/6/7/8,
+> renumbered, unchanged in substance. AC 10 is new (UX tone). See Dev Notes → "Correct-course
+> decision table" for the full branch logic and Dev Notes → "Why POST now returns
+> `ApiResponse<T>`" for the reversed exception.
+
+1. **Given** `GET /alerts/confirm?token=<value>` (a **page**, not an API route) **When** the token's row exists with `status = 'pending_doi'` (any TTL) or `status = 'active'` **Then** it renders a side-effect-free confirmation page — **zero DB writes, zero `consent_log` writes** — showing the game name, target price (via `formatPrice`), a large primary "Potwierdzam" button (`AlertConfirmButton`, `'use client'`), and a small secondary line "nie zapisywałeś się? zignoruj maila".
+2. **Given** `GET /alerts/confirm?token=<value>` **When** the token is missing, not found, belongs to a `cancelled` alert, or belongs to a `pending_doi` alert whose `token_issued_at` is past the 48h TTL **Then** it redirects (still zero DB writes) to `/alerts/expired`, with `?slug=<gameSlug>` appended only when the token *was* found (cancelled/expired-pending cases) — never for a genuinely unknown token. Same oracle-acceptance rule as today (Dev Notes → "The `?slug=` presence oracle is accepted, not a defect") — do not relax or re-derive it.
+3. **Given** `POST /api/alerts/confirm` with JSON body `{ token: string }` **When** `confirmAlert(token, ipHash)` (unchanged) returns `'confirmed'` or `'already_confirmed'` **Then** it returns `200 { success: true, data: { outcome } }` (`ApiResponse<{ outcome: 'confirmed' | 'already_confirmed' }>`) — writes exactly one `consent_log` row for a fresh `'confirmed'`, zero for `'already_confirmed'` (idempotency preserved verbatim from the existing query layer — this is the original AC-1's mutation half + AC-3's idempotency, now behind `POST`).
+4. **Given** `POST /api/alerts/confirm` **When** `confirmAlert()` returns `'expired'` (a rare race — token expired or was cancelled between page render and button click) or throws **Then** it returns a non-2xx `ApiResponse<never>` (`{ success: false, error: '...' }`, no DB error text exposed) and `AlertConfirmButton` renders a warm inline error state on the same page (no navigation, no `gameSlug` needed — the common expired/cancelled case is already intercepted at GET-time by AC-2).
+5. **Given** `/alerts/confirmed` page rendered with `?token=<value>` **When** the token resolves to an alert **Then** it shows: green confirmation message "Gotowe! Powiadomimy Cię gdy cena spadnie.", the game name and target price (via `formatPrice`) echoed back, a "Wróć do gry →" link to `/gra/{slug}`, and a "Zarządzaj alertami →" element rendered as a disabled placeholder (see Dev Notes — no destination page exists yet in any epic). **Unchanged — no code change required.**
+6. **Given** `/alerts/confirmed` page **When** rendered with a missing/invalid `token` param (direct navigation, no game context available) **Then** it still shows the generic green confirmation message, omitting the game-specific summary card and the "Wróć do gry →" link — does not error or 404. **Unchanged.**
+7. **Given** `/alerts/expired` page **When** rendered **Then** it shows a warm message "Link wygasł lub jest nieprawidłowy" and a "Wróć do strony gry i spróbuj ponownie" link to `/gra/{slug}` **if** `?slug=` is present, otherwise a generic "Wróć do strony głównej i spróbuj ponownie" link to `/`. **Unchanged — gains one more caller (the new GET page's redirect, AC-2).**
+8. **Given** the confirmation token **Then** it is the existing `price_alerts.confirmation_token` value (already generated as 32 random bytes / hex in Story 6.1b) — this story only *consumes* it, never generates a new one. **Unchanged.**
+9. **Given** RODO/consent_log constraints (CLAUDE.md, architecture L-4) **Then** `consent_log` is only ever INSERTed, never UPDATEd/DELETEd, in this story's code paths — now also covering `getAlertPreviewByToken` (read-only) and the `POST` route.
+10. **Given** `/alerts/confirm` page **When** rendered **Then** the visual tone is warm/inviting but **not** celebratory (no green checkmark — reserved for the post-confirm `/alerts/confirmed` state) — same design tokens (`var(--color-primary)`, `var(--font-playfair)`, etc.), large primary CTA, target price shown for trust, small "nie zapisywałeś się? zignoruj maila" as secondary/muted text.
 
 ## Tasks / Subtasks
+
+> Tasks 1–5 are the **original** implementation (AC numbers below refer to the **original**
+> AC-1..8, not the renumbered list above) — kept as history, still accurate for what they
+> built. Task 6 is the correct-course addition; see its own AC references against the
+> **current** numbered list.
 
 - [x] **Task 1 — DB query layer** (AC: 1, 2, 3, 7, 8) — `web/src/db/queries/alerts.ts` (MODIFY)
   - [x] 1.1 Add `confirmAlert(token: string): Promise<ConfirmAlertResult>` implementing the branch logic in Dev Notes → "Confirm flow decision table". Return a discriminated union: `{ outcome: 'confirmed' } | { outcome: 'already_confirmed' } | { outcome: 'expired'; gameSlug: string | null }` — mirrors the existing `SubscribeAlertResult` pattern in the same file.
@@ -46,6 +69,18 @@ so that I'm sure I'll receive notifications and no one can activate alerts using
   - [x] 4.2 Model markup/style after `web/src/app/gra/[slug]/not-found.tsx` (same warm-empty-state pattern already in the codebase).
   - [x] 4.3 `web/src/app/alerts/expired/page.test.tsx` (CREATE) — asserts correct link target for both the `slug` and no-`slug` cases.
 - [x] **Task 5 — verify** — `npx tsc --noEmit` and `npx eslint` clean on all new/changed files; `npm run test:run` green.
+
+- [ ] **Task 6 — Correct-course: side-effect-free GET page + POST confirm** (AC: 1, 2, 3, 4, 10) — see Dev Notes → "Correct-course decision table" before starting
+  - [ ] 6.1 `web/src/db/queries/alerts.ts` (MODIFY): add `getAlertPreviewByToken(token: string): Promise<{ status: 'pending_doi' | 'active' | 'cancelled'; gameName: string; gameSlug: string; targetPrice: string | null; tokenIssuedAt: Date } | null>` — same read-only `SELECT … WHERE confirmation_token = token` shape `confirmAlert()` already does (join `price_alerts` → `games`), no status filter (needs to see `pending_doi`/`active`/`cancelled` alike to decide render-vs-redirect). Reuse the exported `CONFIRMATION_TOKEN_TTL_MS` for the page's display-only TTL check — do not hardcode 48h again. **`confirmAlert()` itself: zero changes.**
+  - [ ] 6.2 `web/src/app/alerts/confirm/page.tsx` (CREATE): async server component, `searchParams: Promise<{ token?: string }>` (same pattern as `alerts/confirmed/page.tsx`). Missing token → `redirect('/alerts/expired')` (`next/navigation`). Calls `getAlertPreviewByToken`; not found → `redirect('/alerts/expired')`; `cancelled` or (`pending_doi` and TTL expired) → `redirect('/alerts/expired?slug=' + gameSlug)`; `pending_doi` (TTL valid) or `active` → render summary + `AlertConfirmButton`. A `redirect()` call is not a mutation — GET stays pure per AC-1/AC-2.
+  - [ ] 6.3 `web/src/components/AlertConfirmButton.tsx` (CREATE, `'use client'`): props `{ token: string }`. On click: `fetch('/api/alerts/confirm', { method: 'POST', body: JSON.stringify({ token }) })`, parse `ApiResponse<{ outcome }>`; success → `router.push('/alerts/confirmed?token=' + token)`; failure → local error state rendered inline (AC-4). Mirror the fetch/error-state shape already used in `AlertSubscribeForm.tsx`.
+  - [ ] 6.4 `web/src/app/api/alerts/confirm/route.ts` (MODIFY): **remove the `GET` handler entirely** (moves to the page). Add `POST`: parse JSON body, validate `token` is a non-empty string (400 `ApiResponse<never>` if not), derive `ipHash` exactly as the old `GET` did (`x-forwarded-for` → `sha256Hex`, unchanged), call `confirmAlert(token, ipHash)` (unchanged), map outcome to `ApiResponse<T>` per AC-3/AC-4.
+  - [ ] 6.5 `web/src/app/api/alerts/confirm/route.test.ts` (MODIFY): rewrite from `GET(...)`/`Location`-header assertions to `POST(...)`/`ApiResponse<T>` body assertions.
+  - [ ] 6.6 `web/src/app/alerts/confirm/page.test.tsx` (CREATE): RTL, mock `next/navigation` `redirect`, `next/link`, `@/db/queries/alerts`. Cover: `pending_doi`-valid renders button; `active` renders button; `cancelled`/expired-`pending_doi`/missing/unknown token all redirect to `/alerts/expired` with correct `?slug=` presence (mirror the existing oracle rule test coverage).
+  - [ ] 6.7 `web/src/components/AlertConfirmButton.test.tsx` (CREATE): RTL + mocked `fetch`. Cover: success → `router.push` called with the right URL; failure → inline error rendered, no navigation.
+  - [ ] 6.8 `web/src/db/queries/alerts.test.ts` (MODIFY): add coverage for `getAlertPreviewByToken` — found (`pending_doi`), found (`active`), found (`cancelled`), not found.
+  - [ ] 6.9 Doc sync (tracked here, already partially done by the correct-course pass itself — verify still consistent after implementation): `AGENTS.md` route table, this story's own "Why POST now returns `ApiResponse<T>`" note below, `docs/solutions/architecture/rodo-consent-integrity.md` retraction, `_bmad-output/planning-artifacts/epics.md` Story 6.2 AC text.
+  - [ ] 6.10 verify — `npx tsc --noEmit`, `npx eslint`, `npm run test:run` clean; add an explicit test asserting `GET /alerts/confirm` performs **zero** DB writes under every input (not just inspection — this is the exact property that was violated).
 
 ## Dev Notes
 
@@ -65,6 +100,23 @@ The epics AC text (`_bmad-output/planning-artifacts/epics.md` lines 1719–1749)
 
 Compute the 48h check in JS (`Date.now() - row.token_issued_at.getTime() > 48 * 60 * 60 * 1000`) — `token_issued_at` comes back as a JS `Date` from the `timestamptz` column via Drizzle, same as every other timestamp read in this codebase.
 
+> **This table describes `confirmAlert()`, which the 2026-07-26 correct-course does not touch.** Only the HTTP verb wrapping it changes (GET → POST) — see the next section.
+
+### Correct-course decision table (2026-07-26) — GET page vs. POST, and why
+
+Party-mode 2026-07-24 (`docs/solutions/architecture/rodo-consent-integrity.md`) found that a plain `GET` mutating state lets email security scanners (Outlook SafeLinks, Proofpoint, antivirus link-preview) silently activate alerts before a human clicks — RFC 7231 requires GET to be *safe*, and the resulting `consent_log` row would carry the scanner's `ip_hash` as if it were the user's. Fix: split the mail-clicked `GET` into a side-effect-free page, and move the mutation behind an explicit-click `POST`.
+
+| `getAlertPreviewByToken` result | `GET /alerts/confirm` renders | `POST /api/alerts/confirm` (on click) |
+|---|---|---|
+| Not found | `redirect('/alerts/expired')` — no slug | never reached |
+| `status = 'cancelled'` | `redirect('/alerts/expired?slug=' + gameSlug)` | never reached |
+| `status = 'pending_doi'`, TTL expired | `redirect('/alerts/expired?slug=' + gameSlug)` | never reached |
+| `status = 'pending_doi'`, TTL valid | Summary + `AlertConfirmButton` | `confirmAlert()` → `'confirmed'` (fresh) |
+| `status = 'active'` | Summary + `AlertConfirmButton` (idempotent replay is fine — button still works) | `confirmAlert()` → `'already_confirmed'` |
+| (rare race: valid at GET, expired/cancelled by click time) | — | `confirmAlert()` → `'expired'` → `ApiResponse<never>`, inline error, no redirect (AC-4) |
+
+Do **not** duplicate the 48h math with a separate constant — the page's TTL check is display-only (decides render vs. redirect) and must import `CONFIRMATION_TOKEN_TTL_MS` from `alerts.ts` so it can never drift from what `confirmAlert()` actually enforces. The rare-race row exists because the GET-time check and the POST-time check are two different requests, seconds apart — this is expected and AC-4 handles it without needing a `gameSlug` on the failure response (the common case never reaches `POST` at all, per the redirect rows above).
+
 ### Why `/alerts/confirmed` and `/alerts/expired` carry `?token=` / `?slug=`, not raw game data
 
 The epics AC says the confirm route "redirects to `/alerts/confirmed`" with no query params specified, but the same epic also requires that page to echo the game name and target price. There is no other way for that page (a fresh page load from an email client, zero client state) to know which alert to show. Resolution: redirect with `?token=<value>` and have the `/alerts/confirmed` page re-look-up the alert by token (`getAlertSummaryByToken`, scoped to `status = 'active'` rows only — read-only, no side effects, safe to call on every repeat visit). This keeps the confirmation token as the single identifier throughout the flow instead of introducing a new leaky identifier (e.g. a raw numeric `price_alerts.id` in the URL, which would let anyone enumerate other users' game+price choices).
@@ -79,9 +131,13 @@ Anti-enumeration matters when the identifier is guessable. It is not here: the t
 
 Where the anti-enumeration rule genuinely applies in this codebase is `subscribeAlert`, which hides whether an **email address** is suppressed — a guessable identifier. That is implemented and must stay.
 
-### Why this route does not return `ApiResponse<T>`
+### Why POST now returns `ApiResponse<T>` (reverses this story's original exception)
 
-CLAUDE.md: "Każdy API Route musi zwracać `ApiResponse<T>`" — this route is the one deliberate exception. `GET /api/alerts/confirm` is never called via `fetch()`; it is the target of a link a human clicks from their email client, so its only correct response is an HTTP redirect the browser follows. Returning `{ success: true, data: ... }` JSON here would show the user raw JSON instead of navigating them anywhere. `web/src/app/api/revalidate/route.ts` and `.../alerts/subscribe/route.ts` are the two existing routes that *do* return `ApiResponse<T>` — both are `fetch()`-consumed. Story 6.3 (`/api/alerts/unsubscribe`) will be the same kind of exception; treat this as the established pattern for token-driven redirect routes, not a one-off hack.
+~~CLAUDE.md: "Każdy API Route musi zwracać `ApiResponse<T>`" — this route is the one deliberate exception. `GET /api/alerts/confirm` is never called via `fetch()`; it is the target of a link a human clicks from their email client, so its only correct response is an HTTP redirect the browser follows. ... Story 6.3 (`/api/alerts/unsubscribe`) will be the same kind of exception; treat this as the established pattern for token-driven redirect routes, not a one-off hack.~~
+
+**Reversed 2026-07-26 (correct-course).** The reasoning above was correct for a route that a mail client clicks directly — but as of this correction, `/api/alerts/confirm` is no longer that route. The mail-clicked link now points to `GET /alerts/confirm`, a **page**, which is not an API route at all and has nothing to except. `POST /api/alerts/confirm` is `fetch()`-ed from `AlertConfirmButton`, our own client component, so it **must** follow the normal rule and return `ApiResponse<T>` (AC-3/AC-4) — exactly like `.../alerts/subscribe/route.ts`.
+
+**Consequence for Story 6.3:** the forward-reference above ("6.3 will be the same kind of exception") is now wrong and must not be copied — 6.3's `POST /api/alerts/unsubscribe` is a greenfield mirror of *this* corrected pattern (page + button + `POST` returning `ApiResponse<T>`), not of the original GET-redirect shape. `web/src/app/api/revalidate/route.ts` and `.../alerts/subscribe/route.ts` remain the two other `ApiResponse<T>`-returning, `fetch()`-consumed routes this pattern was always modeled on.
 
 ### "Zarządzaj alertami →" has no destination page
 
@@ -104,9 +160,10 @@ The epics AC for `/alerts/confirmed` (line 1739) lists a "Zarządzaj alertami �
 
 ### Project Structure Notes
 
-- `app/api/alerts/confirm/route.ts` is a **static** route path with the token as a query string parameter (`?token=`), matching `epics.md`'s explicit file path and the `subscribe` route's shape. **Do not** create a dynamic segment (`app/api/alerts/confirm/[token]/route.ts`) — an earlier note in Story 6-1b's Dev Notes speculatively mentioned `[token]` dynamic folders for 6.2/6.3; that speculation is superseded by `epics.md`'s explicit `app/api/alerts/confirm/route.ts` file path and by this story's ACs, which all use `?token=`.
-- `app/alerts/confirmed/page.tsx` and `app/alerts/expired/page.tsx` are new sibling routes under a new `app/alerts/` directory (parallel to existing `app/gra/[slug]/`) — first routes under this path, no existing `app/alerts/layout.tsx` to worry about; they inherit `SiteHeader`/`SiteFooter` from the root `layout.tsx` automatically.
-- Both new pages are personal/transient (post-redirect, not link-worthy) and out of scope for `sitemap.ts` (`web/src/app/sitemap.ts` — do not add them there) — no story requires it and neither page has stable, indexable content per visit.
+- `app/api/alerts/confirm/route.ts` keeps its **static** path with the token as a query string parameter (`?token=`) — unchanged by the correction, still matching the `subscribe` route's shape. **Do not** create a dynamic segment (`app/api/alerts/confirm/[token]/route.ts`) — an earlier note in Story 6-1b's Dev Notes speculatively mentioned `[token]` dynamic folders for 6.2/6.3; superseded, as before.
+- `app/alerts/confirmed/page.tsx` and `app/alerts/expired/page.tsx` are unchanged by the correction. `app/alerts/confirm/page.tsx` (correct-course, new) is a third sibling under the same `app/alerts/` directory — same layout inheritance (`SiteHeader`/`SiteFooter` from root `layout.tsx`), same "no `sitemap.ts` entry" rule below.
+- `AlertConfirmButton.tsx` (correct-course, new) goes in `web/src/components/`, alongside `AlertSubscribeForm.tsx` — not colocated with the page, matching this codebase's existing split between route files and reusable components.
+- Both new pages are personal/transient (post-redirect, not link-worthy) and out of scope for `sitemap.ts` (`web/src/app/sitemap.ts` — do not add them there) — no story requires it and neither page has stable, indexable content per visit. This now also applies to `alerts/confirm/page.tsx`.
 
 ### References
 
@@ -119,6 +176,8 @@ The epics AC for `/alerts/confirmed` (line 1739) lists a "Zarządzaj alertami �
 - [Source: web/src/db/schema.ts] — `priceAlerts`, `consentLog`, `games` table definitions (current, read directly — no separate schema doc)
 - [Source: web/src/db/queries/alerts.ts] — `subscribeAlert()` pattern to mirror (discriminated-union result type, normalized-email handling)
 - [Source: web/src/app/gra/[slug]/page.tsx, not-found.tsx] — page/metadata/empty-state conventions
+- [Source: docs/solutions/architecture/rodo-consent-integrity.md, "ROZSTRZYGNIĘTE: skanery linków" + "Rozstrzygnięcia sesji ustaleniowej (party-mode 2026-07-24)"] — full rationale for the GET→page/POST split this correct-course implements
+- [Source: _bmad-output/planning-artifacts/sprint-change-proposal-2026-07-26.md] — the correct-course proposal this Task 6 / AC 1–4/10 implement verbatim
 
 ## Dev Agent Record
 
@@ -213,3 +272,4 @@ Open, deliberately not in this commit:
 |---|---|
 | 2026-07-21 | Story 6.2 implemented: `confirmAlert`/`getAlertSummaryByToken` queries, `GET /api/alerts/confirm` redirect route, `/alerts/confirmed` and `/alerts/expired` pages. 27 new tests; suite 300 passed. Status → review. |
 | 2026-07-22 | Code review applied: activation collapsed into one atomic CTE, `ip_hash` recorded on confirmation, `findActiveAlertsMissingConsent()` reconciliation query, error handling on the confirmed page, query-predicate assertions, and a flaky 48h-boundary test fixed. Suite 306 passed. |
+| 2026-07-26 | Correct-course (party-mode 2026-07-24 RODO decision): status `done` → `in-progress`. AC 1–4 replace the old GET-mutates flow with a side-effect-free GET page + explicit POST; AC 10 added (UX tone). `ApiResponse<T>` exception reversed for `POST`. Task 6 added. Zero changes to `confirmAlert()`. See `sprint-change-proposal-2026-07-26.md`. |
