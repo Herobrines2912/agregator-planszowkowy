@@ -1,6 +1,10 @@
+---
+baseline_commit: 993c139cbc5746a8c0e5464c19681c9b9654a56d
+---
+
 # Story 4.5b: Parent Game BGG Link Resolution
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -29,29 +33,29 @@ Story 4.6 in epics.md was scoped as **Dev A only** (`components/DlcWarning.tsx`)
 
 ## Tasks / Subtasks
 
-- [ ] Task 1 — Schema migration (AC: 1)
-  - [ ] Add `parent_game_id` to the `games` table in `web/src/db/schema.ts` — see Dev Notes for the exact self-reference syntax (Drizzle requires a typed callback for self-referencing FKs, a plain `.references(() => games.id)` will fail to compile)
-  - [ ] From `web/`, run `npx drizzle-kit generate` to produce `db/migrations/0004_*.sql`
-  - [ ] Rename the generated file to `0004_games_add_parent_game_id.sql` (matches the hand-named convention of `0002_products_store_external_unique.sql` / `0003_hot_deals_indexes.sql`) and update `db/migrations/meta/_journal.json` tag accordingly if drizzle-kit renamed the entry — verify with `git diff` that the journal still matches the file
-  - [ ] Do NOT hand-write the SQL — always generate via drizzle-kit so the journal stays in sync
+- [x] Task 1 — Schema migration (AC: 1)
+  - [x] Add `parent_game_id` to the `games` table in `web/src/db/schema.ts` — see Dev Notes for the exact self-reference syntax (Drizzle requires a typed callback for self-referencing FKs, a plain `.references(() => games.id)` will fail to compile)
+  - [x] From `web/`, run `npx drizzle-kit generate` to produce `db/migrations/0004_*.sql`
+  - [x] Rename the generated file to `0004_games_add_parent_game_id.sql` (matches the hand-named convention of `0002_products_store_external_unique.sql` / `0003_hot_deals_indexes.sql`) and update `db/migrations/meta/_journal.json` tag accordingly if drizzle-kit renamed the entry — verify with `git diff` that the journal still matches the file
+  - [x] Do NOT hand-write the SQL — always generate via drizzle-kit so the journal stays in sync
 
-- [ ] Task 2 — Capture base-game BGG ID in `bgg_client.py` (AC: 2)
-  - [ ] Add a helper in `BggClient._parse_thing()` that reads `item.findall("link[@type='boardgameexpansion']")`, skips any element where `el.get("inbound") == "true"`, and returns `int(el.get("id"))` of the first remaining match, or `None`
-  - [ ] Add `"base_game_bgg_id": <result>` to the dict returned by `_parse_thing()`
-  - [ ] Add test cases to `scraper/tests/test_bgg_client.py`: (a) expansion item with a non-inbound `boardgameexpansion` link → `base_game_bgg_id` set correctly; (b) base game item with only `inbound="true"` links → `base_game_bgg_id` is `None`; (c) item with no `boardgameexpansion` links at all → `None`
+- [x] Task 2 — Capture base-game BGG ID in `bgg_client.py` (AC: 2)
+  - [x] Add a helper in `BggClient._parse_thing()` that reads `item.findall("link[@type='boardgameexpansion']")`, skips any element where `el.get("inbound") == "true"`, and returns `int(el.get("id"))` of the first remaining match, or `None`
+  - [x] Add `"base_game_bgg_id": <result>` to the dict returned by `_parse_thing()`
+  - [x] Add test cases to `scraper/tests/test_bgg_client.py`: (a) expansion item with a non-inbound `boardgameexpansion` link → `base_game_bgg_id` set correctly; (b) base game item with only `inbound="true"` links → `base_game_bgg_id` is `None`; (c) item with no `boardgameexpansion` links at all → `None`
 
-- [ ] Task 3 — Resolve and persist `parent_game_id` in `bgg_enrichment.py` (AC: 3, 4)
-  - [ ] In `_build_update_params()`, do NOT add `parent_game_id` there (it needs a DB lookup, not just data mapping) — instead resolve it in `run_enrichment()`'s per-game loop right after `data = client.get_thing_with_retry(bgg_id)` succeeds
-  - [ ] Add a small helper `_resolve_parent_game_id(cur, base_game_bgg_id: Optional[int]) -> Optional[int]` that runs `SELECT id FROM games WHERE bgg_id = %s` and returns the row's `id` or `None` (no match / `base_game_bgg_id` is `None`)
-  - [ ] Add `parent_game_id` to the `params` dict passed into `_write_game()` and to the `UPDATE games SET ...` statement in `_write_game()`
-  - [ ] Add test cases to `scraper/tests/test_bgg_enrichment.py`: base game already exists locally → `parent_game_id` set; base game not yet scraped → `parent_game_id` stays `NULL`; non-expansion game (`base_game_bgg_id is None`) → `parent_game_id` stays `NULL`, no lookup query executed
+- [x] Task 3 — Resolve and persist `parent_game_id` in `bgg_enrichment.py` (AC: 3, 4)
+  - [x] In `_build_update_params()`, do NOT add `parent_game_id` there (it needs a DB lookup, not just data mapping) — instead resolve it in `run_enrichment()`'s per-game loop right after `data = client.get_thing_with_retry(bgg_id)` succeeds
+  - [x] Add a small helper `_resolve_parent_game_id(cur, base_game_bgg_id: Optional[int]) -> Optional[int]` that runs `SELECT id FROM games WHERE bgg_id = %s` and returns the row's `id` or `None` (no match / `base_game_bgg_id` is `None`)
+  - [x] Add `parent_game_id` to the `params` dict passed into `_write_game()` and to the `UPDATE games SET ...` statement in `_write_game()`
+  - [x] Add test cases to `scraper/tests/test_bgg_enrichment.py`: base game already exists locally → `parent_game_id` set; base game not yet scraped → `parent_game_id` stays `NULL`; non-expansion game (`base_game_bgg_id is None`) → `parent_game_id` stays `NULL`, no lookup query executed
 
-- [ ] Task 4 — Wire `base_game` in `getGameBySlug()` (AC: 5, 6)
-  - [ ] Extend `BaseGameRef` type in `web/src/db/queries/game-passport.ts` to add `bgg_id: number | null` (needed by Story 4.6's "no products yet" case, which links to the base game's BGG page)
-  - [ ] Extend the raw SQL in `_getGameBySlug()` with a `LEFT JOIN games pg ON pg.id = g.parent_game_id` and a scalar subquery for the parent's cheapest in-stock price — see Dev Notes for exact SQL
-  - [ ] Parse `parent_name` / `parent_slug` / `parent_bgg_id` / `parent_min_price` columns from `rows[0]` into a `base_game` object, or `null` if `parent_slug` is absent
-  - [ ] Replace the `return { ...game, products, best_product, base_game: null }` line with the resolved `base_game` value
-  - [ ] Update `web/src/db/queries/game-passport.test.ts`: replace the existing `'base_game is always null (schema gap — Story 4.6)'` test with cases for (a) `parent_game_id = null` → `base_game: null`, (b) parent with in-stock products → `base_game.current_min_price` is the cheapest in-stock price as a string, (c) parent with zero in-stock products → `current_min_price: null` but `name`/`slug`/`bgg_id` still populated
+- [x] Task 4 — Wire `base_game` in `getGameBySlug()` (AC: 5, 6)
+  - [x] Extend `BaseGameRef` type in `web/src/db/queries/game-passport.ts` to add `bgg_id: number | null` (needed by Story 4.6's "no products yet" case, which links to the base game's BGG page)
+  - [x] Extend the raw SQL in `_getGameBySlug()` with a `LEFT JOIN games pg ON pg.id = g.parent_game_id` and a scalar subquery for the parent's cheapest in-stock price — see Dev Notes for exact SQL
+  - [x] Parse `parent_name` / `parent_slug` / `parent_bgg_id` / `parent_min_price` columns from `rows[0]` into a `base_game` object, or `null` if `parent_slug` is absent
+  - [x] Replace the `return { ...game, products, best_product, base_game: null }` line with the resolved `base_game` value
+  - [x] Update `web/src/db/queries/game-passport.test.ts`: replace the existing `'base_game is always null (schema gap — Story 4.6)'` test with cases for (a) `parent_game_id = null` → `base_game: null`, (b) parent with in-stock products → `base_game.current_min_price` is the cheapest in-stock price as a string, (c) parent with zero in-stock products → `current_min_price: null` but `name`/`slug`/`bgg_id` still populated
 
 ## Dev Notes
 
@@ -240,8 +244,34 @@ return { ...game, products, best_product, base_game }
 
 ### Agent Model Used
 
+Claude Sonnet 5 (claude-sonnet-5)
+
 ### Debug Log References
+
+- `drizzle-kit generate` produced a migration that redundantly re-included the `0002` unique constraint and the `0004` `price_alerts.token_issued_at` column — those migrations were hand-written without generating matching `meta/*_snapshot.json` files, so drizzle-kit's last tracked snapshot was `0001`. Filtered the generated SQL down to only the `parent_game_id` delta before committing; kept the generated `0005_snapshot.json` (it's a full end-state snapshot of the current `schema.ts`, not a diff, so it's accurate). Next-available migration number was `0005`, not the `0004` assumed in the story (Story 6.2/6.4 claimed `0004` in the interim) — renamed accordingly and updated `_journal.json` tag to match.
+- Verified BGG XML `inbound` semantics logic per Dev Notes caveat using the two hand-built fixtures in `test_bgg_client.py` (`EXPANSION_WITH_BASE_GAME_LINK_XML`, `BASE_GAME_WITH_INBOUND_EXPANSION_LINKS_XML`) rather than a live BGG call — flagging per the story's caveat that this should be checked against a real expansion response before full production trust.
 
 ### Completion Notes List
 
+- Task 1: Added `parent_game_id` self-referencing FK to `games` in `schema.ts`; generated migration via drizzle-kit and renamed to `0005_games_add_parent_game_id.sql` (see Debug Log for the numbering/drift note).
+- Task 2: Added `get_base_game_bgg_id()` helper to `BggClient._parse_thing()`; 3 new test cases added, all passing (30/30 in `test_bgg_client.py`).
+- Task 3: Added `_resolve_parent_game_id()` helper; wired into `run_enrichment()`'s loop and `_write_game()`'s UPDATE statement. 6 new test cases added, all passing (25/25 in `test_bgg_enrichment.py`).
+- Task 4: Extended `BaseGameRef` with `bgg_id`; added `LEFT JOIN games pg` + scalar subquery to `_getGameBySlug()`; replaced the hardcoded `base_game: null` with the resolved value. Replaced the old placeholder test with 3 cases covering null/populated/zero-in-stock parent. All 20 tests passing in `game-passport.test.ts`.
+- Full regression: `npx vitest run` → 308/308 passed. `pytest` (scraper) → 195 passed, 4 deselected. `tsc --noEmit` clean. `eslint` on changed TS files clean.
+
 ### File List
+
+- Modified: `web/src/db/schema.ts`
+- New: `db/migrations/0005_games_add_parent_game_id.sql`
+- Modified: `db/migrations/meta/_journal.json`
+- New: `db/migrations/meta/0005_snapshot.json`
+- Modified: `scraper/utils/bgg_client.py`
+- Modified: `scraper/utils/bgg_enrichment.py`
+- Modified: `web/src/db/queries/game-passport.ts`
+- Modified: `web/src/db/queries/game-passport.test.ts`
+- Modified: `scraper/tests/test_bgg_client.py`
+- Modified: `scraper/tests/test_bgg_enrichment.py`
+
+### Change Log
+
+- 2026-07-26: Implemented Story 4.5b — parent_game_id schema column, BGG expansion→base-game link resolution in enrichment, base_game wired into getGameBySlug(). Status → review.

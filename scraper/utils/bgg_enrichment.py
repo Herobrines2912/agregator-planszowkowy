@@ -66,6 +66,15 @@ def _build_update_params(data: dict) -> tuple[dict, datetime]:
     return params, now
 
 
+def _resolve_parent_game_id(cur, base_game_bgg_id: Optional[int]) -> Optional[int]:
+    """Look up the local games.id for a base game by its BGG id; None if unresolvable."""
+    if base_game_bgg_id is None:
+        return None
+    cur.execute("SELECT id FROM games WHERE bgg_id = %s", (base_game_bgg_id,))
+    row = cur.fetchone()
+    return row[0] if row else None
+
+
 def _update_status(pool: psycopg2.pool.ThreadedConnectionPool, game_id: int, status: str) -> None:
     conn = None
     try:
@@ -107,6 +116,7 @@ def _write_game(pool: psycopg2.pool.ThreadedConnectionPool, game_id: int, params
                     designers = %(designers)s,
                     publishers = %(publishers)s,
                     is_expansion = %(is_expansion)s,
+                    parent_game_id = %(parent_game_id)s,
                     bgg_category_rank = %(bgg_category_rank)s,
                     rules_pdf_url = %(rules_pdf_url)s,
                     bgg_sync_status = %(bgg_sync_status)s,
@@ -192,7 +202,15 @@ def run_enrichment() -> None:
                 continue
 
             try:
+                conn = pool.getconn()
+                try:
+                    with conn.cursor() as cur:
+                        parent_game_id = _resolve_parent_game_id(cur, data.get("base_game_bgg_id"))
+                finally:
+                    pool.putconn(conn)
+
                 params, _ = _build_update_params(data)
+                params["parent_game_id"] = parent_game_id
                 _write_game(pool, game_id, params)
                 logger.info("BGG ID %d synced: %r", bgg_id, data.get("name"))
                 synced += 1

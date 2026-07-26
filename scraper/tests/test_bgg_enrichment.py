@@ -8,7 +8,13 @@ from unittest.mock import MagicMock, patch, call
 
 import pytest
 
-from utils.bgg_enrichment import run_enrichment, _safe_int, _safe_decimal, _build_update_params
+from utils.bgg_enrichment import (
+    run_enrichment,
+    _safe_int,
+    _safe_decimal,
+    _build_update_params,
+    _resolve_parent_game_id,
+)
 from utils.bgg_client import BggRateLimitError
 
 
@@ -320,3 +326,167 @@ class TestRunEnrichment:
         with patch.dict("os.environ", {"BGG_API_TOKEN": "token"}, clear=True):
             with pytest.raises(RuntimeError, match="DATABASE_URL"):
                 run_enrichment()
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for _resolve_parent_game_id() — Task 3 (Story 4.5b)
+# ---------------------------------------------------------------------------
+
+class TestResolveParentGameId:
+    def test_none_base_game_bgg_id_returns_none_no_query(self):
+        cur = MagicMock()
+        result = _resolve_parent_game_id(cur, None)
+        assert result is None
+        cur.execute.assert_not_called()
+
+    def test_base_game_found_returns_local_id(self):
+        cur = MagicMock()
+        cur.fetchone.return_value = (42,)
+        result = _resolve_parent_game_id(cur, 205637)
+        assert result == 42
+        cur.execute.assert_called_once_with(
+            "SELECT id FROM games WHERE bgg_id = %s", (205637,)
+        )
+
+    def test_base_game_not_found_returns_none(self):
+        cur = MagicMock()
+        cur.fetchone.return_value = None
+        result = _resolve_parent_game_id(cur, 205637)
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Integration tests for parent_game_id resolution in run_enrichment() — Task 3 (Story 4.5b)
+# ---------------------------------------------------------------------------
+
+class TestRunEnrichmentParentGameId:
+    def _make_env(self):
+        return {"BGG_API_TOKEN": "test-token", "DATABASE_URL": "postgresql://test"}
+
+    @patch("utils.bgg_enrichment.psycopg2.pool.ThreadedConnectionPool")
+    @patch("utils.bgg_enrichment.BggClient")
+    def test_base_game_already_local_sets_parent_game_id(self, mock_client_cls, mock_pool_cls):
+        """Expansion whose base game already exists locally → parent_game_id set."""
+        mock_pool, mock_cursor = _make_pool_mock(
+            pending_rows=[(1, 161936, "Some Expansion")],
+            stale_rows=[],
+        )
+        mock_pool_cls.return_value = mock_pool
+        mock_cursor.fetchone.return_value = (42,)  # local id of the base game
+
+        expansion_data = {**BGG_DATA, "is_expansion": True, "base_game_bgg_id": 205637}
+        mock_client = MagicMock()
+        mock_client.get_thing_with_retry.return_value = expansion_data
+        mock_client_cls.return_value = mock_client
+
+        with patch.dict("os.environ", self._make_env()):
+            run_enrichment()
+
+        update_calls = [
+            c for c in mock_cursor.execute.call_args_list
+            if "UPDATE games" in str(c)
+        ]
+        assert len(update_calls) >= 1
+        found = False
+        for c in update_calls:
+            args = c[0]
+            if len(args) > 1 and isinstance(args[1], dict) and "parent_game_id" in args[1]:
+                assert args[1]["parent_game_id"] == 42
+                found = True
+        assert found, "parent_game_id not found in UPDATE games params"
+
+    @patch("utils.bgg_enrichment.psycopg2.pool.ThreadedConnectionPool")
+    @patch("utils.bgg_enrichment.BggClient")
+    def test_base_game_not_yet_scraped_leaves_parent_game_id_null(self, mock_client_cls, mock_pool_cls):
+        """Expansion whose base game hasn't been scraped/deduplicated yet → parent_game_id stays NULL."""
+        mock_pool, mock_cursor = _make_pool_mock(
+            pending_rows=[(1, 161936, "Some Expansion")],
+            stale_rows=[],
+        )
+        mock_pool_cls.return_value = mock_pool
+        mock_cursor.fetchone.return_value = None  # no local row for base game yet
+
+        expansion_data = {**BGG_DATA, "is_expansion": True, "base_game_bgg_id": 205637}
+        mock_client = MagicMock()
+        mock_client.get_thing_with_retry.return_value = expansion_data
+        mock_client_cls.return_value = mock_client
+
+        with patch.dict("os.environ", self._make_env()):
+            run_enrichment()
+
+        update_calls = [
+            c for c in mock_cursor.execute.call_args_list
+            if "UPDATE games" in str(c)
+        ]
+        found = False
+        for c in update_calls:
+            args = c[0]
+            if len(args) > 1 and isinstance(args[1], dict) and "parent_game_id" in args[1]:
+                assert args[1]["parent_game_id"] is None
+                found = True
+        assert found, "parent_game_id not found in UPDATE games params"
+
+    @patch("utils.bgg_enrichment.psycopg2.pool.ThreadedConnectionPool")
+    @patch("utils.bgg_enrichment.BggClient")
+    def test_non_expansion_game_no_parent_lookup_query(self, mock_client_cls, mock_pool_cls):
+        """Non-expansion game (base_game_bgg_id is None) → parent_game_id stays NULL, no lookup query."""
+        mock_pool, mock_cursor = _make_pool_mock(
+            pending_rows=[(1, 224517, "Brass: Birmingham")],
+            stale_rows=[],
+        )
+        mock_pool_cls.return_value = mock_pool
+
+        mock_client = MagicMock()
+        mock_client.get_thing_with_retry.return_value = BGG_DATA  # no base_game_bgg_id key
+        mock_client_cls.return_value = mock_client
+
+        with patch.dict("os.environ", self._make_env()):
+            run_enrichment()
+
+        lookup_calls = [
+            c for c in mock_cursor.execute.call_args_list
+            if "SELECT id FROM games WHERE bgg_id" in str(c)
+        ]
+        assert len(lookup_calls) == 0
+
+    @patch("utils.bgg_enrichment.psycopg2.pool.ThreadedConnectionPool")
+    @patch("utils.bgg_enrichment.BggClient")
+    def test_parent_lookup_db_error_counts_as_error_and_continues(self, mock_client_cls, mock_pool_cls):
+        """DB error inside _resolve_parent_game_id's SELECT → caught by the outer per-game
+        except block (errors += 1), does not crash run_enrichment, next game still processed."""
+        mock_pool, mock_cursor = _make_pool_mock(
+            pending_rows=[
+                (1, 161936, "Expansion One"),
+                (2, 161937, "Expansion Two"),
+            ],
+            stale_rows=[],
+        )
+        mock_pool_cls.return_value = mock_pool
+
+        def execute_side_effect(query, params=None):
+            if "SELECT id FROM games WHERE bgg_id" in query and not execute_side_effect.raised:
+                execute_side_effect.raised = True
+                raise Exception("DB connection lost during parent lookup")
+            return None
+
+        execute_side_effect.raised = False
+        mock_cursor.execute.side_effect = execute_side_effect
+
+        expansion_data = {**BGG_DATA, "is_expansion": True, "base_game_bgg_id": 205637}
+        mock_client = MagicMock()
+        mock_client.get_thing_with_retry.return_value = expansion_data
+        mock_client_cls.return_value = mock_client
+
+        # Should not raise — the per-game try/except in run_enrichment() must catch it
+        with patch.dict("os.environ", self._make_env()):
+            run_enrichment()
+
+        # Both games were attempted despite the first game's lookup failure
+        assert mock_client.get_thing_with_retry.call_count == 2
+
+        # Second game still reached the UPDATE games statement
+        update_calls = [
+            c for c in mock_cursor.execute.call_args_list
+            if "UPDATE games" in str(c)
+        ]
+        assert len(update_calls) >= 1

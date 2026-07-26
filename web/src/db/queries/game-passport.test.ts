@@ -126,10 +126,44 @@ describe('getGameBySlug', () => {
     expect(result!.best_product).toBeNull()
   })
 
-  test('base_game is always null (schema gap — Story 4.6)', async () => {
+  test('base_game is null when parent_game_id is null', async () => {
     mockExecute.mockResolvedValue({ rows: [makeProductRow()] })
     const result = await getGameBySlug('brass-birmingham')
     expect(result!.base_game).toBeNull()
+  })
+
+  test('base_game reflects parent with in-stock products', async () => {
+    const row = makeProductRow({
+      parent_name: 'Arkham Horror: The Card Game',
+      parent_slug: 'arkham-horror-card-game',
+      parent_bgg_id: 205637,
+      parent_min_price: '89.00',
+    })
+    mockExecute.mockResolvedValue({ rows: [row] })
+    const result = await getGameBySlug('dunwich-legacy')
+    expect(result!.base_game).toEqual({
+      name: 'Arkham Horror: The Card Game',
+      slug: 'arkham-horror-card-game',
+      bgg_id: 205637,
+      current_min_price: '89.00',
+    })
+  })
+
+  test('base_game current_min_price is null when parent has zero in-stock products', async () => {
+    const row = makeProductRow({
+      parent_name: 'Arkham Horror: The Card Game',
+      parent_slug: 'arkham-horror-card-game',
+      parent_bgg_id: 205637,
+      parent_min_price: null,
+    })
+    mockExecute.mockResolvedValue({ rows: [row] })
+    const result = await getGameBySlug('dunwich-legacy')
+    expect(result!.base_game).toEqual({
+      name: 'Arkham Horror: The Card Game',
+      slug: 'arkham-horror-card-game',
+      bgg_id: 205637,
+      current_min_price: null,
+    })
   })
 
   test('prices are returned as strings not numbers', async () => {

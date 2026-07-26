@@ -16,6 +16,7 @@ export type GameProduct = {
 export type BaseGameRef = {
   name: string
   slug: string
+  bgg_id: number | null
   current_min_price: string | null
 }
 
@@ -25,7 +26,6 @@ export type GamePassportData = GameMetaGame & {
   bgg_id: number | null
   products: GameProduct[]
   best_product: GameProduct | null
-  // TODO Story 4.6: always null until schema gains parent_game_id for DLC warning
   base_game: BaseGameRef | null
 }
 
@@ -71,6 +71,16 @@ function parseGameRow(row: Record<string, unknown>): Omit<GamePassportData, 'pro
   }
 }
 
+function parseBaseGameRow(row: Record<string, unknown>): BaseGameRef | null {
+  if (typeof row.parent_slug !== 'string' || typeof row.parent_name !== 'string') return null
+  return {
+    name: row.parent_name,
+    slug: row.parent_slug,
+    bgg_id: typeof row.parent_bgg_id === 'number' ? row.parent_bgg_id : null,
+    current_min_price: typeof row.parent_min_price === 'string' ? row.parent_min_price : null,
+  }
+}
+
 async function _getGameBySlug(slug: string): Promise<GamePassportData | null> {
   const db = getDb()
 
@@ -101,10 +111,19 @@ async function _getGameBySlug(slug: string): Promise<GamePassportData | null> {
       p.price_orig::text      AS price_orig,
       p.in_stock,
       p.url                   AS product_url,
-      s.name                  AS store_name
+      s.name                  AS store_name,
+      pg.name                 AS parent_name,
+      pg.slug                 AS parent_slug,
+      pg.bgg_id                AS parent_bgg_id,
+      (
+        SELECT MIN(pp.price)
+        FROM products pp
+        WHERE pp.game_id = pg.id AND pp.in_stock = true
+      )::text                 AS parent_min_price
     FROM games g
     LEFT JOIN products p ON p.game_id = g.id
     LEFT JOIN stores   s ON s.id = p.store_id
+    LEFT JOIN games   pg ON pg.id = g.parent_game_id
     WHERE g.slug = ${slug}
     ORDER BY
       p.in_stock DESC NULLS LAST,
@@ -131,7 +150,9 @@ async function _getGameBySlug(slug: string): Promise<GamePassportData | null> {
         return parseFloat(a.price) - parseFloat(b.price)
       })[0] ?? null
 
-  return { ...game, products, best_product, base_game: null }
+  const base_game = parseBaseGameRow(rows[0])
+
+  return { ...game, products, best_product, base_game }
 }
 
 export const getGameBySlug = unstable_cache(

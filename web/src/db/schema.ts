@@ -1,4 +1,5 @@
 import {
+  type AnyPgColumn,
   boolean,
   index,
   integer,
@@ -37,6 +38,7 @@ export const games = pgTable('games', {
     .$type<'pending' | 'synced' | 'not_found' | 'rate_limited'>()
     .default('pending'),
   is_expansion: boolean('is_expansion').notNull().default(false),
+  parent_game_id: integer('parent_game_id').references((): AnyPgColumn => games.id),
   cover_image_url: text('cover_image_url'),
   designers: text('designers').array(),
   publishers: text('publishers').array(),

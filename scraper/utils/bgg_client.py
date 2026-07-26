@@ -102,6 +102,18 @@ class BggClient:
         def get_list(xpath: str, attr: str = "value") -> list:
             return [el.get(attr) for el in item.findall(xpath) if el.get(attr)]
 
+        def get_base_game_bgg_id() -> Optional[int]:
+            for el in item.findall("link[@type='boardgameexpansion']"):
+                if el.get("inbound") == "true":
+                    continue
+                raw_id = el.get("id")
+                if raw_id:
+                    try:
+                        return int(raw_id)
+                    except ValueError:
+                        continue
+            return None
+
         name_el = item.find("name[@type='primary']")
         name = name_el.get("value") if name_el is not None else "Nieznana gra"
 
@@ -135,6 +147,7 @@ class BggClient:
             "bgg_avg_rating": get_attr("statistics/ratings/average"),
             "complexity": get_attr("statistics/ratings/averageweight"),
             "is_expansion": item.get("type") == "boardgameexpansion",
+            "base_game_bgg_id": get_base_game_bgg_id(),
             "bgg_category_rank": bgg_category_rank,
             "mechanics": get_list("link[@type='boardgamemechanic']"),
             "designers": get_list("link[@type='boardgamedesigner']"),
