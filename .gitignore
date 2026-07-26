@@ -20,6 +20,9 @@ scraper/.venv/
 scraper/.env
 __pycache__/
 
+# Scraper — backupy operacyjne skryptów cleanup (lokalne, nie do repo)
+scraper/cleanup_gameupc_backup_*.csv
+
 # Eksploracje i drafty tymczasowe
 _tmp/
 tmp/
