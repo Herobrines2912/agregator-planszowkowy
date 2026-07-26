@@ -1,12 +1,13 @@
 ---
 title: RODO / consent_log — Integralność Zapisów Zgody (ustalenia z implementacji Story 6.2)
 date: 2026-07-21
+updated: 2026-07-24
 category: architecture
 module: "web/src/db/queries/alerts.ts, web/src/app/api/alerts/* — Epic 6 (email alerts, double opt-in)"
 problem_type: architecture
 component: database
 severity: high
-status: częściowo ustalone — patrz sekcja "Status decyzji"
+status: rozstrzygnięte (party-mode 2026-07-24) — patrz sekcje "Status decyzji" i "Rozstrzygnięcia sesji ustaleniowej"
 applies_when:
   - "Dowolna zmiana stanu w price_alerts lub email_suppressions, która musi sparować się z wpisem w consent_log (architecture L-4)"
   - "Story 6.3 (unsubscribe), 6.5 (alert engine), 6.8 (Brevo webhook suppression) — każde robi ten sam sparowany zapis"
@@ -18,9 +19,10 @@ tags: [rodo, gdpr, consent-log, double-opt-in, neon-http, transactions, atomicit
 # RODO / consent_log — Integralność Zapisów Zgody
 
 Dokument zbiera **wszystko, co ustaliliśmy o RODO podczas implementacji Story 6.2**
-(Double Opt-In Confirmation). Powstał jako briefing dla osobnej, pełniejszej sesji
-ustaleniowej (`bmad-help` + agenci) — część rzeczy jest **zdecydowana**, część
-**otwarta**. Sekcja „Status decyzji" na końcu mówi wprost, co jest czym.
+(Double Opt-In Confirmation) oraz **rozstrzygnięcia z sesji ustaleniowej party-mode
+2026-07-24** (Winston/Sally/John/Amelia/Mary). Wszystkie wcześniej otwarte kwestie są
+teraz zdecydowane — sekcje „Status decyzji" i „Rozstrzygnięcia sesji ustaleniowej"
+na końcu mówią wprost, co i dlaczego.
 
 ## Kontekst
 
@@ -151,10 +153,10 @@ zapisujący przebiegi).
 6.2 żaden kod nie ustawiał `status = 'active'`; `subscribeAlert()` w ON CONFLICT robi
 wyłącznie `cancelled → pending_doi`. Nie ma zaległych niespójnych wierszy do wyleczenia.
 
-## Otwarte: skanery linków a wiarygodność zgody
+## ROZSTRZYGNIĘTE (party-mode 2026-07-24): skanery linków a wiarygodność zgody
 
-**To jest najpoważniejsza otwarta kwestia RODO, jaką znaleźliśmy** — i żadna warstwa
-transakcyjna jej nie dotyka.
+**To była najpoważniejsza otwarta kwestia RODO, jaką znaleźliśmy** — i żadna warstwa
+transakcyjna jej nie dotyka. **Decyzja: wariant (b) — POST-confirm.** Uzasadnienie niżej.
 
 Skanery bezpieczeństwa poczty (Outlook SafeLinks, Proofpoint, antywirusy, podglądy
 w klientach) robią **GET na każdy URL w wiadomości**, zanim człowiek kliknie. Nasz link
@@ -167,13 +169,52 @@ potwierdzający aktywuje alert samym GET-em. Skutki:
 
 Rozważane wyjścia:
 
-- **(a)** zostawić GET jako normę branżową i zaakceptować ryzyko,
-- **(b)** strona pośrednia z przyciskiem „Potwierdzam" i POST-em ← **chwilowo się do
-  tego skłaniamy**, decyzja niepodjęta,
-- **(c)** zapisywać user-agent, żeby odróżnić prefetch od człowieka.
+- **(a)** zostawić GET jako normę branżową i zaakceptować ryzyko — **odrzucone**,
+- **(b)** strona pośrednia z przyciskiem „Potwierdzam" i POST-em — **WYBRANE**,
+- **(c)** zapisywać user-agent, żeby odróżnić prefetch od człowieka — **tylko jako
+  metadana audytowa, nigdy jako brama** (heurystyka strzegąca dowodu prawnego to
+  odwrotność accountability z art. 7).
 
-Uwaga: (b) zmienia kształt Story 6.2 i 6.3 (link z maila prowadzi na stronę, nie na
-route API), więc decyzja powinna zapaść **przed** implementacją 6.3.
+### Uzasadnienie decyzji (b)
+
+- **To nie problem bezpieczeństwa — to problem semantyki HTTP.** RFC 7231: GET ma być
+  *safe* (bez efektów ubocznych). Skanery polegają na tym kontrakcie; to my go łamiemy,
+  mutując stan na GET. Nie skaner „fałszuje" zgodę — to nasz endpoint zaprasza dowolnego
+  bota do potwierdzania zgód.
+- **Dodatkowy klik to nie koszt — to funkcja.** Art. 7 RODO wymaga „wyraźnego działania
+  potwierdzającego". GET wywołany przez skaner z definicji nim nie jest; klik w „Potwierdzam"
+  — jest. (b) podnosi jakość prawną zgody, a nie tylko łata dziurę.
+- **Rdzeń transakcyjny (CTE w `confirmAlert`) zostaje nietknięty** — zmienia się tylko
+  czasownik HTTP i dochodzi cienka strona. Koszt na Vercel+Neon ~zerowy, mieści się we free tier.
+- **6.3 (unsubscribe) jest jeszcze ważniejszy** — wypis aktywowany przez skaner to cichy
+  sabotaż retencji: tracisz użytkownika, który nigdy nie kliknął. Niema awaria produktu (JTBD).
+
+### Kształt implementacji (ustalony z Amelią na realnych plikach)
+
+- **6.2 = correct-course, NIE nowa historyjka** (te same pliki, ta sama powierzchnia AC,
+  zero nowej zdolności). `GET /api/alerts/confirm` → **side-effect-free strona**
+  `web/src/app/alerts/confirm/page.tsx` + `AlertConfirmButton` (`'use client'`) → **POST**
+  `/api/alerts/confirm` wołający istniejący `confirmAlert()` bez zmian.
+- **Odwrócenie udokumentowanego wyjątku od `ApiResponse<T>`:** POST confirm będzie teraz
+  `fetch()`-owany z naszej własnej strony (przycisk), więc **MUSI zwracać `ApiResponse<T>`**,
+  nie redirect. Dotychczasowy wyjątek (route klikany z maila → redirect) przestaje obowiązywać.
+- **Idempotencja już istnieje** w warstwie query (`already_confirmed` dla `status='active'`
+  i dla przegranego wyścigu) — refaktor dotyczy wyłącznie warstwy HTTP.
+- **6.3 = greenfield mirror** wzorca 6.2: `cancelAlert()` (ten sam CTE:
+  `active → cancelled` + `consent_log(action='unsubscribed')`) + `/api/alerts/unsubscribe`
+  (POST, `ApiResponse<T>`) + strony `alerts/unsubscribe` / `alerts/unsubscribed`.
+  **ZERO migracji** — `status='cancelled'` i `action='unsubscribed'` już są w `schema.ts`.
+- **DRY:** po 6.2 wyekstrahować wspólny `AlertTokenActionButton` (token + endpoint +
+  docelowe URL-e jako propsy), żeby 6.3 go reużył.
+- **UX confirm vs unsubscribe — przeciwny ładunek emocjonalny, ta sama architektura:**
+  confirm ciepły/celebracyjny z dużym primary „Potwierdzam" + próg ceny dla zaufania;
+  unsubscribe rzeczowy, wyciszony przycisk, uczciwa furtka „możesz zapisać się ponownie",
+  BEZ smutnych minek i BEZ modala „na pewno?" (landing z jednym przyciskiem JUŻ jest
+  potwierdzeniem intencji).
+
+Cała praca to **Dev A (Web)**. Dev B (`scraper/utils/brevo_client.py::send_doi_email`)
+tknięty dopiero gdy powstanie live caller (6.5/6.6, backlog) — wtedy zbuduje URL
+`/alerts/confirm?token=` zamiast `/api/...`.
 
 ## Znalezione w code review (2026-07-22)
 
@@ -205,8 +246,10 @@ analiza nie objęła:
   także 6.3: skaner może użytkownika **wypisać**.
 - **Token nigdy nie rotuje po użyciu.** Potwierdzony link zostaje wieczystą przepustką: kto go ma
   (przekazany mail, historia przeglądarki, logi), ten w każdej chwili odczyta nazwę gry i cenę
-  progową z `/alerts/confirmed`. Rozważyć rotację lub wyzerowanie `confirmation_token` przy
-  aktywacji i osobny token dla 6.3.
+  progową z `/alerts/confirmed`. **Decyzja (party-mode 2026-07-24): ODROCZONE** — wyciek eksponuje
+  tylko nazwę gry i próg ceny (zerowa wrażliwość, brak PII). Higiena tak, blokada launchu nie;
+  dorzucić przy okazji POST-refactoru jeśli tanie, inaczej później. Ten sam kaliber decyzji co
+  HMAC-pepper — „zrób gdy tanio", nie MUST.
 - ~~**`?slug=` na `/alerts/expired` odróżnia nieznany token od prawdziwego martwego.**~~
   **ROZSTRZYGNIĘTE 2026-07-22: zostawiamy slug, inwariant wycofany.** Przy 32-bajtowym losowym
   tokenie oracle jest bezużyteczny (trzeba już mieć token), a token aktywny i tak ujawnia więcej
@@ -271,19 +314,88 @@ analiza nie objęła:
 | `ip_hash` przy `opt_in_confirmed` | **Wdrożone** 2026-07-22 (znalezione w code review) |
 | TTL liczony od `created_at`, którego ponowny zapis nie odświeża | **Wdrożone** 2026-07-22 — kolumna `token_issued_at` + rotacja tokenu gdy jest bezużyteczny |
 | Odwrócona kolejność / dodatkowa warstwa zapisu | **Odrzucone** — uzasadnienie wyżej |
-| Skanery linków (GET vs POST-confirm) | **Otwarte** — chwilowo skłaniamy się do (b), decyzja w osobnej sesji |
+| Skanery linków (GET vs POST-confirm) | **Rozstrzygnięte 2026-07-24 (party-mode): wariant (b) POST-confirm** dla 6.2 i 6.3; (c) tylko jako metadana. 6.2 = correct-course, 6.3 = greenfield mirror |
+| Rotacja tokenu po użyciu | **Odroczone 2026-07-24** — wyciek eksponuje tylko nazwę gry + próg (zerowa wrażliwość); „zrób gdy tanio", nie MUST |
+| Rate limiting na `/api/alerts/*` | **Rozstrzygnięte 2026-07-24: MUST-before-launch, osobna historyjka (6.10)** owijająca 3 POST-y (subscribe + confirm + unsubscribe). Wektor abuse: wpisywanie cudzego maila → spam potwierdzeń + log twierdzący „wyraziła zgodę". Per-IP + per-email throttle, może być prymitywny; brak Redis (stack=Neon) → tabela + okno `now()` albo Upstash |
+| RODO art. 15/17 vs append-only `consent_log` | **Rozstrzygnięte 2026-07-24: proces ręczny udokumentowany w Story 6.9**, ZERO kodu erasure. Szczegóły niżej |
+| HMAC-pepper na `email_hash` (art. 32, poufność) | **Rozstrzygnięte 2026-07-24: SHOULD w batchu launchowym** (nie MUST). `SHA-256(email)` to pseudonimizacja, nie anonimizacja — sam jest swoim kluczem. HMAC z globalnym PEPPER (env, poza bazą) broni przed wyciekiem samego dumpu bazy bez sekretu aplikacji. Nie launch blocker (pusta tabela pre-launch), ale zrób przed pierwszym prawdziwym wierszem — migracja żywej tabeli SHA→HMAC to bałagan (schemat w połowie zmigrowany). Szczegóły niżej |
 | `created_at NOT NULL` w `price_alerts` | **Do ponownej oceny** — pierwotny argument („brak katalogu migracji") był błędny; migracje istnieją, więc koszt jest niski |
-| Rate limiting na `/api/alerts/*` | **Nieporuszone** — brak dziś, warto ocenić przy okazji |
 | Zmiana drivera na `neon-serverless` (prawdziwe transakcje) | **Odrzucone w tym zakresie** — zmiana infrastrukturalna dotykająca wszystkich zapytań; do rozważenia osobno, jeśli sparowanych zapisów przybędzie |
 
-## Pytania na pełniejszą sesję ustaleniową
+## Rozstrzygnięcia sesji ustaleniowej (party-mode 2026-07-24)
 
-1. GET vs POST-confirm — czy przechodzimy na (b) i przebudowujemy 6.2/6.3, czy
-   akceptujemy (a) z zapisem user-agenta?
-2. Czy zapytanie kontrolne integralności ma być tylko testem, czy stałym krokiem
-   `maintenance.yml` z alertowaniem?
-3. Czy `consent_log` potrzebuje wpisu również przy *automatycznych* zmianach stanu
-   (wygaśnięcie tokenu, czyszczenie retencyjne), czy `data_retention_log` wystarczy?
-4. Rate limiting `/api/alerts/*` — czy przed publicznym uruchomieniem?
-5. Czy potrzebujemy ścieżki „eksport / usunięcie danych na żądanie" (RODO art. 15/17)
-   i jak pogodzić ją z append-only `consent_log`?
+Sesja: Winston (architekt), Sally (UX), John (PM), Amelia (dev), Mary (analityk).
+Pytania z poprzedniej wersji tego dokumentu i ich odpowiedzi:
+
+1. **GET vs POST-confirm →** wariant **(b) POST-confirm** dla 6.2 i 6.3. (c) tylko jako
+   metadana audytowa. Uzasadnienie i kształt: sekcja „ROZSTRZYGNIĘTE: skanery linków" wyżej.
+2. **Zapytanie kontrolne integralności (`findActiveAlertsMissingConsent`) — test czy krok
+   `maintenance.yml`?** Nierozstrzygnięte na tej sesji; niska pilność (dziś zwraca pustkę,
+   dowód a nie rytuał). Domyślnie zostaje testem; ocenić przy okazji 6.5/`maintenance.yml`.
+3. **`consent_log` przy automatycznych zmianach stanu?** Nierozstrzygnięte wprost; `data_retention_log`
+   pokrywa przebiegi retencyjne, a każda ręczna erasure ma tam trafić (patrz niżej). Ocenić przy 6.5.
+4. **Rate limiting `/api/alerts/*` →** **MUST-before-launch, osobna historyjka 6.10** owijająca
+   trzy POST-y jednym przejściem (subscribe + confirm + unsubscribe). Nie wciskać w 6.3 (pokryłoby
+   1 z 3). Sekwencjonowana OSTATNIA w Epiku 6.
+5. **Ścieżka eksport/usunięcie (art. 15/17) vs append-only →** **proces ręczny udokumentowany
+   w Story 6.9, ZERO kodu.** Szczegóły niżej.
+
+### Art. 15/17 — proporcjonalna odpowiedź: 4 dokumenty, nie portal
+
+Cały footprint danych osobowych produktu = `{email, gra, próg ceny, timestampy, zdarzenia zgody}`.
+Brak imion, płatności, kategorii specjalnych (art. 9), profilowania. Przy tym zbiorze:
+
+- **art. 15 (dostęp)** = jeden SELECT z `price_alerts` po mailu + jeden po `email_hash` do
+  `consent_log`, plus stały szablon metadanych (cele, retencja, brak odbiorców). Mieści się w
+  jednym mailu zwrotnym z tabelką.
+- **art. 17 (usunięcie)** = `DELETE FROM price_alerts` po mailu (znika surowy email → realizacja
+  art. 17); **`consent_log` ZOSTAJE** jako pseudonimizowany tombstone + dopisany wpis „erasure
+  requested" (append-only działa też w tę stronę). Podstawa zachowania: **art. 17(3)(b) w zw. z
+  art. 7(1) + art. 5(2)** — obowiązek wykazania zgody. Skasowanie dowodu zgody = dobrowolne
+  pozbawienie się obrony, gdyby osoba potem zgłosiła „maile bez zgody".
+- **Portal DSAR / automatyczny eksport = YAGNI** — uwierzytelnianie + weryfikacja tożsamości +
+  eksport to nowa powierzchnia ataku; zbudowanie go *zwiększyłoby* ryzyko RODO. Art. 12 wymaga
+  „miesiąc", nie self-service. Zgodne z wcześniejszą decyzją „brak strony zarządzania alertami".
+- **Retencja `consent_log` MUSI mieć spisane uzasadnienie** (3 lata = okres przedawnienia roszczeń),
+  inaczej „append-only na wieczność" łamie art. 5(1)(e) (ograniczenie przechowywania). `email_hash`
+  to pseudonimizacja → licznik retencji tyka.
+
+**MUST-before-launch (wszystko w Story 6.9, jako AC „Obsługa żądań RODO art. 15/17"):**
+1. adres kontaktowy w polityce prywatności (jeden mailto na art. 15/16/17/21),
+2. runbook ręczny (5 kroków: weryfikacja tożsamości = żądanie z tego samego maila per art. 12(6) →
+   eksport → usunięcie → tombstone w `consent_log` → zapis daty obsłużenia + wpis w `data_retention_log`),
+3. dwa SQL-e (eksport art. 15, usunięcie art. 17) jako snippet w runbooku,
+4. akapit stanowiska retencyjnego + rejestr czynności przetwarzania (art. 30, jedna strona).
+
+### HMAC-pepper na `email_hash` — kontrola art. 32, nie art. 17 (SHOULD, nie MUST)
+
+Kluczowe rozróżnienie z sesji (Winston vs John): to **osobna oś** niż art. 17.
+
+- `SHA-256(lower(email))` to **pseudonimizacja, nie anonimizacja** (motyw 26): niska entropia +
+  brak solenia → każdy z kandydującym adresem robi `SHA-256(candidate)` i matchuje. `email_hash`
+  pozostaje danymi osobowymi; hash **jest sam swoim kluczem**.
+- **Scenariusz, który to zamyka (art. 32, poufność):** wyciek samego dumpu bazy **bez** sekretu
+  aplikacji (leak connection stringa Neona — patrz `project_chat_contains_secret`, hasło Neona w
+  plaintext w jednej sesji czatu; zły publiczny branch; SQLi). Atakujący z samym `consent_log`
+  rehashuje listę kandydatów → **potwierdza członkostwo aktywnych subskrybentów** (zgłaszalne
+  art. 32/33). DELETE-z-`price_alerts` + retencja + 17(3)(b) tego **nie dotykają** — bronią logu
+  przed *podmiotem danych* (art. 17), nie przed *włamywaczem* (art. 32).
+- **Rozwiązanie:** `HMAC-SHA-256(lower(email), PEPPER)`, PEPPER w env Vercela (poza bazą). Dump bez
+  pepper-a staje się martwy — re-identyfikacja wymaga drugiego, niezależnego przełamania.
+- **Priorytet: SHOULD, w batchu launchowym — nie MUST, nie launch blocker.** Ryzyko skaluje się z
+  liczbą userów; breach w dniu 1 to pusta tabela. Ale zrobić **przed pierwszym prawdziwym wierszem**:
+  migracja żywej tabeli SHA→HMAC (schemat w połowie zmigrowany) to bałagan. Uczciwie: HMAC+pepper
+  **nie czyni logu anonimowym** — podnosi poprzeczkę; prawną tarczą pozostaje art. 17(3)(b), nie
+  kryptografia. Globalny pepper to erasure „wszystko albo nic" — per-user crypto-erasure odroczone
+  do czasu, gdy skala tego zażąda.
+
+### Nowe/zmienione historyjki wynikające z sesji
+
+- **6.2** — z `done` na `in-progress` przez `bmad-correct-course`; korekta AC-2 (GET→POST + strona);
+  po zmerge z powrotem `done`.
+- **6.3** — greenfield mirror wzorca 6.2 (POST unsubscribe).
+- **6.9** — dorzucić AC „Obsługa żądań RODO (art. 15/17)": kontakt + runbook + 2 SQL + akapit retencyjny.
+- **6.10 (NOWA)** — rate limiting POST endpoints (subscribe + confirm + unsubscribe), MUST-before-launch,
+  sekwencjonowana ostatnia.
+- **Backlog/higiena (nie blokują launchu):** rotacja tokenu po użyciu; HMAC-pepper na `email_hash`
+  (SHOULD, w batchu launchowym); kolumna `consent_log.user_agent` jeśli zdecydujemy się logować UA.
