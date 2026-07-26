@@ -1,5 +1,5 @@
 # generated: 2026-07-20
-# last_updated: 2026-07-23
+# last_updated: 2026-07-26
 # project: board_games_app
 # project_key: NOKEY
 # tracking_system: file-system
@@ -62,8 +62,9 @@ development_status:
   2-4-bgg-data-enrichment-background-job: done
   2-5-scraper-github-actions-workflow: done
   2-6-operator-monitoring-selector-health-tests: done
-  2-2b-gameupc-key-hardening-data-cleanup: review
+  2-2b-gameupc-key-hardening-data-cleanup: done
   2-7-bgg-corpus-title-matching: backlog  # DRAFT follow-up from 2.2b review (spike first)
+  2-8-gameupc-crowdsource-vote-back: ready-for-dev  # goodwill addition, sourced from GameUPC maintainer email
   epic-2-retrospective: optional
 
   epic-3: done
