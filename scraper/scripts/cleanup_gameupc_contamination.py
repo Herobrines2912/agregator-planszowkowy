@@ -131,7 +131,7 @@ def reset_affected_rows(conn, expected_rows: int) -> int:
     """Reset the affected rows in one transaction; roll back if the count diverges."""
     with conn.cursor() as cur:
         cur.execute(
-            f"UPDATE products SET bgg_id = NULL, game_id = NULL WHERE {_WHERE}",
+            f"UPDATE products AS p SET bgg_id = NULL, game_id = NULL WHERE {_WHERE}",
             _WHERE_PARAMS,
         )
         rows_affected = cur.rowcount
