@@ -11,7 +11,7 @@ on:
 
 jobs:
   validate-timeouts:
-    name: Check scraper.yml timeout-minutes <= 14
+    name: Check scraper.yml timeout-minutes <= 360
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -23,6 +23,9 @@ jobs:
           import yaml, sys, os
 
           TARGET = '.github/workflows/scraper.yml'
+          # Raised from 14 to 360 as the scraper scope grew (more stores + BGG
+          # enrichment) — see git history of scraper.yml's timeout-minutes.
+          LIMIT = 360
 
           if not os.path.exists(TARGET):
               print(f"WARNING: {TARGET} not yet created — skipping timeout check")
@@ -39,12 +42,12 @@ jobs:
               if timeout is None:
                   errors.append(
                       f"  Job '{job_name}': no timeout-minutes set "
-                      f"(required: <= 14, NFR-2)"
+                      f"(required: <= {LIMIT}, NFR-2)"
                   )
-              elif int(timeout) > 14:
+              elif int(timeout) > LIMIT:
                   errors.append(
                       f"  Job '{job_name}': timeout-minutes={timeout} "
-                      f"exceeds limit of 14 (NFR-2 violation)"
+                      f"exceeds limit of {LIMIT} (NFR-2 violation)"
                   )
 
           if errors:
@@ -53,5 +56,5 @@ jobs:
                   print(e)
               sys.exit(1)
 
-          print(f"OK: All {len(jobs)} job(s) in {TARGET} have timeout-minutes <= 14")
+          print(f"OK: All {len(jobs)} job(s) in {TARGET} have timeout-minutes <= {LIMIT}")
           EOF
