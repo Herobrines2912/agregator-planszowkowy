@@ -4,7 +4,7 @@ baseline_commit: 993c139cbc5746a8c0e5464c19681c9b9654a56d
 
 # Story 4.5b: Parent Game BGG Link Resolution
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -239,6 +239,14 @@ return { ...game, products, best_product, base_game }
 - [Source: scraper/utils/bgg_enrichment.py — `run_enrichment`, `_build_update_params`, `_write_game`]
 - [Source: scraper/tests/test_bgg_client.py — BGG XML fixture pattern]
 - [Source: CLAUDE.md — schema.ts/items.py sync rule, NUMERIC=string never float, TIMESTAMPTZ]
+
+### Review Findings
+
+- [x] [Review][Decision→Patch] Inbound/non-inbound BGG link semantics were inverted — resolved: flipped `get_base_game_bgg_id()` (`scraper/utils/bgg_client.py:105-115`) to require `inbound="true"` instead of skipping it, matching real BGG XMLAPI2 convention (expansion's own record links to base game with `inbound="true"`). Test fixtures in `test_bgg_client.py` swapped to match. Not yet verified against a live BGG call — recommended before full production trust.
+- [x] [Review][Patch] Guard `parent_game_id` resolution behind `is_expansion` [scraper/utils/bgg_enrichment.py] — fixed: `run_enrichment()` now only reads `base_game_bgg_id` when `data.get("is_expansion")` is true.
+- [x] [Review][Patch] Add self-reference guard in `_resolve_parent_game_id()` [scraper/utils/bgg_enrichment.py:69-81] — fixed: function now takes `game_id` and returns `None` (with a warning log) if the resolved parent id equals the game's own id.
+- [x] [Review][Patch] Only acquire a pool connection when `base_game_bgg_id` is present [scraper/utils/bgg_enrichment.py] — fixed: `pool.getconn()` now only runs inside `if base_game_bgg_id is not None:`.
+- [x] [Review][Defer] FK `ON DELETE no action` + TOCTOU between parent lookup and write [db/migrations/0005_games_add_parent_game_id.sql:2, scraper/utils/bgg_enrichment.py] — deferred, pre-existing design choice; no code path deletes `games` rows today, revisit when delete/cleanup tooling is built.
 
 ## Dev Agent Record
 

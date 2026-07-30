@@ -66,13 +66,21 @@ def _build_update_params(data: dict) -> tuple[dict, datetime]:
     return params, now
 
 
-def _resolve_parent_game_id(cur, base_game_bgg_id: Optional[int]) -> Optional[int]:
-    """Look up the local games.id for a base game by its BGG id; None if unresolvable."""
+def _resolve_parent_game_id(cur, base_game_bgg_id: Optional[int], game_id: int) -> Optional[int]:
+    """Look up the local games.id for a base game by its BGG id; None if unresolvable
+    or if it would resolve to the game's own row (self-reference guard)."""
     if base_game_bgg_id is None:
         return None
     cur.execute("SELECT id FROM games WHERE bgg_id = %s", (base_game_bgg_id,))
     row = cur.fetchone()
-    return row[0] if row else None
+    if row is None:
+        return None
+    if row[0] == game_id:
+        logger.warning(
+            "BGG base_game_bgg_id resolves to the game's own row (game_id=%d) — ignoring", game_id
+        )
+        return None
+    return row[0]
 
 
 def _update_status(pool: psycopg2.pool.ThreadedConnectionPool, game_id: int, status: str) -> None:
@@ -202,12 +210,15 @@ def run_enrichment() -> None:
                 continue
 
             try:
-                conn = pool.getconn()
-                try:
-                    with conn.cursor() as cur:
-                        parent_game_id = _resolve_parent_game_id(cur, data.get("base_game_bgg_id"))
-                finally:
-                    pool.putconn(conn)
+                parent_game_id = None
+                base_game_bgg_id = data.get("base_game_bgg_id") if data.get("is_expansion") else None
+                if base_game_bgg_id is not None:
+                    conn = pool.getconn()
+                    try:
+                        with conn.cursor() as cur:
+                            parent_game_id = _resolve_parent_game_id(cur, base_game_bgg_id, game_id)
+                    finally:
+                        pool.putconn(conn)
 
                 params, _ = _build_update_params(data)
                 params["parent_game_id"] = parent_game_id

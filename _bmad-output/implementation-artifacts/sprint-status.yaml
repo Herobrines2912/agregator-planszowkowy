@@ -37,7 +37,7 @@
 #   fully completed story or fix (see CLAUDE.md "Sprint status" section)
 
 generated: 2026-07-20
-last_updated: 2026-07-26
+last_updated: 2026-07-30
 project: board_games_app
 project_key: NOKEY
 tracking_system: file-system
@@ -82,7 +82,7 @@ development_status:
   4-3-pricetable-multi-store-price-comparison: done
   4-4-best-deal-banner: done
   4-5-game-passport-db-queries: done
-  4-5b-parent-game-bgg-link: review
+  4-5b-parent-game-bgg-link: done
   4-6-dlc-dependency-warning: ready-for-dev
   epic-4-retrospective: optional
 

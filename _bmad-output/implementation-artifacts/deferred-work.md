@@ -1,3 +1,7 @@
+## Deferred from: code review of story-4.5b (2026-07-30)
+
+- FK `ON DELETE no action` on `games.parent_game_id` + TOCTOU between `_resolve_parent_game_id()`'s lookup and `_write_game()`'s update [db/migrations/0005_games_add_parent_game_id.sql:2, scraper/utils/bgg_enrichment.py:204-214] — if a base game row is ever deleted while an expansion still references it, the delete will fail with a raw FK-violation error rather than being handled gracefully. No code path deletes `games` rows today; revisit when delete/cleanup tooling is built.
+
 ## Deferred from: code review of story-6.4 (2026-07-21)
 
 - Missing/renamed `doi_email.html` raises an uncaught `FileNotFoundError` from `_load_template()` [scraper/utils/brevo_client.py:29-30] — not required by any AC; low-effort hardening candidate (wrap in try/except, log, return False).

@@ -335,14 +335,14 @@ class TestRunEnrichment:
 class TestResolveParentGameId:
     def test_none_base_game_bgg_id_returns_none_no_query(self):
         cur = MagicMock()
-        result = _resolve_parent_game_id(cur, None)
+        result = _resolve_parent_game_id(cur, None, 1)
         assert result is None
         cur.execute.assert_not_called()
 
     def test_base_game_found_returns_local_id(self):
         cur = MagicMock()
         cur.fetchone.return_value = (42,)
-        result = _resolve_parent_game_id(cur, 205637)
+        result = _resolve_parent_game_id(cur, 205637, 1)
         assert result == 42
         cur.execute.assert_called_once_with(
             "SELECT id FROM games WHERE bgg_id = %s", (205637,)
@@ -351,7 +351,13 @@ class TestResolveParentGameId:
     def test_base_game_not_found_returns_none(self):
         cur = MagicMock()
         cur.fetchone.return_value = None
-        result = _resolve_parent_game_id(cur, 205637)
+        result = _resolve_parent_game_id(cur, 205637, 1)
+        assert result is None
+
+    def test_base_game_resolves_to_own_row_returns_none(self):
+        cur = MagicMock()
+        cur.fetchone.return_value = (1,)
+        result = _resolve_parent_game_id(cur, 205637, 1)
         assert result is None
 
 

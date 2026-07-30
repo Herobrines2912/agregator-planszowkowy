@@ -104,7 +104,7 @@ class BggClient:
 
         def get_base_game_bgg_id() -> Optional[int]:
             for el in item.findall("link[@type='boardgameexpansion']"):
-                if el.get("inbound") == "true":
+                if el.get("inbound") != "true":
                     continue
                 raw_id = el.get("id")
                 if raw_id:

@@ -368,42 +368,42 @@ NO_CATEGORY_RANK_XML = """<?xml version="1.0" encoding="utf-8"?>
   </item>
 </items>"""
 
-# Expansion item pointing to its base game via a non-inbound boardgameexpansion link
+# Expansion item pointing to its base game via an inbound="true" boardgameexpansion link
 EXPANSION_WITH_BASE_GAME_LINK_XML = """<?xml version="1.0" encoding="utf-8"?>
 <items>
   <item type="boardgameexpansion" id="161936">
     <name type="primary" value="Arkham Horror: The Card Game - Dunwich Legacy" />
-    <link type="boardgameexpansion" id="205637" value="Arkham Horror: The Card Game" />
+    <link type="boardgameexpansion" id="205637" value="Arkham Horror: The Card Game" inbound="true" />
   </item>
 </items>"""
 
-# Base game item listing its expansions — all links are inbound="true"
-BASE_GAME_WITH_INBOUND_EXPANSION_LINKS_XML = """<?xml version="1.0" encoding="utf-8"?>
+# Base game item listing its expansions — no links are inbound="true"
+BASE_GAME_WITH_NON_INBOUND_EXPANSION_LINKS_XML = """<?xml version="1.0" encoding="utf-8"?>
 <items>
   <item type="boardgame" id="205637">
     <name type="primary" value="Arkham Horror: The Card Game" />
-    <link type="boardgameexpansion" id="161936" value="Dunwich Legacy" inbound="true" />
-    <link type="boardgameexpansion" id="161937" value="Carcosa" inbound="true" />
+    <link type="boardgameexpansion" id="161936" value="Dunwich Legacy" />
+    <link type="boardgameexpansion" id="161937" value="Carcosa" />
   </item>
 </items>"""
 
-# Expansion item with two non-inbound boardgameexpansion links — first one (document order) must win
+# Expansion item with two inbound="true" boardgameexpansion links — first one (document order) must win
 EXPANSION_WITH_MULTIPLE_BASE_GAME_LINKS_XML = """<?xml version="1.0" encoding="utf-8"?>
 <items>
   <item type="boardgameexpansion" id="999001">
     <name type="primary" value="Weird Crossover Expansion" />
-    <link type="boardgameexpansion" id="205637" value="Arkham Horror: The Card Game" />
-    <link type="boardgameexpansion" id="174430" value="Gloomhaven" />
+    <link type="boardgameexpansion" id="205637" value="Arkham Horror: The Card Game" inbound="true" />
+    <link type="boardgameexpansion" id="174430" value="Gloomhaven" inbound="true" />
   </item>
 </items>"""
 
-# Expansion item whose first non-inbound link has a non-numeric id — must be skipped, next valid one used
+# Expansion item whose first inbound="true" link has a non-numeric id — must be skipped, next valid one used
 EXPANSION_WITH_MALFORMED_BASE_GAME_LINK_ID_XML = """<?xml version="1.0" encoding="utf-8"?>
 <items>
   <item type="boardgameexpansion" id="999002">
     <name type="primary" value="Malformed Link Expansion" />
-    <link type="boardgameexpansion" id="not-a-number" value="Bad Link" />
-    <link type="boardgameexpansion" id="205637" value="Arkham Horror: The Card Game" />
+    <link type="boardgameexpansion" id="not-a-number" value="Bad Link" inbound="true" />
+    <link type="boardgameexpansion" id="205637" value="Arkham Horror: The Card Game" inbound="true" />
   </item>
 </items>"""
 
@@ -456,15 +456,15 @@ class TestParseThing_BaseGameBggId:
     def setup_method(self):
         self.client = BggClient(token="test-token")
 
-    def test_expansion_with_non_inbound_link_sets_base_game_bgg_id(self):
+    def test_expansion_with_inbound_link_sets_base_game_bgg_id(self):
         result = self.client._parse_thing(EXPANSION_WITH_BASE_GAME_LINK_XML, 161936)
         assert result["base_game_bgg_id"] == 205637
 
-    def test_base_game_with_only_inbound_links_returns_none(self):
-        result = self.client._parse_thing(BASE_GAME_WITH_INBOUND_EXPANSION_LINKS_XML, 205637)
+    def test_base_game_with_only_non_inbound_links_returns_none(self):
+        result = self.client._parse_thing(BASE_GAME_WITH_NON_INBOUND_EXPANSION_LINKS_XML, 205637)
         assert result["base_game_bgg_id"] is None
 
-    def test_multiple_non_inbound_links_first_one_wins(self):
+    def test_multiple_inbound_links_first_one_wins(self):
         result = self.client._parse_thing(EXPANSION_WITH_MULTIPLE_BASE_GAME_LINKS_XML, 999001)
         assert result["base_game_bgg_id"] == 205637
 
