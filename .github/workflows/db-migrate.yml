@@ -1,0 +1,30 @@
+name: DB Migrate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'db/migrations/**'
+  workflow_dispatch:       # allow manual trigger from the Actions tab
+
+jobs:
+  migrate:
+    name: Apply pending Drizzle migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install web dependencies
+        run: cd web && npm ci
+
+      - name: Run migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: cd web && npx drizzle-kit migrate
