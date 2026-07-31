@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { GameMeta } from '@/components/GameMeta'
+import { DlcWarning } from '@/components/DlcWarning'
 import { GameJsonLd } from '@/components/GameJsonLd'
 import { OfferJsonLd } from '@/components/OfferJsonLd'
 import { AlertSubscribeForm } from '@/components/AlertSubscribeForm'
@@ -104,6 +105,7 @@ export default async function GamePassportPage({
         {/* Left column — GameMeta panel */}
         <div>
           <GameMeta game={game} />
+          <DlcWarning isExpansion={game.is_expansion} baseGame={game.base_game} />
         </div>
 
         {/* Right column — price data */}

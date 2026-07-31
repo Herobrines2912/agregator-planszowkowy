@@ -1,6 +1,10 @@
+---
+baseline_commit: 65947fc8c7f7fdeed25bcfa040aacaef7d6526ea
+---
+
 # Story 4.6: DLC Dependency Warning
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -24,19 +28,19 @@ This story consumes `game.base_game` and `game.is_expansion` from `getGameBySlug
 
 ## Tasks / Subtasks
 
-- [ ] Task 1 — Build `DlcWarning` component (AC: 1, 2, 3, 4, 5)
-  - [ ] Create `web/src/components/DlcWarning.tsx`
-  - [ ] Props: `{ isExpansion: boolean; baseGame: BaseGameRef | null }` (import `BaseGameRef` from `@/db/queries/game-passport`)
-  - [ ] Early return `null` when `!isExpansion || !baseGame` (covers AC-2 and AC-3 in one guard)
-  - [ ] Render amber banner per UX-DR11 styling (exact values in Dev Notes)
-  - [ ] Price line: `formatPrice(baseGame.current_min_price)` prefixed with "Cena od " when `current_min_price` is not `null`; otherwise the BGG fallback line (AC-4, AC-5)
-  - [ ] "Zobacz grę bazową →" link → `` `/gra/${baseGame.slug}` `` (internal `next/link`, no `target="_blank"` — this stays in-app)
+- [x] Task 1 — Build `DlcWarning` component (AC: 1, 2, 3, 4, 5)
+  - [x] Create `web/src/components/DlcWarning.tsx`
+  - [x] Props: `{ isExpansion: boolean; baseGame: BaseGameRef | null }` (import `BaseGameRef` from `@/db/queries/game-passport`)
+  - [x] Early return `null` when `!isExpansion || !baseGame` (covers AC-2 and AC-3 in one guard)
+  - [x] Render amber banner per UX-DR11 styling (exact values in Dev Notes)
+  - [x] Price line: `formatPrice(baseGame.current_min_price)` prefixed with "Cena od " when `current_min_price` is not `null`; otherwise the BGG fallback line (AC-4, AC-5)
+  - [x] "Zobacz grę bazową →" link → `` `/gra/${baseGame.slug}` `` (internal `next/link`, no `target="_blank"` — this stays in-app)
 
-- [ ] Task 2 — Wire into Game Passport page (AC: 1, 2, 3)
-  - [ ] In `web/src/app/gra/[slug]/page.tsx`, import `DlcWarning` and render it directly below `<GameMeta game={game} />` in the left column, passing `isExpansion={game.is_expansion}` and `baseGame={game.base_game}`
+- [x] Task 2 — Wire into Game Passport page (AC: 1, 2, 3)
+  - [x] In `web/src/app/gra/[slug]/page.tsx`, import `DlcWarning` and render it directly below `<GameMeta game={game} />` in the left column, passing `isExpansion={game.is_expansion}` and `baseGame={game.base_game}`
 
-- [ ] Task 3 — Tests (AC: 1, 2, 3, 4, 5)
-  - [ ] Create `web/src/components/DlcWarning.test.tsx` covering: full render with price (AC-1), `is_expansion=true` + `base_game=null` → renders nothing (AC-2), `is_expansion=false` → renders nothing regardless of `base_game` (AC-3), `current_min_price=null` + `bgg_id` present → BGG fallback link shown (AC-4), `current_min_price=null` + `bgg_id=null` → fallback text with no link (AC-5)
+- [x] Task 3 — Tests (AC: 1, 2, 3, 4, 5)
+  - [x] Create `web/src/components/DlcWarning.test.tsx` covering: full render with price (AC-1), `is_expansion=true` + `base_game=null` → renders nothing (AC-2), `is_expansion=false` → renders nothing regardless of `base_game` (AC-3), `current_min_price=null` + `bgg_id` present → BGG fallback link shown (AC-4), `current_min_price=null` + `bgg_id=null` → fallback text with no link (AC-5)
 
 ## Dev Notes
 
@@ -209,8 +213,28 @@ Key cases (map 1:1 to ACs):
 
 ### Agent Model Used
 
+Claude Sonnet 5
+
 ### Debug Log References
+
+None — implementation followed the story's exact component skeleton and page-wiring diff with no deviations.
 
 ### Completion Notes List
 
+- Implemented `DlcWarning` exactly per the story's component skeleton (Dev Notes), no changes needed to the proposed markup/styling.
+- Wired into `web/src/app/gra/[slug]/page.tsx` left column directly below `GameMeta`, per the exact diff specified.
+- 6 new tests in `DlcWarning.test.tsx` cover all 5 ACs plus a guard-order case (isExpansion=false + baseGame=null). All pass.
+- Verified `4-5b-parent-game-bgg-link` is `done` in sprint-status.yaml — `base_game` is real (not hardcoded null) for expansions with a resolved parent.
+- `npx tsc --noEmit` clean, `npx eslint` clean on new/changed files, full suite green: 314/314 tests across 26 files (no regressions).
+
 ### File List
+
+- New: `web/src/components/DlcWarning.tsx`
+- New: `web/src/components/DlcWarning.test.tsx`
+- Modified: `web/src/app/gra/[slug]/page.tsx` (import + render `DlcWarning` below `GameMeta` in left column)
+
+## Change Log
+
+| Date | Change |
+| --- | --- |
+| 2026-07-31 | Story 4.6 implemented: `DlcWarning` component, wired into Game Passport left column, 6 new tests. Status → review. |
