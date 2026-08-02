@@ -49,21 +49,21 @@ Full background, the expansion-vs-base insight, and why MT is rejected as a prim
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Extend `BggClient` to expose alternate names** (AC: 6) — `scraper/utils/bgg_client.py` (MODIFY)
-  - [ ] 1.1 In `_parse_thing()`, add `"alternate_names": get_list("name[@type='alternate']")` to the returned dict — same `get_list(xpath, attr="value")` helper already used for `mechanics`/`designers`/`publishers` two lines above, just a different xpath. `<name type="alternate">` elements carry the localized/international titles as a `value` attribute, same shape as `<name type="primary">`.
-  - [ ] 1.2 `scraper/tests/test_bgg_client.py` (MODIFY): add one test fixture/assertion covering a `thing` response with 2+ `<name type="alternate">` elements, asserting `alternate_names` is a list of their `value`s in document order. Run the full existing suite for this file to confirm zero regressions (the new key is additive; no existing test should need changes).
-  - [ ] 1.3 Sanity-check `scraper/utils/bgg_enrichment.py` (Story 2.4's caller of `BggClient.get_thing_with_retry`) doesn't destructure the returned dict in a way an extra key would break (e.g. `**kwargs` fan-out into a strict-arity function) — read it before assuming; if it does, adjust only the enrichment call site, not `_parse_thing`.
+- [x] **Task 1 — Extend `BggClient` to expose alternate names** (AC: 6) — `scraper/utils/bgg_client.py` (MODIFY)
+  - [x] 1.1 In `_parse_thing()`, add `"alternate_names": get_list("name[@type='alternate']")` to the returned dict — same `get_list(xpath, attr="value")` helper already used for `mechanics`/`designers`/`publishers` two lines above, just a different xpath. `<name type="alternate">` elements carry the localized/international titles as a `value` attribute, same shape as `<name type="primary">`.
+  - [x] 1.2 `scraper/tests/test_bgg_client.py` (MODIFY): add one test fixture/assertion covering a `thing` response with 2+ `<name type="alternate">` elements, asserting `alternate_names` is a list of their `value`s in document order. Run the full existing suite for this file to confirm zero regressions (the new key is additive; no existing test should need changes).
+  - [x] 1.3 Sanity-check `scraper/utils/bgg_enrichment.py` (Story 2.4's caller of `BggClient.get_thing_with_retry`) doesn't destructure the returned dict in a way an extra key would break (e.g. `**kwargs` fan-out into a strict-arity function) — read it before assuming; if it does, adjust only the enrichment call site, not `_parse_thing`.
 
-- [ ] **Task 2 — Build the known-correct sample** (AC: 1, 2) — no file yet, feeds Task 3's script
-  - [ ] 2.1 Extract the 22 (Polish store title, BGG ID) pairs from `docs/spike-results/gameUPC-coverage.md`'s results table (ignore the EAN column and the `bgg_info_status` column — not needed here).
-  - [ ] 2.2 Optional, only if time allows and it's cheap: grow the sample past 22 by querying the production DB for `products` rows with a non-`NULL` `bgg_id` that were matched via the name-path (not the two now-reset poisoned clusters — `232420`, `178255`, confirmed empty as of 2026-07-26) — more samples narrow the confidence interval in AC-2's honesty note. Not required; 22 is an acceptable, already-available floor. Do not spend more than a few minutes on this before falling back to the 22.
+- [x] **Task 2 — Build the known-correct sample** (AC: 1, 2) — no file yet, feeds Task 3's script
+  - [x] 2.1 Extract the 22 (Polish store title, BGG ID) pairs from `docs/spike-results/gameUPC-coverage.md`'s results table (ignore the EAN column and the `bgg_info_status` column — not needed here). Embedded as `KNOWN_CORRECT_PAIRS` in `scraper/scripts/spike_bgg_alternate_names.py`.
+  - [ ] 2.2 Skipped — optional per its own text ("not required; 22 is an acceptable, already-available floor").
 
-- [ ] **Task 3 — Spike script** (AC: 1, 3, 5) — `scraper/scripts/spike_bgg_alternate_names.py` (CREATE)
-  - [ ] 3.1 For each (title, bgg_id) pair: `BggClient(token).get_thing_with_retry(bgg_id)` (reuses existing 1s throttle + 60/120/240s backoff on 429/202 — do not add a second sleep/retry loop around it).
-  - [ ] 3.2 Normalize the store title using `_normalise_name` imported from `scraper.pipelines.deduplication` (Polish diacritic transliteration + edition-suffix stripping — same normalization the real matching pipeline already applies, so this spike measures the same comparison Part 2 would actually make, not an idealized one).
-  - [ ] 3.3 Fuzzy-match the normalized store title against each of `result["alternate_names"]` (also normalize each candidate the same way — comparing PL-normalized text against PL-normalized text, not PL vs raw BGG-formatted text) using `rapidfuzz.fuzz.token_sort_ratio` (already a dependency, used in `deduplication.py`). Record the best score and which alternate name produced it. Suggest starting threshold 85 (same constant already used elsewhere as `FUZZY_THRESHOLD`) — this is a spike, so also log the actual best score for every title (matched or not) in the output table, so a human can sanity-check whether 85 is the right cutoff before Part 2 hard-codes it.
-  - [ ] 3.4 On a miss (no alternate name clears the threshold), also record the BGG primary name and, if present in the `thing` response, the publisher link(s) (`get_list("link[@type='boardgamepublisher']")` — already returned as `result["publishers"]`) for the clustering check in AC-3.
-  - [ ] 3.5 `logging.getLogger(__name__)` throughout, never `print()`. Run via `cd scraper && uv run python -m scripts.spike_bgg_alternate_names` (matches the existing `scripts/` package convention — see `scraper/scripts/__init__.py`, already present from Story 1.6).
+- [x] **Task 3 — Spike script** (AC: 1, 3, 5) — `scraper/scripts/spike_bgg_alternate_names.py` (CREATE)
+  - [x] 3.1 For each (title, bgg_id) pair: `BggClient(token).get_thing_with_retry(bgg_id)` (reuses existing 1s throttle + 60/120/240s backoff on 429/202 — do not add a second sleep/retry loop around it).
+  - [x] 3.2 Normalize the store title using `_normalise_name` imported from `scraper.pipelines.deduplication` (Polish diacritic transliteration + edition-suffix stripping — same normalization the real matching pipeline already applies, so this spike measures the same comparison Part 2 would actually make, not an idealized one).
+  - [x] 3.3 Fuzzy-match the normalized store title against each of `result["alternate_names"]` (also normalize each candidate the same way — comparing PL-normalized text against PL-normalized text, not PL vs raw BGG-formatted text) using `rapidfuzz.fuzz.token_sort_ratio` (already a dependency, used in `deduplication.py`). Record the best score and which alternate name produced it. Suggest starting threshold 85 (same constant already used elsewhere as `FUZZY_THRESHOLD`) — this is a spike, so also log the actual best score for every title (matched or not) in the output table, so a human can sanity-check whether 85 is the right cutoff before Part 2 hard-codes it.
+  - [x] 3.4 On a miss (no alternate name clears the threshold), also record the BGG primary name and, if present in the `thing` response, the publisher link(s) (`get_list("link[@type='boardgamepublisher']")` — already returned as `result["publishers"]`) for the clustering check in AC-3.
+  - [ ] 3.5 `logging.getLogger(__name__)` throughout, never `print()`. Run via `cd scraper && uv run python -m scripts.spike_bgg_alternate_names` (matches the existing `scripts/` package convention — see `scraper/scripts/__init__.py`, already present from Story 1.6). **BLOCKED — see Debug Log: no `BGG_API_TOKEN` available in this environment to actually execute the live spike.**
 
 - [ ] **Task 4 — Document results and write the gate decision** (AC: 2, 3, 4) — `docs/spike-results/bgg-alternate-names-coverage.md` (CREATE)
   - [ ] 4.1 Full per-title table: store title, BGG ID, best-matching alternate name (or "—"), best score, matched Y/N.
@@ -131,14 +131,30 @@ docs/
 
 ### Agent Model Used
 
+Claude Sonnet 5
+
 ### Debug Log References
+
+`cd scraper && .venv/Scripts/python.exe -m pytest tests/test_bgg_client.py -q` → 35 passed (32 pre-existing + 3 new `alternate_names` tests), 0 regressions.
+
+**BLOCKED on Task 3.5 / Task 4 / Task 5**: no `BGG_API_TOKEN` is available in this environment (`scraper/.env` does not exist, only `.env.example` is present; no other credential source found). `scraper/scripts/spike_bgg_alternate_names.py` is written and its import/matching logic verified locally (`best_alternate_match()` exercised directly against hand-built alternate-name lists — correct behavior confirmed), but the actual live-BGG-API run (22 `get_thing_with_retry` calls, ~25s with throttle) that produces the real coverage numbers this story exists to measure has not happened. Fabricating a coverage percentage would defeat the story's entire purpose ("based on a real coverage number, not a guess" — see Story section). Need `BGG_API_TOKEN` supplied to proceed with Task 3.5 execution, Task 4 (results doc), and Task 5 (final verify).
 
 ### Completion Notes List
 
+- Task 1 done: `BggClient._parse_thing()` gains `alternate_names: list[str]`, purely additive (verified `bgg_enrichment.py` uses explicit `.get()` calls, not `**kwargs` fan-out — no breakage risk). 3 new tests, all existing tests unchanged and passing.
+- Task 2 done: 22 known-correct pairs extracted from `docs/spike-results/gameUPC-coverage.md` into `KNOWN_CORRECT_PAIRS`. Task 2.2 (grow sample via DB query) skipped — explicitly optional, not required.
+- Task 3 code complete, execution blocked (see Debug Log).
+- Tasks 4–5 not started — depend on Task 3.5's real output.
+
 ### File List
+
+- `scraper/utils/bgg_client.py` (MODIFY) — added `alternate_names` key to `_parse_thing()`
+- `scraper/tests/test_bgg_client.py` (MODIFY) — 3 new tests for `alternate_names`
+- `scraper/scripts/spike_bgg_alternate_names.py` (CREATE) — spike script, not yet executed against live BGG API
 
 ## Change Log
 
 | Date | Change |
 |---|---|
 | 2026-07-26 | Story created via `create-story`, scoped to Part 1 (spike) only per explicit instruction — Part 2 deferred to a future story pending this spike's gate result. |
+| 2026-08-02 | Task 1 (BggClient.alternate_names) and Task 2 (known-correct sample) complete; Task 3 (spike script) written but not executed — blocked on missing `BGG_API_TOKEN`. Status remains in-progress pending the live run. |

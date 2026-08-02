@@ -449,6 +449,47 @@ class TestParseThing_Extended:
 
 
 # ---------------------------------------------------------------------------
+# Tests for alternate_names — Task 1 (Story 2.7)
+# ---------------------------------------------------------------------------
+
+MULTIPLE_ALTERNATE_NAMES_XML = """<?xml version="1.0" encoding="utf-8"?>
+<items>
+  <item type="boardgame" id="437106">
+    <name type="primary" sortindex="1" value="Simsala Spin" />
+    <name type="alternate" sortindex="1" value="Simsala Spin (Makoto edycja polska)" />
+    <name type="alternate" sortindex="1" value="Simsala Grande" />
+  </item>
+</items>"""
+
+NO_ALTERNATE_NAMES_XML = """<?xml version="1.0" encoding="utf-8"?>
+<items>
+  <item type="boardgame" id="1">
+    <name type="primary" value="Test Game" />
+  </item>
+</items>"""
+
+
+class TestParseThing_AlternateNames:
+    def setup_method(self):
+        self.client = BggClient(token="test-token")
+
+    def test_multiple_alternate_names_returned_in_document_order(self):
+        result = self.client._parse_thing(MULTIPLE_ALTERNATE_NAMES_XML, 437106)
+        assert result["alternate_names"] == [
+            "Simsala Spin (Makoto edycja polska)",
+            "Simsala Grande",
+        ]
+
+    def test_single_alternate_name_from_brass_birmingham_fixture(self):
+        result = self.client._parse_thing(BRASS_BIRMINGHAM_XML, 224517)
+        assert result["alternate_names"] == ["Bronce: Birmingham"]
+
+    def test_no_alternate_names_returns_empty_list(self):
+        result = self.client._parse_thing(NO_ALTERNATE_NAMES_XML, 1)
+        assert result["alternate_names"] == []
+
+
+# ---------------------------------------------------------------------------
 # Tests for base_game_bgg_id — Task 2 (Story 4.5b)
 # ---------------------------------------------------------------------------
 

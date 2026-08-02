@@ -4,7 +4,7 @@ baseline_commit: 0d7194b2e08b09269e21f367afbc66554f517760
 
 # Story 2.8: GameUPC Crowdsource Vote-Back — `POST /upc/{upc}/bgg_id/{bgg_id}`
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -110,6 +110,7 @@ This is a free key granted on trust from a single-maintainer hobby project (live
 ## Change Log
 
 - 2026-08-02: Implemented vote-back on both EAN-path (non-verified confident match) and name-path fallback resolutions; added `_vote_back()` private method and `GAMEUPC_VOTER_ID` constant; 7 new tests added, full suite green (206 passed).
+- 2026-08-02: Code review (8-persona) found and fixed 2 real bugs before merge: `_try_name_path` used unguarded `WRatio` (risked corrupting GameUPC's shared dataset via vote-back), and `_vote_back` didn't validate `ean` format (unsanitized value could reach the POST URL via the name-path fallback). Both fixed with regression tests (+2 tests, 9 total). Full suite green (208 passed). Merged to `main` at `b099bfc`. Status → done.
 
 ## Dev Agent Record
 

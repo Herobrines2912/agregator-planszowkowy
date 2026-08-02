@@ -152,4 +152,5 @@ class BggClient:
             "mechanics": get_list("link[@type='boardgamemechanic']"),
             "designers": get_list("link[@type='boardgamedesigner']"),
             "publishers": get_list("link[@type='boardgamepublisher']"),
+            "alternate_names": get_list("name[@type='alternate']"),
         }
