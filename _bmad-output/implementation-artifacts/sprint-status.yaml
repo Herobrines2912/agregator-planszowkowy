@@ -37,7 +37,7 @@
 #   fully completed story or fix (see CLAUDE.md "Sprint status" section)
 
 generated: 2026-07-20
-last_updated: 2026-07-31
+last_updated: 2026-08-02
 project: board_games_app
 project_key: NOKEY
 tracking_system: file-system
@@ -64,7 +64,7 @@ development_status:
   2-6-operator-monitoring-selector-health-tests: done
   2-2b-gameupc-key-hardening-data-cleanup: done
   2-7-bgg-corpus-title-matching: ready-for-dev  # Part 1 (spike) only — Part 2 is a future story, gated on this one's result
-  2-8-gameupc-crowdsource-vote-back: ready-for-dev  # goodwill addition, sourced from GameUPC maintainer email
+  2-8-gameupc-crowdsource-vote-back: review  # goodwill addition, sourced from GameUPC maintainer email
   epic-2-retrospective: optional
 
   epic-3: done

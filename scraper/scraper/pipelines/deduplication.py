@@ -20,6 +20,10 @@ GAMEUPC_BASE_PROD = "https://api.gameupc.com/v1/upc"
 BGG_SEARCH_URL = "https://boardgamegeek.com/xmlapi2/search"
 FUZZY_THRESHOLD = 85
 
+# Stable, non-secret identifier for this app (not per-request) — GameUPC's spec
+# describes it as "should be persistent on the device/consumer using it."
+GAMEUPC_VOTER_ID = "agregator-planszowek-pl"
+
 _EDITION_PATTERNS = [
     r"\s*\(edycja polska\)",
     r"\s*\(polish edition\)",
@@ -100,6 +104,8 @@ class DeduplicationPipeline:
 
         if bgg_id is None:
             bgg_id = self._try_name_path(item.get("name", ""))
+            if bgg_id is not None and ean:
+                self._vote_back(ean, bgg_id)
 
         if bgg_id is not None:
             item["bgg_id"] = bgg_id
@@ -187,6 +193,8 @@ class DeduplicationPipeline:
             logger.debug(
                 "EAN %s → bgg_id=%d via GameUPC (score=%d)", ean, best_bgg_id, best_score
             )
+            if data.get("bgg_info_status") != "verified":
+                self._vote_back(ean, best_bgg_id)
             return best_bgg_id
         except httpx.HTTPStatusError as exc:
             logger.warning("GameUPC HTTP %d for EAN %s", exc.response.status_code, ean)
@@ -228,8 +236,7 @@ class DeduplicationPipeline:
             raw_id = item_el.get("id")
             if raw_id is None:
                 continue
-            candidate = _normalise_name(name_el.get("value", ""))
-            score = fuzz.WRatio(normalised, candidate)
+            score = _name_match_score(name, name_el.get("value", ""))
             if score > best_score:
                 best_score = score
                 best_bgg_id = int(raw_id)
@@ -244,6 +251,32 @@ class DeduplicationPipeline:
             "BGG fuzzy match: no confident match for %r (best score=%d)", name, best_score
         )
         return None
+
+    def _vote_back(self, ean: str, bgg_id: int) -> None:
+        """Report a resolved bgg_id back to GameUPC's crowdsourced dataset.
+
+        Best-effort and non-blocking by design: this spends the same shared,
+        undocumented rate-limit budget as the lookup calls, so failures (400,
+        429, timeouts) are logged and swallowed, never retried, never allowed
+        to affect the item's own bgg_id/game_id resolution.
+        """
+        if not self._gameupc_key:
+            return
+        if not re.fullmatch(r"\d{8,14}", ean):
+            logger.warning("Skipping vote-back for invalid EAN format: %r", ean)
+            return
+        url = f"{self._gameupc_base}/{ean}/bgg_id/{bgg_id}"
+        try:
+            response = self._http.post(
+                url,
+                json={"user_id": GAMEUPC_VOTER_ID},
+                headers={"x-api-key": self._gameupc_key},
+            )
+            response.raise_for_status()
+        except Exception as exc:
+            logger.warning(
+                "GameUPC vote-back failed for EAN %s -> bgg_id=%d: %s", ean, bgg_id, exc
+            )
 
     def _upsert_game(self, bgg_id: int, product_name: str) -> int:
         slug = f"bgg-{bgg_id}"

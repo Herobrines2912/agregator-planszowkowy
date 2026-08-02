@@ -4,7 +4,7 @@ baseline_commit: 0d7194b2e08b09269e21f367afbc66554f517760
 
 # Story 2.8: GameUPC Crowdsource Vote-Back — `POST /upc/{upc}/bgg_id/{bgg_id}`
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -36,27 +36,17 @@ This maps directly onto the `bgg_info_status` field GameUPC's `GET /upc/{upc}` r
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Vote-back on a confident EAN-path match** (AC: 1, 2, 6, 7) — `scraper/scraper/pipelines/deduplication.py` (MODIFY)
-  - [ ] 1.1 Add module constant near `GAMEUPC_BASE_TEST`/`GAMEUPC_BASE_PROD`: `GAMEUPC_VOTER_ID = "agregator-planszowek-pl"` (or equivalent — must be ≥8 chars per the maintainer's stated constraint; the OpenAPI spec itself documents `user_id` as a required string with no explicit length limit, so this is a courtesy minimum, not an enforced one). Comment: stable, non-secret identifier for *this app*, not per-request — GameUPC's spec describes it as "should be persistent on the device/consumer using it."
-  - [ ] 1.2 Add private method `_vote_back(self, ean: str, bgg_id: int) -> None`:
-    - Guard: `if not self._gameupc_key: return` (no key → no vote, same reasoning as the EAN-lookup guard).
-    - `POST f"{self._gameupc_base}/{ean}/bgg_id/{bgg_id}"`, JSON body `{"user_id": GAMEUPC_VOTER_ID}`, header `{"x-api-key": self._gameupc_key}`.
-    - Wrap the request + `response.raise_for_status()` in `try/except Exception`, `logger.warning("GameUPC vote-back failed for EAN %s -> bgg_id=%d: %s", ean, bgg_id, exc)` on failure, never re-raise. This one method covers AC 5 (key guard) and AC 6 (failure isolation).
-  - [ ] 1.3 In `_try_ean_path`, immediately before the existing `return best_bgg_id` (i.e. after the `best_score < FUZZY_THRESHOLD` rejection branch has already returned `None`): if `data.get("bgg_info_status") != "verified"`, call `self._vote_back(ean, best_bgg_id)`. **Do not** touch the existing scoring/acceptance logic — this is a read of an already-available field (`data`, already parsed) purely to decide whether to vote, not whether to trust.
-  - [ ] 1.4 `test_deduplication.py`: give `_gameupc_response()` and `_gameupc_multi()` an optional `status: str = "choose_from_bgg_info_or_search"` kwarg (the default preserves every existing call site unmodified). Add:
-    - a case with `status="verified"` → confident match still accepted, but `mock_http.post.assert_not_called()`.
-    - the default-status confident-match case → `mock_http.post` called once; assert the URL ends in `.../{ean}/bgg_id/{bgg_id}` and the JSON body contains `"user_id"`.
-    - vote-back `POST` raises (`mock_http.post.side_effect = httpx.ConnectError(...)`) → item's `bgg_id`/`game_id` still resolve normally, no exception propagates.
+- [x] **Task 1 — Vote-back on a confident EAN-path match** (AC: 1, 2, 6, 7) — `scraper/scraper/pipelines/deduplication.py` (MODIFY)
+  - [x] 1.1 Added module constant `GAMEUPC_VOTER_ID = "agregator-planszowek-pl"` near `GAMEUPC_BASE_TEST`/`GAMEUPC_BASE_PROD`.
+  - [x] 1.2 Added private method `_vote_back(self, ean: str, bgg_id: int) -> None` with key guard, `POST`, and `try/except Exception` → `logger.warning`, never re-raises.
+  - [x] 1.3 In `_try_ean_path`, added `if data.get("bgg_info_status") != "verified": self._vote_back(ean, best_bgg_id)` immediately before `return best_bgg_id`; existing scoring/acceptance logic untouched.
+  - [x] 1.4 `test_deduplication.py`: added optional `status` kwarg to `_gameupc_response()`/`_gameupc_multi()` (default unchanged, all existing call sites unmodified). Added 3 tests: `verified` → no vote (`test_vote_back_skipped_when_gameupc_already_verified`), non-verified confident match → vote sent (`test_vote_back_sent_for_confident_non_verified_ean_match`), `POST` raises → swallowed, resolution unaffected (`test_vote_back_failure_does_not_affect_item_resolution`).
 
-- [ ] **Task 2 — Vote-back on the name-path fallback for an EAN GameUPC couldn't confidently resolve** (AC: 3, 4, 5, 6, 7) — `scraper/scraper/pipelines/deduplication.py` (MODIFY)
-  - [ ] 2.1 In `process_item`, the only change: after the existing `if bgg_id is None: bgg_id = self._try_name_path(...)` line, add `if bgg_id is not None and ean: self._vote_back(ean, bgg_id)`. Current shape (`ean = item.get("ean"); bgg_id = None; if ean: bgg_id = self._try_ean_path(...); if bgg_id is None: bgg_id = self._try_name_path(...)`) is otherwise unchanged.
-  - [ ] 2.2 Tests:
-    - empty `bgg_info` (`_gameupc_response`-shaped but `"bgg_info": []`, or reuse the existing 404-style fixture) → falls through to name-path → name-path resolves → assert `_vote_back` fires (via `mock_http.post` assertion) for that `ean`.
-    - extend `test_no_gameupc_key_ean_path_skipped_falls_through_to_name_path`: assert `mock_http.post` is never called (no key → `_vote_back`'s own guard short-circuits even though `ean` is present and name-path succeeds).
-    - no `ean` on the item at all, name-path resolves → `mock_http.post` never called.
-    - extend `test_ean_path_candidate_name_mismatch_falls_through_to_name_path` (GameUPC suggests a wrong candidate, name-path recovers the correct one): assert vote-back fires with the *name-path's* `bgg_id` (31260), not GameUPC's rejected one (999999).
+- [x] **Task 2 — Vote-back on the name-path fallback for an EAN GameUPC couldn't confidently resolve** (AC: 3, 4, 5, 6, 7) — `scraper/scraper/pipelines/deduplication.py` (MODIFY)
+  - [x] 2.1 In `process_item`, added `if bgg_id is not None and ean: self._vote_back(ean, bgg_id)` after the existing name-path fallback line.
+  - [x] 2.2 Tests added: empty `bgg_info` → name-path resolves → vote-back fires (`test_vote_back_sent_for_name_path_fallback`); no key → name-path resolves → no vote (`test_no_gameupc_key_name_path_fallback_no_vote_back`); no `ean` at all → name-path resolves → no vote (`test_no_ean_name_path_resolves_no_vote_back`); GameUPC wrong candidate rejected, name-path recovers → vote-back uses name-path's `bgg_id` (31260), not GameUPC's rejected one (999999) (`test_vote_back_uses_name_path_bgg_id_not_rejected_gameupc_candidate`).
 
-- [ ] **Task 3 — verify** (AC: 7) — `cd scraper && uv run pytest` full suite green. Compare against the Story 2.2b baseline (172 passed / 6 failed, all pre-existing local-`.env`-only flakes, documented in 2-2b's Debug Log) — the delta should be exactly this story's new tests; do not chase the 6 pre-existing failures, they are unrelated and environment-only (real `scraper/.env` on this machine defeats `clear=True` env-patch tests via `load_dotenv()`).
+- [x] **Task 3 — verify** (AC: 7) — `cd scraper && .venv/Scripts/python.exe -m pytest tests/` → full suite green: 206 passed, 4 deselected, 0 failed (no local `.env`-only flakes present in this environment, unlike the 2.2b baseline — all-green here is a stronger result than that baseline required).
 
 ## Dev Notes
 
@@ -117,12 +107,28 @@ This is a free key granted on trust from a single-maintainer hobby project (live
 - [Source: scraper/scripts/cleanup_gameupc_contamination.py::_revalidate_isr] — the best-effort/non-blocking external-call pattern `_vote_back` mirrors.
 - Live verification, 2026-07-26: `GET https://api.gameupc.com/v1/upc/5010993568909` with the now-configured production key → `200`, `{"bgg_info_status": "choose_from_bgg_info_or_search", "bgg_info": [], "status": "ok", "new": true}` — confirms the key works and confirms the "no info" case's exact shape used in the Dev Notes above.
 
+## Change Log
+
+- 2026-08-02: Implemented vote-back on both EAN-path (non-verified confident match) and name-path fallback resolutions; added `_vote_back()` private method and `GAMEUPC_VOTER_ID` constant; 7 new tests added, full suite green (206 passed).
+
 ## Dev Agent Record
 
 ### Agent Model Used
 
+Claude Sonnet 5
+
 ### Debug Log References
+
+`.venv/Scripts/python.exe -m pytest tests/ -q` → `206 passed, 4 deselected` (uv trampoline failed to resolve on this machine's path with spaces — invoked the venv's python directly instead; no impact on test outcome).
 
 ### Completion Notes List
 
+- Implemented `_vote_back()` exactly per Dev Notes contract: `POST {base}/{ean}/bgg_id/{bgg_id}`, JSON body `{"user_id": GAMEUPC_VOTER_ID}`, `x-api-key` header, best-effort (catch `Exception`, `logger.warning`, never re-raise), no retry/backoff (per the rate-limit-goodwill note).
+- Vote-back wired into both resolution paths without touching existing acceptance/trust logic: EAN-path (gated on `bgg_info_status != "verified"`) and name-path fallback (gated on `bgg_id is not None and ean`).
+- All 7 new tests pass; full suite (206 tests) green with zero regressions — existing tests that now also trigger an unconfigured mock `POST` pass unchanged, as expected (mock `.post()` returns a fresh `MagicMock` whose `.raise_for_status()` doesn't raise).
+- No new dependencies; no `web/` files touched; no schema/migration changes — matches story's stated zero-collision-risk scope.
+
 ### File List
+
+- `scraper/scraper/pipelines/deduplication.py` (MODIFY)
+- `scraper/tests/test_deduplication.py` (MODIFY)

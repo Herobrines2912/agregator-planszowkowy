@@ -24,24 +24,28 @@ def _make_pool_mock(game_id: int = 1) -> MagicMock:
     return mock_pool
 
 
-def _gameupc_response(bgg_id: int, name: str = "Test Game") -> MagicMock:
+def _gameupc_response(
+    bgg_id: int, name: str = "Test Game", status: str = "choose_from_bgg_info_or_search"
+) -> MagicMock:
     resp = MagicMock()
     resp.status_code = 200
     resp.json.return_value = {
         "status": "ok",
         "bgg_info": [{"id": bgg_id, "name": name}],
-        "bgg_info_status": "choose_from_bgg_info_or_search",
+        "bgg_info_status": status,
     }
     return resp
 
 
-def _gameupc_multi(bgg_info: list[dict]) -> MagicMock:
+def _gameupc_multi(
+    bgg_info: list[dict], status: str = "choose_from_bgg_info_or_search"
+) -> MagicMock:
     resp = MagicMock()
     resp.status_code = 200
     resp.json.return_value = {
         "status": "ok",
         "bgg_info": bgg_info,
-        "bgg_info_status": "choose_from_bgg_info_or_search",
+        "bgg_info_status": status,
     }
     return resp
 
@@ -283,6 +287,272 @@ def test_ean_path_scores_all_candidates_not_just_first(mock_client_cls, mock_poo
     result = pipeline.process_item(item, MagicMock())
 
     assert result["bgg_id"] == 437106
+
+
+# ---------------------------------------------------------------------------
+# Vote-back — EAN path, verified status → no vote (GameUPC already certain)
+# ---------------------------------------------------------------------------
+
+@patch("scraper.pipelines.deduplication.psycopg2.pool.ThreadedConnectionPool")
+@patch("scraper.pipelines.deduplication.httpx.Client")
+def test_vote_back_skipped_when_gameupc_already_verified(mock_client_cls, mock_pool_cls):
+    mock_http = MagicMock()
+    mock_client_cls.return_value = mock_http
+    mock_pool_cls.return_value = _make_pool_mock(game_id=42)
+
+    mock_http.get.return_value = _gameupc_response(
+        bgg_id=437106, name="Simsala Spin", status="verified"
+    )
+
+    pipeline = DeduplicationPipeline()
+    with patch.dict("os.environ", {"DATABASE_URL": "postgresql://test", "GAMEUPC_API_KEY": "testkey"}):
+        pipeline.open_spider(MagicMock())
+
+    item = {"name": "Simsala Spin", "url": "http://example.com", "ean": "5903707560875"}
+    result = pipeline.process_item(item, MagicMock())
+
+    assert result["bgg_id"] == 437106
+    mock_http.post.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Vote-back — EAN path, non-verified confident match → vote-back POST sent
+# ---------------------------------------------------------------------------
+
+@patch("scraper.pipelines.deduplication.psycopg2.pool.ThreadedConnectionPool")
+@patch("scraper.pipelines.deduplication.httpx.Client")
+def test_vote_back_sent_for_confident_non_verified_ean_match(mock_client_cls, mock_pool_cls):
+    mock_http = MagicMock()
+    mock_client_cls.return_value = mock_http
+    mock_pool_cls.return_value = _make_pool_mock(game_id=42)
+
+    mock_http.get.return_value = _gameupc_response(bgg_id=437106, name="Simsala Spin")
+
+    pipeline = DeduplicationPipeline()
+    with patch.dict("os.environ", {"DATABASE_URL": "postgresql://test", "GAMEUPC_API_KEY": "testkey"}):
+        pipeline.open_spider(MagicMock())
+
+    item = {"name": "Simsala Spin", "url": "http://example.com", "ean": "5903707560875"}
+    result = pipeline.process_item(item, MagicMock())
+
+    assert result["bgg_id"] == 437106
+    mock_http.post.assert_called_once()
+    call_args = mock_http.post.call_args
+    assert call_args[0][0].endswith("/5903707560875/bgg_id/437106")
+    assert call_args.kwargs["json"] == {"user_id": "agregator-planszowek-pl"}
+    assert call_args.kwargs["headers"] == {"x-api-key": "testkey"}
+
+
+# ---------------------------------------------------------------------------
+# Vote-back — POST raises → swallowed, item's own resolution unaffected
+# ---------------------------------------------------------------------------
+
+@patch("scraper.pipelines.deduplication.psycopg2.pool.ThreadedConnectionPool")
+@patch("scraper.pipelines.deduplication.httpx.Client")
+def test_vote_back_failure_does_not_affect_item_resolution(mock_client_cls, mock_pool_cls):
+    import httpx as _httpx
+
+    mock_http = MagicMock()
+    mock_client_cls.return_value = mock_http
+    mock_pool_cls.return_value = _make_pool_mock(game_id=42)
+
+    mock_http.get.return_value = _gameupc_response(bgg_id=437106, name="Simsala Spin")
+    mock_http.post.side_effect = _httpx.ConnectError("timeout")
+
+    pipeline = DeduplicationPipeline()
+    with patch.dict("os.environ", {"DATABASE_URL": "postgresql://test", "GAMEUPC_API_KEY": "testkey"}):
+        pipeline.open_spider(MagicMock())
+
+    item = {"name": "Simsala Spin", "url": "http://example.com", "ean": "5903707560875"}
+    result = pipeline.process_item(item, MagicMock())
+
+    assert result["bgg_id"] == 437106
+    assert result["game_id"] == 42
+
+
+# ---------------------------------------------------------------------------
+# Vote-back — name-path fallback after an inconclusive EAN lookup
+# ---------------------------------------------------------------------------
+
+@patch("scraper.pipelines.deduplication.psycopg2.pool.ThreadedConnectionPool")
+@patch("scraper.pipelines.deduplication.httpx.Client")
+def test_vote_back_sent_for_name_path_fallback(mock_client_cls, mock_pool_cls):
+    mock_http = MagicMock()
+    mock_client_cls.return_value = mock_http
+    mock_pool_cls.return_value = _make_pool_mock(game_id=10)
+
+    mock_http.get.side_effect = [
+        _gameupc_multi([]),  # empty bgg_info — "no info" case
+        MagicMock(status_code=200, text=_bgg_search_xml(31260, "agricola")),
+    ]
+
+    pipeline = DeduplicationPipeline()
+    with patch.dict("os.environ", {
+        "DATABASE_URL": "postgresql://test",
+        "GAMEUPC_API_KEY": "testkey",
+        "BGG_API_TOKEN": "bgg-token-abc",
+    }):
+        pipeline.open_spider(MagicMock())
+
+    item = {"name": "Agricola", "url": "http://example.com", "ean": "9999999999999"}
+    result = pipeline.process_item(item, MagicMock())
+
+    assert result.get("bgg_id") == 31260
+    mock_http.post.assert_called_once()
+    call_args = mock_http.post.call_args
+    assert call_args[0][0].endswith("/9999999999999/bgg_id/31260")
+    assert call_args.kwargs["json"] == {"user_id": "agregator-planszowek-pl"}
+    assert call_args.kwargs["headers"] == {"x-api-key": "testkey"}
+
+
+@patch("scraper.pipelines.deduplication.psycopg2.pool.ThreadedConnectionPool")
+@patch("scraper.pipelines.deduplication.httpx.Client")
+def test_no_gameupc_key_name_path_fallback_no_vote_back(mock_client_cls, mock_pool_cls):
+    mock_http = MagicMock()
+    mock_client_cls.return_value = mock_http
+    mock_pool_cls.return_value = _make_pool_mock(game_id=11)
+
+    mock_http.get.return_value = MagicMock(
+        status_code=200,
+        text=_bgg_search_xml(31260, "agricola"),
+    )
+
+    pipeline = DeduplicationPipeline()
+    with patch("scraper.pipelines.deduplication.load_dotenv", lambda *a, **k: None), \
+         patch.dict("os.environ", {
+             "DATABASE_URL": "postgresql://test",
+             "BGG_API_TOKEN": "bgg-token-abc",
+         }, clear=True):
+        pipeline.open_spider(MagicMock())
+
+    item = {"name": "Agricola", "url": "http://example.com", "ean": "9999999999999"}
+    result = pipeline.process_item(item, MagicMock())
+
+    assert result.get("bgg_id") == 31260
+    mock_http.post.assert_not_called()
+
+
+@patch("scraper.pipelines.deduplication.psycopg2.pool.ThreadedConnectionPool")
+@patch("scraper.pipelines.deduplication.httpx.Client")
+def test_no_ean_name_path_resolves_no_vote_back(mock_client_cls, mock_pool_cls):
+    mock_http = MagicMock()
+    mock_client_cls.return_value = mock_http
+    mock_pool_cls.return_value = _make_pool_mock(game_id=3)
+
+    mock_http.get.return_value = MagicMock(
+        status_code=200,
+        text=_bgg_search_xml(31260, "agricola"),
+    )
+
+    pipeline = DeduplicationPipeline()
+    with patch.dict("os.environ", {
+        "DATABASE_URL": "postgresql://test",
+        "GAMEUPC_API_KEY": "testkey",
+        "BGG_API_TOKEN": "bgg-token-abc",
+    }):
+        pipeline.open_spider(MagicMock())
+
+    item = {"name": "Agricola", "url": "http://example.com"}
+    result = pipeline.process_item(item, MagicMock())
+
+    assert result.get("bgg_id") == 31260
+    mock_http.post.assert_not_called()
+
+
+@patch("scraper.pipelines.deduplication.psycopg2.pool.ThreadedConnectionPool")
+@patch("scraper.pipelines.deduplication.httpx.Client")
+def test_vote_back_uses_name_path_bgg_id_not_rejected_gameupc_candidate(
+    mock_client_cls, mock_pool_cls
+):
+    mock_http = MagicMock()
+    mock_client_cls.return_value = mock_http
+    mock_pool_cls.return_value = _make_pool_mock(game_id=12)
+
+    mock_http.get.side_effect = [
+        _gameupc_response(bgg_id=999999, name="Completely Unrelated Game"),
+        MagicMock(status_code=200, text=_bgg_search_xml(31260, "agricola")),
+    ]
+
+    pipeline = DeduplicationPipeline()
+    with patch.dict("os.environ", {
+        "DATABASE_URL": "postgresql://test",
+        "GAMEUPC_API_KEY": "testkey",
+        "BGG_API_TOKEN": "bgg-token-abc",
+    }):
+        pipeline.open_spider(MagicMock())
+
+    item = {"name": "Agricola", "url": "http://example.com", "ean": "9999999999999"}
+    result = pipeline.process_item(item, MagicMock())
+
+    assert result.get("bgg_id") == 31260
+    mock_http.post.assert_called_once()
+    call_args = mock_http.post.call_args
+    assert call_args[0][0].endswith("/9999999999999/bgg_id/31260")
+    assert call_args.kwargs["json"] == {"user_id": "agregator-planszowek-pl"}
+    assert call_args.kwargs["headers"] == {"x-api-key": "testkey"}
+
+
+# ---------------------------------------------------------------------------
+# Name path — expansion candidate must NOT be merged onto its base game
+# (mirrors test_ean_path_expansion_not_merged_into_base_game; the name path
+# feeds vote-back too, so it needs the same token_sort_ratio guard)
+# ---------------------------------------------------------------------------
+
+@patch("scraper.pipelines.deduplication.psycopg2.pool.ThreadedConnectionPool")
+@patch("scraper.pipelines.deduplication.httpx.Client")
+def test_name_path_expansion_not_merged_into_base_game(mock_client_cls, mock_pool_cls):
+    mock_http = MagicMock()
+    mock_client_cls.return_value = mock_http
+    mock_pool_cls.return_value = _make_pool_mock(game_id=13)
+
+    # No EAN — name path only. BGG search returns the BASE game "Catan" for an
+    # EXPANSION query. Under raw WRatio this scored ~90 and was wrongly accepted;
+    # _name_match_score's token_sort_ratio must reject it.
+    mock_http.get.return_value = MagicMock(status_code=200, text=_bgg_search_xml(13, "Catan"))
+
+    pipeline = DeduplicationPipeline()
+    with patch.dict("os.environ", {
+        "DATABASE_URL": "postgresql://test",
+        "BGG_API_TOKEN": "bgg-token-abc",
+    }):
+        pipeline.open_spider(MagicMock())
+
+    item = {"name": "Catan: Miasta i Rycerze", "url": "http://example.com"}
+    result = pipeline.process_item(item, MagicMock())
+
+    # Rejected on the name path → not merged into bgg_id=13 ("Catan")
+    assert result.get("bgg_id") != 13
+
+
+# ---------------------------------------------------------------------------
+# Vote-back — malformed ean must never reach the POST URL, even via the
+# name-path fallback where _try_ean_path's own format guard is bypassed
+# ---------------------------------------------------------------------------
+
+@patch("scraper.pipelines.deduplication.psycopg2.pool.ThreadedConnectionPool")
+@patch("scraper.pipelines.deduplication.httpx.Client")
+def test_vote_back_skipped_for_malformed_ean(mock_client_cls, mock_pool_cls):
+    mock_http = MagicMock()
+    mock_client_cls.return_value = mock_http
+    mock_pool_cls.return_value = _make_pool_mock(game_id=11)
+
+    mock_http.get.return_value = MagicMock(status_code=200, text=_bgg_search_xml(31260, "agricola"))
+
+    pipeline = DeduplicationPipeline()
+    with patch.dict("os.environ", {
+        "DATABASE_URL": "postgresql://test",
+        "GAMEUPC_API_KEY": "testkey",
+        "BGG_API_TOKEN": "bgg-token-abc",
+    }):
+        pipeline.open_spider(MagicMock())
+
+    # ean fails _try_ean_path's own format check (not called: no GameUPC GET happens
+    # for it), so process_item falls through to the name path with the raw ean intact.
+    item = {"name": "Agricola", "url": "http://example.com", "ean": "not-a-valid-ean/../etc"}
+    result = pipeline.process_item(item, MagicMock())
+
+    assert result.get("bgg_id") == 31260
+    mock_http.post.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
