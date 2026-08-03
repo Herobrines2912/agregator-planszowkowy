@@ -1,3 +1,8 @@
+## Deferred from: code review of story-4.6 (2026-08-03)
+
+- Self-referential `base_game` link renders "Zobacz grę bazową →" pointing at the current page when `parent_game_id` ever equals the game's own `id` [web/src/components/DlcWarning.tsx:46, web/src/db/queries/game-passport.ts:74-82] — a cycle guard belongs in the 4.5b data layer (`parent_game_id` resolution), not in `DlcWarning`, which is a pure consumer. No known code path produces this today.
+- Non-numeric `current_min_price` string (e.g. `""`) makes `hasPrice` true and renders misleading "Cena od —" instead of falling to the BGG-link/no-offers branch [web/src/components/DlcWarning.tsx:11-17] — `current_min_price` is a `NUMERIC(10,2)` column; a malformed value here would indicate an upstream query/scraper bug. Same `!== null` trust pattern already used by `BestDealBanner`/`StalenessWarningBanner`.
+
 ## Deferred from: code review of story-4.5b (2026-07-30)
 
 - FK `ON DELETE no action` on `games.parent_game_id` + TOCTOU between `_resolve_parent_game_id()`'s lookup and `_write_game()`'s update [db/migrations/0005_games_add_parent_game_id.sql:2, scraper/utils/bgg_enrichment.py:204-214] — if a base game row is ever deleted while an expansion still references it, the delete will fail with a raw FK-violation error rather than being handled gracefully. No code path deletes `games` rows today; revisit when delete/cleanup tooling is built.

@@ -37,7 +37,7 @@
 #   fully completed story or fix (see CLAUDE.md "Sprint status" section)
 
 generated: 2026-07-20
-last_updated: 2026-08-02
+last_updated: 2026-08-03
 project: board_games_app
 project_key: NOKEY
 tracking_system: file-system
@@ -83,7 +83,7 @@ development_status:
   4-4-best-deal-banner: done
   4-5-game-passport-db-queries: done
   4-5b-parent-game-bgg-link: done
-  4-6-dlc-dependency-warning: review
+  4-6-dlc-dependency-warning: done
   epic-4-retrospective: optional
 
   epic-5: in-progress
@@ -101,7 +101,7 @@ development_status:
   6-2-double-opt-in-confirmation-get-api-alerts-confirm: in-progress  # correct-course 2026-07-26 — POST-confirm (RODO party-mode 2026-07-24)
   6-3-wylaczanie-powiadomien: backlog
   6-4-brevo-client-szablon-emaila-doi: done
-  6-5-alert-engine-wykrywanie-spadku-ceny: backlog
+  6-5-alert-engine-wykrywanie-spadku-ceny: ready-for-dev
   6-6-email-o-spadku-ceny: backlog
   6-7-type-b-anomaly-detection: backlog
   6-8-brevo-webhook-hard-bounce-complaint-suppression: backlog

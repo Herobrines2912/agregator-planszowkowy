@@ -4,7 +4,7 @@ baseline_commit: 65947fc8c7f7fdeed25bcfa040aacaef7d6526ea
 
 # Story 4.6: DLC Dependency Warning
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -233,8 +233,16 @@ None — implementation followed the story's exact component skeleton and page-w
 - New: `web/src/components/DlcWarning.test.tsx`
 - Modified: `web/src/app/gra/[slug]/page.tsx` (import + render `DlcWarning` below `GameMeta` in left column)
 
+### Review Findings
+
+- [x] [Review][Defer] Self-referential `base_game` link renders "Zobacz grę bazową →" pointing at the current page [web/src/components/DlcWarning.tsx:46, web/src/db/queries/game-passport.ts:74-82] — deferred, pre-existing: `parent_game_id` resolution is owned by Story 4.5b's data layer; a cycle guard belongs there, not in this pure-consumer component.
+- [x] [Review][Defer] Non-numeric `current_min_price` string (e.g. `""`) makes `hasPrice` true and renders misleading "Cena od —" instead of the BGG fallback branch [web/src/components/DlcWarning.tsx:11-17] — deferred, pre-existing: same `!== null` trust pattern used by sibling components (`BestDealBanner`, `StalenessWarningBanner`); `current_min_price` is a `NUMERIC(10,2)` column, malformed values would indicate an upstream query/scraper bug, not a defect in this diff.
+
+Dismissed as noise (6): formatPrice "crash" claim (formatPrice already returns `'—'` on NaN, never throws — format.ts:4); empty/degenerate slug → broken `/gra/` link (slug is a NOT NULL generated column, same trust boundary as every other `Link` in the app); `bgg_id === 0` treated as valid (BGG numeric IDs are never 0 in practice); generic "runtime trust beyond top-level guard" concern (applies to any typed React component, not actionable); `current_min_price = "0.00"` rendering "Cena od 0 zł" (valid display of a real zero price, no evidence it's reachable); guard-order test (case 6) not discriminating (functionally moot — `!isExpansion || !baseGame` returns `null` identically regardless of clause order).
+
 ## Change Log
 
 | Date | Change |
 | --- | --- |
 | 2026-07-31 | Story 4.6 implemented: `DlcWarning` component, wired into Game Passport left column, 6 new tests. Status → review. |
+| 2026-08-03 | Code review (dev b): 3-layer adversarial review (Blind Hunter, Edge Case Hunter, Acceptance Auditor). 0 decision-needed, 0 patch, 2 deferred (data-layer trust concerns for future stories), 6 dismissed. No AC violations. Status → done. |
