@@ -221,6 +221,70 @@ class TestRender:
         assert "{{confirmation_url}}" in content
 
 
+class TestSendPriceDropEmail:
+    """Minimal unblock for Story 6.5 — see brevo_client.send_price_drop_email docstring."""
+
+    @patch("utils.brevo_client.httpx.post")
+    def test_returns_true_on_2xx(self, mock_post):
+        mock_post.return_value = _make_response(201)
+
+        result = brevo_client.send_price_drop_email(
+            "user@example.com", "Brass: Birmingham", "89.99", "99.00",
+            "https://example.com/gra/brass-birmingham",
+        )
+
+        assert result is True
+
+    @patch("utils.brevo_client.httpx.post")
+    def test_request_payload_shape(self, mock_post):
+        mock_post.return_value = _make_response(201)
+
+        brevo_client.send_price_drop_email(
+            "user@example.com", "Brass: Birmingham", "89.99", "99.00",
+            "https://example.com/gra/brass-birmingham",
+        )
+
+        payload = mock_post.call_args.kwargs["json"]
+        assert payload["subject"] == "Cena spadła!"
+        assert "Brass: Birmingham" in payload["htmlContent"]
+        assert "89.99" in payload["htmlContent"]
+        assert "99.00" in payload["htmlContent"]
+        assert "https://example.com/gra/brass-birmingham" in payload["htmlContent"]
+
+    @patch("utils.brevo_client.httpx.post")
+    def test_returns_false_on_non_2xx(self, mock_post, caplog):
+        mock_post.return_value = _make_response(400)
+
+        with caplog.at_level("WARNING"):
+            result = brevo_client.send_price_drop_email(
+                "user@example.com", "Brass: Birmingham", "89.99", "99.00",
+                "https://example.com/gra/brass-birmingham",
+            )
+
+        assert result is False
+
+    @patch("utils.brevo_client.httpx.post")
+    @patch("utils.brevo_client.time.sleep")
+    def test_429_then_success_returns_true(self, mock_sleep, mock_post):
+        mock_post.side_effect = [_make_response(429), _make_response(201)]
+
+        result = brevo_client.send_price_drop_email(
+            "user@example.com", "Brass: Birmingham", "89.99", "99.00",
+            "https://example.com/gra/brass-birmingham",
+        )
+
+        assert result is True
+        assert mock_post.call_count == 2
+
+    def test_load_template_reads_price_drop_email_html(self):
+        content = brevo_client._load_template("price_drop_email.html")
+
+        assert "{{game_name}}" in content
+        assert "{{current_price}}" in content
+        assert "{{target_price}}" in content
+        assert "{{game_url}}" in content
+
+
 class TestMissingEnvVarsFailFast:
     def _reload_with_env(self, monkeypatch, **env):
         for key in ("BREVO_API_KEY", "BREVO_SENDER_EMAIL", "BREVO_SENDER_NAME"):

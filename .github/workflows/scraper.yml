@@ -79,6 +79,3 @@ jobs:
             -X POST "$VERCEL_URL/api/revalidate" \
             -H "x-revalidate-secret: $REVALIDATION_SECRET" \
           || echo "::warning::ISR revalidation failed — stale data risk (fallback TTL 2h)"
-
-      - name: Step 5 — Alert engine placeholder (Epic 6)
-        run: echo "Alert engine not yet implemented — Epic 6"

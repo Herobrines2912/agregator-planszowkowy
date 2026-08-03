@@ -1,0 +1,39 @@
+name: Alert Engine
+
+on:
+  workflow_run:
+    workflows: ["Daily Scraper"]
+    types: [completed]
+
+concurrency:
+  group: alert-engine
+  cancel-in-progress: false
+
+jobs:
+  alert-engine:
+    name: Check active alerts against latest prices
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install scraper dependencies
+        run: cd scraper && uv sync
+
+      - name: Run alert engine
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+          BREVO_SENDER_EMAIL: ${{ secrets.BREVO_SENDER_EMAIL }}
+          BREVO_SENDER_NAME: ${{ secrets.BREVO_SENDER_NAME }}
+        run: cd scraper && uv run python -m alert_engine

@@ -1,3 +1,8 @@
+## Deferred from: code review of story-6.5 (2026-08-03)
+
+- `MIN(price)` over an in-stock product group where every row has a NULL `price` is indistinguishable in logs from "no in-stock products at all" [scraper/alert_engine.py] — low-value observability gap, alert is correctly skipped either way; no reported occurrence.
+- Full DB-level idempotency (`SELECT ... FOR UPDATE SKIP LOCKED` or advisory lock) to fully close the window where two concurrent `alert_engine.yml` runs could both select the same active alert before either commits `'triggered'` — user explicitly chose the cheaper GH Actions `concurrency:` group mitigation instead (2026-08-03) for the common case (manual re-run overlap). Revisit if duplicate price-drop emails are actually reported in production.
+
 ## Deferred from: code review of story-4.6 (2026-08-03)
 
 - Self-referential `base_game` link renders "Zobacz grę bazową →" pointing at the current page when `parent_game_id` ever equals the game's own `id` [web/src/components/DlcWarning.tsx:46, web/src/db/queries/game-passport.ts:74-82] — a cycle guard belongs in the 4.5b data layer (`parent_game_id` resolution), not in `DlcWarning`, which is a pure consumer. No known code path produces this today.

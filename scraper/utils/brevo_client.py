@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
 DOI_EMAIL_SUBJECT = "Potwierdź powiadomienia o cenie"
+PRICE_DROP_EMAIL_SUBJECT = "Cena spadła!"
 
 _TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 
@@ -47,9 +48,36 @@ def _render(template: str, **kwargs: str) -> str:
     return pattern.sub(lambda m: escaped[m.group()[2:-2]], template)
 
 
-def _post_doi_email(payload: dict) -> httpx.Response:
+def _post_email(payload: dict) -> httpx.Response:
     headers = {"api-key": BREVO_API_KEY, "Content-Type": "application/json"}
     return httpx.post(BREVO_API_URL, headers=headers, json=payload, timeout=15)
+
+
+def _send_email(to_email: str, subject: str, html_content: str) -> bool:
+    """Shared send path: builds the Brevo payload, sends, retries once on 429.
+    Returns True on 2xx, False on any other non-2xx — never raises for HTTP-level failures."""
+    email_hash = _hash_email(to_email)
+    payload = {
+        "sender": {"email": BREVO_SENDER_EMAIL, "name": BREVO_SENDER_NAME},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "htmlContent": html_content,
+    }
+
+    logger.info("Sending email to %s", email_hash)
+    response = _post_email(payload)
+
+    if response.status_code == 429:
+        logger.warning("Brevo rate limit (429) for %s — retrying once after 2s", email_hash)
+        time.sleep(2)
+        response = _post_email(payload)
+
+    if 200 <= response.status_code < 300:
+        logger.info("Email sent to %s", email_hash)
+        return True
+
+    logger.warning("Brevo email send failed for %s: HTTP %d", email_hash, response.status_code)
+    return False
 
 
 def send_doi_email(to_email: str, confirmation_url: str, game_name: str, target_price: str) -> bool:
@@ -58,7 +86,6 @@ def send_doi_email(to_email: str, confirmation_url: str, game_name: str, target_
     Returns True on 2xx, False on any non-2xx (after one 429 retry) — never raises
     for HTTP-level failures.
     """
-    email_hash = _hash_email(to_email)
     template = _load_template("doi_email.html")
     html_content = _render(
         template,
@@ -66,26 +93,29 @@ def send_doi_email(to_email: str, confirmation_url: str, game_name: str, target_
         target_price=target_price,
         confirmation_url=confirmation_url,
     )
-    payload = {
-        "sender": {"email": BREVO_SENDER_EMAIL, "name": BREVO_SENDER_NAME},
-        "to": [{"email": to_email}],
-        "subject": DOI_EMAIL_SUBJECT,
-        "htmlContent": html_content,
-    }
+    return _send_email(to_email, DOI_EMAIL_SUBJECT, html_content)
 
-    logger.info("Sending DOI email to %s", email_hash)
-    response = _post_doi_email(payload)
 
-    if response.status_code == 429:
-        logger.warning("Brevo rate limit (429) for %s — retrying once after 2s", email_hash)
-        time.sleep(2)
-        response = _post_doi_email(payload)
+def send_price_drop_email(to_email: str, game_name: str, current_price: str, target_price: str, game_url: str) -> bool:
+    """
+    Send the price-drop notification email via Brevo transactional email API.
+    Same retry/return contract as send_doi_email — True on 2xx, False on any
+    other non-2xx (after one 429 retry), never raises for HTTP-level failures.
 
-    if 200 <= response.status_code < 300:
-        logger.info("DOI email sent to %s", email_hash)
-        return True
-
-    logger.warning(
-        "Brevo DOI email send failed for %s: HTTP %d", email_hash, response.status_code
+    NOTE: this is a minimal unblock for Story 6.5 (Alert Engine), written to let
+    alert_engine.py call a real, working function while Story 6.6 (backlog) is
+    pending. It does NOT yet implement 6.6's full AC: no store_name/buy_url
+    (affiliate_url ?? product_url) distinction and no unsubscribe_token link —
+    that infrastructure (Story 6.3, unsubscribe tokens) doesn't exist yet either.
+    Story 6.6, when picked up, should extend this signature and template to match
+    epics.md's full spec rather than treating this as already complete.
+    """
+    template = _load_template("price_drop_email.html")
+    html_content = _render(
+        template,
+        game_name=game_name,
+        current_price=current_price,
+        target_price=target_price,
+        game_url=game_url,
     )
-    return False
+    return _send_email(to_email, PRICE_DROP_EMAIL_SUBJECT, html_content)
