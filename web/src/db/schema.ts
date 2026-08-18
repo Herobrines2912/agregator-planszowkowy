@@ -126,6 +126,10 @@ export const priceAlerts = pgTable(
       .$type<'price_drop' | 'availability'>()
       .notNull(),
     type_b_enabled: boolean('type_b_enabled').notNull().default(false),
+    // Last time a Type B (anomaly-discount) email was sent for this alert — NULL means
+    // never notified. Gates the 24h Type B cooldown; status is never used for this since
+    // Type B alerts stay 'active' and re-evaluate every run, unlike Type A's one-shot trigger.
+    last_type_b_notified_at: timestamptz('last_type_b_notified_at'),
     target_price: numeric('target_price', { precision: 10, scale: 2 }),
     status: text('status')
       .$type<'pending_doi' | 'active' | 'cancelled'>()

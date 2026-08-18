@@ -254,6 +254,11 @@ class TestSendPriceDropEmail:
         assert "AlePlanszowki" in payload["htmlContent"]
         assert "https://aleplanszowki.pl/brass" in payload["htmlContent"]
         assert "https://example.com/gra/brass-birmingham" in payload["htmlContent"]
+        # header_prefix omitted -> default "" -> no leaking {{header_prefix}} token,
+        # no unwanted prefix on the plain Type A subject/heading (Story 6.7 AC-6)
+        assert "{{header_prefix}}" not in payload["htmlContent"]
+        assert "<h1" in payload["htmlContent"]
+        assert 'style="color:#3D5C3A; font-size:22px; margin:0 0 16px;">Cena spadła!' in payload["htmlContent"]
 
     @patch("utils.brevo_client.httpx.post")
     def test_returns_false_on_non_2xx(self, mock_post, caplog):
@@ -291,6 +296,41 @@ class TestSendPriceDropEmail:
         assert "{{store_name}}" in content
         assert "{{buy_url}}" in content
         assert "{{game_url}}" in content
+        assert "{{header_prefix}}" in content
+
+
+class TestSendPriceDropEmailHeaderPrefix:
+    """Story 6.7 — header_prefix kwarg, used for Type B anomaly-discount emails."""
+
+    @patch("utils.brevo_client.httpx.post")
+    def test_non_empty_header_prefix_prepended_to_subject_and_heading(self, mock_post):
+        mock_post.return_value = _make_response(201)
+
+        brevo_client.send_price_drop_email(
+            "user@example.com", "Brass: Birmingham",
+            "https://example.com/gra/brass-birmingham", "89.99", "99.00",
+            "AlePlanszowki", "https://aleplanszowki.pl/brass",
+            header_prefix="WYJĄTKOWA OKAZJA! ",
+        )
+
+        payload = mock_post.call_args.kwargs["json"]
+        assert payload["subject"] == "WYJĄTKOWA OKAZJA! Cena spadła!"
+        assert "WYJĄTKOWA OKAZJA! Cena spadła!" in payload["htmlContent"]
+        assert "{{header_prefix}}" not in payload["htmlContent"]
+
+    @patch("utils.brevo_client.httpx.post")
+    def test_omitted_header_prefix_defaults_to_empty_string(self, mock_post):
+        mock_post.return_value = _make_response(201)
+
+        brevo_client.send_price_drop_email(
+            "user@example.com", "Brass: Birmingham",
+            "https://example.com/gra/brass-birmingham", "89.99", "99.00",
+            "AlePlanszowki", "https://aleplanszowki.pl/brass",
+        )
+
+        payload = mock_post.call_args.kwargs["json"]
+        assert payload["subject"] == "Cena spadła!"
+        assert "{{header_prefix}}" not in payload["htmlContent"]
 
 
 class TestMissingEnvVarsFailFast:

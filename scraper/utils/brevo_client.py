@@ -104,11 +104,20 @@ def send_price_drop_email(
     target_price: str,
     store_name: str,
     buy_url: str,
+    header_prefix: str = "",
 ) -> bool:
     """
     Send the price-drop notification email via Brevo transactional email API.
     Same retry/return contract as send_doi_email — True on 2xx, False on any
     other non-2xx (after one 429 retry), never raises for HTTP-level failures.
+
+    header_prefix is prepended to both the subject and the template's <h1> —
+    empty string (default) reproduces the plain "Cena spadła!" Type A email;
+    Story 6.7 passes "WYJĄTKOWA OKAZJA! " for Type B anomaly-discount emails.
+    Every caller must pass it explicitly (even "") — _render() leaves any
+    {{name}} token with no matching kwarg literally un-substituted in the
+    output, the exact defect class Story 6.6's code review caught for
+    doi_email.html's {{game_url}}.
 
     NOTE: unsubscribe_token infrastructure (Story 6.3) doesn't exist yet — the
     template's "Wyłącz powiadomienia" footer link points at game_url as a
@@ -123,5 +132,7 @@ def send_price_drop_email(
         target_price=target_price,
         store_name=store_name,
         buy_url=buy_url,
+        header_prefix=header_prefix,
     )
-    return _send_email(to_email, PRICE_DROP_EMAIL_SUBJECT, html_content)
+    subject = f"{header_prefix}{PRICE_DROP_EMAIL_SUBJECT}"
+    return _send_email(to_email, subject, html_content)

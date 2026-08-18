@@ -1,0 +1,1 @@
+ALTER TABLE "price_alerts" ADD COLUMN "last_type_b_notified_at" timestamp with time zone;
