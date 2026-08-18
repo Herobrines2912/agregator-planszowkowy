@@ -1,10 +1,10 @@
 ---
-baseline_commit: a878a5757570b30c4f9d3e07f3d4f2e5be5c8f5f
+baseline_commit: a878a57839d540e511cdd377e507501efc409a8c
 ---
 
 # Story 6.6: Email o Spadku Ceny
 
-Status: ready-for-dev
+Status: review
 
 **Epic:** 6 — Email Price Alerts
 **Dev:** Dev B (Scraper/Infra) — _pliki: `scraper/utils/brevo_client.py` (MODIFY), `scraper/templates/price_drop_email.html` (MODIFY), `scraper/alert_engine.py` (MODIFY), `scraper/tests/test_brevo_client.py` (MODIFY), `scraper/tests/test_alert_engine.py` (MODIFY)_
@@ -36,21 +36,21 @@ so that I can act immediately on the deal.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Extend `send_price_drop_email()` signature** (AC: 1, 6) — `scraper/utils/brevo_client.py` (MODIFY)
-  - [ ] 1.1 Change signature to `send_price_drop_email(to_email: str, game_name: str, game_url: str, current_price: str, target_price: str, store_name: str, buy_url: str) -> bool` — keep the `_send_email()` call, just pass the two new template variables through `_render()`.
-  - [ ] 1.2 Update the function's docstring: remove the "minimal unblock, NOT full Story 6.6" caveat now that store_name/buy_url are wired; keep a note that `unsubscribe_token` is still deferred to Story 6.3 (footer link is `game_url`, not a real unsubscribe).
-  - [ ] 1.3 Update `TestSendPriceDropEmail` in `scraper/tests/test_brevo_client.py` — all existing calls need `store_name`/`buy_url` args; add one assertion that the rendered HTML contains the store name and the buy URL (mirror how existing tests assert `game_name`/`current_price` appear in `httpx.post`'s captured payload).
+- [x] **Task 1 — Extend `send_price_drop_email()` signature** (AC: 1, 6) — `scraper/utils/brevo_client.py` (MODIFY)
+  - [x] 1.1 Change signature to `send_price_drop_email(to_email: str, game_name: str, game_url: str, current_price: str, target_price: str, store_name: str, buy_url: str) -> bool` — keep the `_send_email()` call, just pass the two new template variables through `_render()`.
+  - [x] 1.2 Update the function's docstring: remove the "minimal unblock, NOT full Story 6.6" caveat now that store_name/buy_url are wired; keep a note that `unsubscribe_token` is still deferred to Story 6.3 (footer link is `game_url`, not a real unsubscribe).
+  - [x] 1.3 Update `TestSendPriceDropEmail` in `scraper/tests/test_brevo_client.py` — all existing calls need `store_name`/`buy_url` args; add one assertion that the rendered HTML contains the store name and the buy URL (mirror how existing tests assert `game_name`/`current_price` appear in `httpx.post`'s captured payload).
 
-- [ ] **Task 2 — Update `price_drop_email.html` template** (AC: 2) — `scraper/templates/price_drop_email.html` (MODIFY)
-  - [ ] 2.1 Add a `{{store_name}}` line near the price block (e.g. below target price, small/muted text, matching `doi_email.html`'s typographic scale — `#6b6258`, 14px).
-  - [ ] 2.2 Change the "Kup teraz →" button `href` from `{{game_url}}` to `{{buy_url}}`.
-  - [ ] 2.3 Change the footer "Wyłącz powiadomienia" link `href` from `#` to `{{game_url}}` (both this template and `doi_email.html` — see Prerequisite; do this in both files for consistency even though `doi_email.html` isn't otherwise in scope, it has the identical dead `href="#"` today).
+- [x] **Task 2 — Update `price_drop_email.html` template** (AC: 2) — `scraper/templates/price_drop_email.html` (MODIFY)
+  - [x] 2.1 Add a `{{store_name}}` line near the price block (e.g. below target price, small/muted text, matching `doi_email.html`'s typographic scale — `#6b6258`, 14px).
+  - [x] 2.2 Change the "Kup teraz →" button `href` from `{{game_url}}` to `{{buy_url}}`.
+  - [x] 2.3 Change the footer "Wyłącz powiadomienia" link `href` from `#` to `{{game_url}}` in `price_drop_email.html`. **Deviation from the original task text:** did NOT make the matching change in `doi_email.html` — code review (maintainability + testing personas) confirmed `send_doi_email()` never passes a `game_url` kwarg, so that template would ship a literal, un-substituted `{{game_url}}` string in production DOI emails. Reverted to keep `doi_email.html` unchanged (dead `href="#"`, same as before this story) rather than trade a harmless dead link for broken markup; see Completion Notes.
 
-- [ ] **Task 3 — Cheapest-offer-with-store lookup in `alert_engine.py`** (AC: 3, 4, 5) — `scraper/alert_engine.py` (MODIFY)
-  - [ ] 3.1 Replace the current `SELECT game_id, MIN(price) FROM products WHERE game_id = ANY(%s) AND in_stock = true GROUP BY game_id` with a query that also returns, per `game_id`, the winning row's `url` and `store_id` — use `DISTINCT ON (game_id) game_id, price, url, store_id ... ORDER BY game_id, price ASC` (Postgres `DISTINCT ON` — single query, no N+1, preserves AC-5 of Story 6.5). Join `stores` for `name` in the same query (or a second small batched query keyed by distinct `store_id`s — either is fine, just keep it batched, not per-alert).
-  - [ ] 3.2 Replace `current_prices = dict(cur.fetchall())` and its later `current_prices.get(game_id)` lookups with a dict keyed by `game_id` holding `{price, url, store_name}` (or equivalent); update every place that reads `current_min_price` to read `.price` from this richer structure — behavior for the `is None` / `> target_price` skip branches is unchanged, just the data shape carrying more fields.
-  - [ ] 3.3 Update the `send_price_drop_email()` call site to pass `store_name=` and `buy_url=` from the new lookup, alongside the existing `game_name`/`game_url`/`current_price`/`target_price` args (arg order must match Task 1's new signature).
-  - [ ] 3.4 Update `scraper/tests/test_alert_engine.py`: every mocked `cur.fetchall()` return value for the products query must include `url`/`store_id` (or whatever columns Task 3.1 selects) and the mock stores lookup must return a name; update the `send_price_drop_email` assertion in existing tests to check the new kwargs; add one new test for a game with multiple in-stock products across different stores — assert the winning row is the cheapest one's store/url, not the first one found.
+- [x] **Task 3 — Cheapest-offer-with-store lookup in `alert_engine.py`** (AC: 3, 4, 5) — `scraper/alert_engine.py` (MODIFY)
+  - [x] 3.1 Replace the current `SELECT game_id, MIN(price) FROM products WHERE game_id = ANY(%s) AND in_stock = true GROUP BY game_id` with a query that also returns, per `game_id`, the winning row's `url` and `store_id` — use `DISTINCT ON (game_id) game_id, price, url, store_id ... ORDER BY game_id, price ASC` (Postgres `DISTINCT ON` — single query, no N+1, preserves AC-5 of Story 6.5). Join `stores` for `name` in the same query (or a second small batched query keyed by distinct `store_id`s — either is fine, just keep it batched, not per-alert).
+  - [x] 3.2 Replace `current_prices = dict(cur.fetchall())` and its later `current_prices.get(game_id)` lookups with a dict keyed by `game_id` holding `{price, url, store_name}` (or equivalent); update every place that reads `current_min_price` to read `.price` from this richer structure — behavior for the `is None` / `> target_price` skip branches is unchanged, just the data shape carrying more fields.
+  - [x] 3.3 Update the `send_price_drop_email()` call site to pass `store_name=` and `buy_url=` from the new lookup, alongside the existing `game_name`/`game_url`/`current_price`/`target_price` args (arg order must match Task 1's new signature).
+  - [x] 3.4 Update `scraper/tests/test_alert_engine.py`: every mocked `cur.fetchall()` return value for the products query must include `url`/`store_id` (or whatever columns Task 3.1 selects) and the mock stores lookup must return a name; update the `send_price_drop_email` assertion in existing tests to check the new kwargs; add one new test for a game with multiple in-stock products across different stores — assert the winning row is the cheapest one's store/url, not the first one found.
 
 ## Dev Notes
 
@@ -109,8 +109,29 @@ Same as Story 6.5: `pytest` + `unittest.mock`, mock `psycopg2` cursors returning
 
 ### Agent Model Used
 
+Claude Sonnet 5 (claude-sonnet-5)
+
 ### Debug Log References
+
+- `uv run pytest` unavailable in this shell (uv trampoline path-canonicalization error on a path containing spaces) — ran via `.venv\Scripts\python.exe -m pytest` instead. Same interpreter/venv, no behavioral difference.
+- Full suite: `228 passed, 4 deselected` (deselected = `live` marker, unchanged from before this story).
 
 ### Completion Notes List
 
+- Extended `send_price_drop_email()` to the 7-arg signature (`to_email, game_name, game_url, current_price, target_price, store_name, buy_url`); updated call site in `alert_engine.py` and all callers in `test_brevo_client.py` (tests were already written against the new signature — pure red→green).
+- `price_drop_email.html`: added `{{store_name}}` line, buy button now points at `{{buy_url}}`, footer unsubscribe now points at `{{game_url}}` (was dead `#`).
+- `doi_email.html`: left unchanged (dead `href="#"` unsubscribe link, same as before this story). Task 2.3 originally called for changing this template's link to `{{game_url}}` too "for consistency," but code review caught that `send_doi_email()` never passes a `game_url` kwarg, so that edit would have shipped a literal `{{game_url}}` string in DOI emails. Reverted the one-line change post-review. Not currently reachable in production either way — `send_doi_email()` has no live caller yet (Story 6.2, which will wire it up, is still `in-progress`) — but a dead link is a safer default than broken markup for whoever finishes 6.2.
+- `alert_engine.py`: replaced the `GROUP BY`/`MIN(price)` products query with `DISTINCT ON (game_id) ... ORDER BY game_id, price ASC, store_id ASC` returning `(game_id, price, url, store_id)`, plus one small batched `stores` lookup keyed by distinct `store_id`s — still two queries total regardless of alert-batch size (no N+1 regression, AC-5 preserved). Per-alert loop now reads `current_offers[game_id]` (`price`/`url`/`store_name`) instead of the old flat `current_prices` dict; skip/trigger branches unchanged. `store_id ASC` added as a tie-break so which store wins on an exact-price tie is deterministic, not Postgres's arbitrary `DISTINCT ON` choice.
+- **Post-implementation code review fix (P0):** the `DISTINCT ON` query as originally written could return a row with `price = NULL` when a game's *sole* in-stock product had a NULL price (`products.price` has no `NOT NULL` constraint) — unlike the old `MIN(price)` query, which implicitly skips all-NULL groups, the new per-alert loop's `current_offer is None` check only catches a *missing* dict entry, not a present dict with `price: None`, so `current_min_price > target_price` would raise `TypeError: '>' not supported between instances of 'NoneType' and 'decimal.Decimal'` — uncaught, crashing the entire alert batch (every other pending alert in that run), not just the offending one. Reproduced locally, then fixed by adding `AND price IS NOT NULL` to the products query's WHERE clause, restoring the old query's implicit null-skip semantics exactly. Added `test_game_with_only_null_price_in_stock_product_is_skipped_without_crashing` to `test_alert_engine.py` to cover it.
+- Tests: updated all `test_alert_engine.py` mock fixtures to the new two-query shape (products + stores), added `TestRunAlertEngineTrigger.test_cheapest_offer_across_stores_wins` (cheapest row's store/url wins across stores) and `test_game_with_only_null_price_in_stock_product_is_skipped_without_crashing` (the P0 regression fix above).
+- All 6 ACs verified: AC-1/6 (signature+callers), AC-2 (template fields), AC-3/4 (cheapest in-stock product resolved, `products.url` used as buy URL), AC-5 (single batched products query, confirmed by existing `TestBatchQuery.test_hundred_alerts_issue_one_products_query`, still green).
+- Ran `compound-engineering:ce-code-review` (8 reviewers: correctness, adversarial, testing, maintainability, project-standards, performance, agent-native, learnings-researcher) against the full diff. One P0 (NULL-price crash, fixed above), one P2 (doi_email.html placeholder, fixed by revert above); all other findings were residual risks/testing gaps or pre-existing/advisory (e.g. a `products(game_id, in_stock, price)` composite index is pre-existing from Story 6.5, not this diff — noted, not actioned).
+
 ### File List
+
+- Modified: `scraper/utils/brevo_client.py`
+- Modified: `scraper/templates/price_drop_email.html`
+- Modified: `scraper/alert_engine.py`
+- Modified: `scraper/tests/test_brevo_client.py`
+- Modified: `scraper/tests/test_alert_engine.py`
+- Unchanged (edited then reverted during code review): `scraper/templates/doi_email.html`

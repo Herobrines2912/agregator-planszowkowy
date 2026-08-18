@@ -42,12 +42,31 @@ def run_alert_engine(conn) -> None:
 
     with conn.cursor() as cur:
         cur.execute(
-            """SELECT game_id, MIN(price) FROM products
-               WHERE game_id = ANY(%s) AND in_stock = true
-               GROUP BY game_id""",
+            """SELECT DISTINCT ON (game_id) game_id, price, url, store_id
+               FROM products
+               WHERE game_id = ANY(%s) AND in_stock = true AND price IS NOT NULL
+               ORDER BY game_id, price ASC, store_id ASC""",
             (game_ids,),
         )
-        current_prices = dict(cur.fetchall())
+        cheapest_rows = cur.fetchall()
+
+    store_ids = list({row[3] for row in cheapest_rows})
+
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT id, name FROM stores WHERE id = ANY(%s)",
+            (store_ids,),
+        )
+        store_names_by_id = dict(cur.fetchall())
+
+    current_offers = {
+        game_id: {
+            "price": price,
+            "url": url,
+            "store_name": store_names_by_id.get(store_id),
+        }
+        for game_id, price, url, store_id in cheapest_rows
+    }
 
     with conn.cursor() as cur:
         cur.execute(
@@ -61,11 +80,13 @@ def run_alert_engine(conn) -> None:
             logger.warning("Alert %s: target_price is NULL — skipping", alert_id)
             continue
 
-        current_min_price = current_prices.get(game_id)
+        current_offer = current_offers.get(game_id)
 
-        if current_min_price is None:
+        if current_offer is None:
             logger.info("Alert %s (game %s): no in-stock offers — skipping", alert_id, game_id)
             continue
+
+        current_min_price = current_offer["price"]
 
         if current_min_price > target_price:
             continue
@@ -92,9 +113,11 @@ def run_alert_engine(conn) -> None:
             sent = send_price_drop_email(
                 email,
                 game_name=game_name,
+                game_url=f"{SITE_URL}/gra/{game_slug}",
                 current_price=str(current_min_price),
                 target_price=str(target_price),
-                game_url=f"{SITE_URL}/gra/{game_slug}",
+                store_name=current_offer["store_name"],
+                buy_url=current_offer["url"],
             )
         except Exception:
             logger.exception(

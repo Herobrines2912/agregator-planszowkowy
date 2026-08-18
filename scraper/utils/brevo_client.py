@@ -96,26 +96,32 @@ def send_doi_email(to_email: str, confirmation_url: str, game_name: str, target_
     return _send_email(to_email, DOI_EMAIL_SUBJECT, html_content)
 
 
-def send_price_drop_email(to_email: str, game_name: str, current_price: str, target_price: str, game_url: str) -> bool:
+def send_price_drop_email(
+    to_email: str,
+    game_name: str,
+    game_url: str,
+    current_price: str,
+    target_price: str,
+    store_name: str,
+    buy_url: str,
+) -> bool:
     """
     Send the price-drop notification email via Brevo transactional email API.
     Same retry/return contract as send_doi_email — True on 2xx, False on any
     other non-2xx (after one 429 retry), never raises for HTTP-level failures.
 
-    NOTE: this is a minimal unblock for Story 6.5 (Alert Engine), written to let
-    alert_engine.py call a real, working function while Story 6.6 (backlog) is
-    pending. It does NOT yet implement 6.6's full AC: no store_name/buy_url
-    (affiliate_url ?? product_url) distinction and no unsubscribe_token link —
-    that infrastructure (Story 6.3, unsubscribe tokens) doesn't exist yet either.
-    Story 6.6, when picked up, should extend this signature and template to match
-    epics.md's full spec rather than treating this as already complete.
+    NOTE: unsubscribe_token infrastructure (Story 6.3) doesn't exist yet — the
+    template's "Wyłącz powiadomienia" footer link points at game_url as a
+    placeholder, not a real one-click unsubscribe.
     """
     template = _load_template("price_drop_email.html")
     html_content = _render(
         template,
         game_name=game_name,
+        game_url=game_url,
         current_price=current_price,
         target_price=target_price,
-        game_url=game_url,
+        store_name=store_name,
+        buy_url=buy_url,
     )
     return _send_email(to_email, PRICE_DROP_EMAIL_SUBJECT, html_content)
