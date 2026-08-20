@@ -1,3 +1,7 @@
+## Deferred from: code review of story-6.7 (2026-08-20)
+
+- `priceAlerts.status` TS `.$type<>()` union omits `'triggered'`, a real value the scraper writes and Story 6.7 now formally relies on via `status IN ('active', 'triggered')` [web/src/db/schema.ts:135, web/src/db/queries/alerts.ts:157-215] — pre-existing since Story 6.5 (not introduced by 6.7); `confirmAlert()`'s exhaustive `switch`/`assertNever` is type-unsound as a result, currently unreachable in practice. Revisit by adding `'triggered'` to the union in a follow-up.
+
 ## Deferred from: code review of story-6.6 (2026-08-19)
 
 - Non-deterministic pick among rows with identical `(game_id, price, store_id)` (duplicate SKU same store) [scraper/alert_engine.py] — `DISTINCT ON` has no defined tiebreak beyond `store_id`; low-value edge case requiring duplicate product rows for the same store/price, and this story's own Dev Notes discourage adding further ORDER BY keys without a test demanding it. Revisit only if data drift ever produces true store/price duplicates.

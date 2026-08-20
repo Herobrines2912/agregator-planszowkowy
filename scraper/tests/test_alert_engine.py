@@ -552,3 +552,23 @@ class TestMainEntrypoint:
             mock_type_b.assert_called_once_with(mock_conn)
             mock_conn.close.assert_called_once()
             mock_exit.assert_called_once_with(3)
+
+    def test_type_a_db_failure_rolls_back_before_type_b_runs(self, monkeypatch):
+        # A real DB-level error (not just an application exception) leaves psycopg2's
+        # connection in an aborted-transaction state until rollback() is called — every
+        # subsequent query on that connection (i.e. all of run_type_b_alerts()) would
+        # otherwise fail too, defeating the intended failure isolation (code review fix).
+        monkeypatch.setenv("DATABASE_URL", "postgres://fake")
+
+        with patch("alert_engine.psycopg2.connect") as mock_connect, \
+             patch("alert_engine.run_alert_engine") as mock_type_a, \
+             patch("alert_engine.run_type_b_alerts") as mock_type_b, \
+             patch("alert_engine.sys.exit"):
+            mock_conn = MagicMock()
+            mock_connect.return_value = mock_conn
+            mock_type_a.side_effect = RuntimeError("type A boom")
+
+            alert_engine.main()
+
+            mock_conn.rollback.assert_called_once()
+            mock_type_b.assert_called_once_with(mock_conn)

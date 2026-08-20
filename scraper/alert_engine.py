@@ -299,12 +299,14 @@ def main() -> None:
         except Exception:
             logger.exception("run_alert_engine() failed — Type B pass still runs this cycle")
             failed = True
+            conn.rollback()
 
         try:
             run_type_b_alerts(conn)
         except Exception:
             logger.exception("run_type_b_alerts() failed")
             failed = True
+            conn.rollback()
     finally:
         conn.close()
 

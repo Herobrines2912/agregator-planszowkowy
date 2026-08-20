@@ -4,7 +4,7 @@ baseline_commit: 317c3b7af04abbc52a1528c2ac313783ceace527
 
 # Story 6.7: Type B Anomaly Detection
 
-Status: review
+Status: done
 
 **Epic:** 6 — Email Price Alerts
 **Dev:** Dev B (Scraper/Infra) — _pliki: `scraper/alert_engine.py` (MODIFY), `scraper/utils/brevo_client.py` (MODIFY), `scraper/templates/price_drop_email.html` (MODIFY), `web/src/db/schema.ts` (MODIFY — schema-owner exception, see Prerequisite), `db/migrations/*` (NEW — generated), `scraper/tests/test_alert_engine.py` (MODIFY), `scraper/tests/test_brevo_client.py` (MODIFY)_
@@ -167,3 +167,8 @@ Claude Sonnet 5 (claude-sonnet-5)
 - Modified: `scraper/templates/price_drop_email.html`
 - Modified: `scraper/tests/test_alert_engine.py`
 - Modified: `scraper/tests/test_brevo_client.py`
+
+### Review Findings
+
+- [x] [Review][Patch] Missing `conn.rollback()` between Type A and Type B passes in `main()` — a real DB-level error in `run_alert_engine()` leaves `conn` in an aborted-transaction state, cascading `InFailedSqlTransaction` into `run_type_b_alerts()` and defeating the intended failure isolation [scraper/alert_engine.py:main()] — fixed, `conn.rollback()` added to both except blocks, regression test `test_type_a_db_failure_rolls_back_before_type_b_runs` added
+- [x] [Review][Defer] `priceAlerts.status` TS `.$type<>()` union omits `'triggered'`, a real value written by the scraper and now formally relied upon by Story 6.7's `status IN ('active', 'triggered')` — pre-existing since Story 6.5, `confirmAlert()`'s `assertNever` switch is type-unsound as a result [web/src/db/schema.ts:135, web/src/db/queries/alerts.ts:157-215] — deferred, pre-existing
