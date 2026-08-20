@@ -141,10 +141,17 @@ export const priceAlerts = pgTable(
     // cancelled or long-expired alert issues a fresh token, and a fresh token has to start a
     // fresh clock or it would arrive already expired.
     token_issued_at: timestamptz('token_issued_at').notNull().defaultNow(),
+    // Generated once at insert and NEVER rotated (unlike confirmation_token) — every email ever
+    // sent embeds this token, and a user must be able to unsubscribe from a months-old message
+    // sitting unread in their inbox. No TTL, no re-subscribe rotation.
+    unsubscribe_token: text('unsubscribe_token').notNull(),
     confirmed_at: timestamptz('confirmed_at'),
     created_at: timestamptz('created_at').defaultNow(),
   },
-  (t) => [unique('uq_price_alerts_email_game').on(t.email_hash, t.game_id)],
+  (t) => [
+    unique('uq_price_alerts_email_game').on(t.email_hash, t.game_id),
+    unique('uq_price_alerts_unsubscribe_token').on(t.unsubscribe_token),
+  ],
 )
 
 // ---------------------------------------------------------------------------

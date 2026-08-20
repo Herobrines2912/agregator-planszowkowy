@@ -37,7 +37,7 @@
 #   fully completed story or fix (see CLAUDE.md "Sprint status" section)
 
 generated: 2026-07-20
-last_updated: 2026-08-18
+last_updated: 2026-08-19
 project: board_games_app
 project_key: NOKEY
 tracking_system: file-system
@@ -99,10 +99,10 @@ development_status:
   epic-6: in-progress
   6-1-alertform-post-api-alerts-zapis-powiadomienia: done
   6-2-double-opt-in-confirmation-get-api-alerts-confirm: in-progress  # correct-course 2026-07-26 — POST-confirm (RODO party-mode 2026-07-24)
-  6-3-wylaczanie-powiadomien: backlog
+  6-3-wylaczanie-powiadomien: review
   6-4-brevo-client-szablon-emaila-doi: done
   6-5-alert-engine-wykrywanie-spadku-ceny: done
-  6-6-email-o-spadku-ceny: review
+  6-6-email-o-spadku-ceny: done
   6-7-type-b-anomaly-detection: review
   6-8-brevo-webhook-hard-bounce-complaint-suppression: backlog
   6-9-dokumenty-prawne-privacy-regulamin-cookies-gdpr: backlog

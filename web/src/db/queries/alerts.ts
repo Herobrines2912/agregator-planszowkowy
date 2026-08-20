@@ -51,6 +51,7 @@ export async function subscribeAlert(input: SubscribeAlertInput): Promise<Subscr
   if (suppressed.length > 0) return { outcome: 'suppressed' }
 
   const confirmationToken = randomBytes(32).toString('hex')
+  const unsubscribeToken = randomBytes(32).toString('hex')
 
   // A re-subscribe gets a fresh token only when the existing one can no longer be used: the
   // alert was cancelled, or its pending token has aged out of the 48h window. Both cases are
@@ -81,9 +82,13 @@ export async function subscribeAlert(input: SubscribeAlertInput): Promise<Subscr
       target_price: input.targetPrice,
       status: 'pending_doi',
       confirmation_token: confirmationToken,
+      unsubscribe_token: unsubscribeToken,
     })
     .onConflictDoUpdate({
       target: [priceAlerts.email_hash, priceAlerts.game_id],
+      // unsubscribe_token is deliberately absent from this `set` — omitting a column leaves
+      // the existing row's value untouched on conflict. It must never rotate: every email
+      // already sent to this subscriber embeds the old token, and it must keep working.
       set: {
         target_price: input.targetPrice,
         type_b_enabled: input.typeBEnabled,
@@ -268,4 +273,114 @@ export async function getAlertSummaryByToken(token: string): Promise<AlertSummar
     .limit(1)
 
   return rows[0] ?? null
+}
+
+export type UnsubscribeAlertResult =
+  | { outcome: 'unsubscribed' }
+  | { outcome: 'already_unsubscribed' }
+  | { outcome: 'not_found' }
+
+/**
+ * Per-alert one-click unsubscribe (Story 6.3). Mirrors confirmAlert()'s shape: a single
+ * data-modifying CTE keeps the status update and the consent_log write atomic on the
+ * neon-http driver, which has no db.transaction().
+ */
+export async function unsubscribeAlert(token: string): Promise<UnsubscribeAlertResult> {
+  const db = getDb()
+
+  const rows = await db
+    .select({ id: priceAlerts.id, status: priceAlerts.status, emailHash: priceAlerts.email_hash })
+    .from(priceAlerts)
+    .where(eq(priceAlerts.unsubscribe_token, token))
+    .limit(1)
+
+  const alert = rows[0]
+  if (!alert) return { outcome: 'not_found' }
+
+  // Already cancelled — idempotent replay (double-click, or the confirmed link revisited),
+  // not an error. No second consent_log row.
+  if (alert.status === 'cancelled') return { outcome: 'already_unsubscribed' }
+
+  let cancelled
+  try {
+    cancelled = await db.execute(sql`
+      WITH updated AS (
+        UPDATE ${priceAlerts}
+        SET status = 'cancelled'
+        WHERE ${priceAlerts.id} = ${alert.id} AND ${priceAlerts.status} != 'cancelled'
+        RETURNING id, email_hash
+      )
+      INSERT INTO ${consentLog} (email_hash, action, source, token_id)
+      SELECT email_hash, 'unsubscribed', 'user', id FROM updated
+      RETURNING id
+    `)
+  } catch (err) {
+    console.error(
+      `[unsubscribeAlert] cancel failed for price_alerts.id=${alert.id} — alert left un-cancelled, no consent recorded`,
+      err,
+    )
+    throw err
+  }
+
+  // Zero rows means a concurrent request already cancelled this alert first.
+  if (cancelled.rows.length === 0) return { outcome: 'already_unsubscribed' }
+
+  return { outcome: 'unsubscribed' }
+}
+
+export type UnsubscribeAllResult = { outcome: 'suppressed' } | { outcome: 'not_found' }
+
+/**
+ * Global opt-out (Story 6.3, epics AC-5): cancels every price_alerts row for the token's
+ * email and records a global_optout email_suppressions row, per architecture L-2/L-3.
+ * Idempotent against an existing overridable (user_request/global_optout) suppression, and
+ * never overrides a permanent one (hard_bounce/complaint — Story 6.8's territory).
+ */
+export async function unsubscribeAllAlertsByToken(token: string): Promise<UnsubscribeAllResult> {
+  const db = getDb()
+
+  const rows = await db
+    .select({ email: priceAlerts.email, emailHash: priceAlerts.email_hash })
+    .from(priceAlerts)
+    .where(eq(priceAlerts.unsubscribe_token, token))
+    .limit(1)
+
+  const alert = rows[0]
+  if (!alert) return { outcome: 'not_found' }
+
+  await db
+    .update(priceAlerts)
+    .set({ status: 'cancelled' })
+    .where(eq(priceAlerts.email, alert.email))
+
+  const existingSuppression = await db
+    .select({ reason: emailSuppressions.reason })
+    .from(emailSuppressions)
+    .where(eq(emailSuppressions.email, alert.email))
+    .limit(1)
+
+  const existing = existingSuppression[0]
+  // Permanent reasons (hard_bounce/complaint) are never overridden by this global-optout path
+  // (architecture L-2) — the alerts above are still cancelled, but no suppression/consent_log
+  // write happens here. An existing overridable reason means this call is a replay — idempotent,
+  // no duplicate row.
+  if (existing) return { outcome: 'suppressed' }
+
+  await db.insert(emailSuppressions).values({ email: alert.email, reason: 'global_optout' })
+
+  try {
+    await db.insert(consentLog).values({
+      email_hash: alert.emailHash,
+      action: 'suppressed',
+      source: 'user',
+    })
+  } catch (err) {
+    console.error(
+      `[unsubscribeAllAlertsByToken] consent_log write failed after email_suppressions insert for email_hash=${alert.emailHash} — RODO audit trail is now inconsistent`,
+      err,
+    )
+    throw err
+  }
+
+  return { outcome: 'suppressed' }
 }

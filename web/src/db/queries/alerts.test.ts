@@ -4,6 +4,8 @@ import {
   confirmAlert,
   getAlertSummaryByToken,
   findActiveAlertsMissingConsent,
+  unsubscribeAlert,
+  unsubscribeAllAlertsByToken,
 } from './alerts'
 import { priceAlerts, consentLog, emailSuppressions } from '@/db/schema'
 import { and, eq, type SQL } from 'drizzle-orm'
@@ -470,5 +472,155 @@ describe('getAlertSummaryByToken', () => {
     expect(summary).toBeNull()
     expect(mockUpdate).not.toHaveBeenCalled()
     expect(mockInsert).not.toHaveBeenCalled()
+  })
+})
+
+describe('unsubscribeAlert', () => {
+  test('unknown token: returns not_found, no writes', async () => {
+    mockSelect.mockReturnValueOnce(chain([]))
+
+    const result = await unsubscribeAlert('tok-unknown')
+
+    expect(result).toEqual({ outcome: 'not_found' })
+    expect(mockExecute).not.toHaveBeenCalled()
+  })
+
+  test('active alert: cancels and writes one consent_log row (action=unsubscribed) atomically', async () => {
+    const selectChain = chain([{ id: 7, status: 'active', emailHash: 'hash-abc' }])
+    mockSelect.mockReturnValueOnce(selectChain)
+    mockExecute.mockResolvedValue({ rows: [{ id: 99 }] })
+
+    const result = await unsubscribeAlert('tok-active')
+
+    expect(result).toEqual({ outcome: 'unsubscribed' })
+    expect(selectChain.where).toHaveBeenCalledWith(eq(priceAlerts.unsubscribe_token, 'tok-active'))
+    const text = sqlText(mockExecute.mock.calls[0][0])
+    expect(text).toContain("SET status = 'cancelled'")
+    expect(text).toContain("'unsubscribed'")
+    expect(text).toContain("'user'")
+  })
+
+  test('already-cancelled alert: idempotent replay, no second consent_log write', async () => {
+    mockSelect.mockReturnValueOnce(chain([{ id: 7, status: 'cancelled', emailHash: 'hash-abc' }]))
+
+    const result = await unsubscribeAlert('tok-cancelled')
+
+    expect(result).toEqual({ outcome: 'already_unsubscribed' })
+    expect(mockExecute).not.toHaveBeenCalled()
+  })
+
+  test('concurrent double-unsubscribe: guarded UPDATE matches no row, reports already_unsubscribed', async () => {
+    mockSelect.mockReturnValueOnce(chain([{ id: 7, status: 'active', emailHash: 'hash-abc' }]))
+    mockExecute.mockResolvedValue({ rows: [] })
+
+    const result = await unsubscribeAlert('tok-race')
+
+    expect(result).toEqual({ outcome: 'already_unsubscribed' })
+  })
+
+  test('cancel failure: rethrows and logs, does not report success', async () => {
+    mockSelect.mockReturnValueOnce(chain([{ id: 7, status: 'active', emailHash: 'hash-abc' }]))
+    const dbError = new Error('connection reset')
+    mockExecute.mockRejectedValue(dbError)
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await expect(unsubscribeAlert('tok-boom')).rejects.toThrow(dbError)
+    expect(consoleErrorSpy).toHaveBeenCalled()
+
+    consoleErrorSpy.mockRestore()
+  })
+})
+
+describe('unsubscribeAllAlertsByToken', () => {
+  test('unknown token: returns not_found, no writes', async () => {
+    mockSelect.mockReturnValueOnce(chain([]))
+
+    const result = await unsubscribeAllAlertsByToken('tok-unknown')
+
+    expect(result).toEqual({ outcome: 'not_found' })
+    expect(mockUpdate).not.toHaveBeenCalled()
+    expect(mockInsert).not.toHaveBeenCalled()
+  })
+
+  test('fresh global opt-out: cancels every alert for the email, writes suppression + consent_log', async () => {
+    const updateChain = chain(undefined)
+    mockSelect
+      .mockReturnValueOnce(chain([{ email: 'user@example.com', emailHash: 'hash-abc' }])) // token lookup
+      .mockReturnValueOnce(chain([])) // no existing suppression
+    mockUpdate.mockReturnValueOnce(updateChain)
+    mockInsert.mockImplementation((table: unknown) => {
+      if (table === emailSuppressions) return chain(undefined)
+      if (table === consentLog) return chain(undefined)
+      throw new Error(`unexpected insert table: ${String(table)}`)
+    })
+
+    const result = await unsubscribeAllAlertsByToken('tok-active')
+
+    expect(result).toEqual({ outcome: 'suppressed' })
+    expect(mockUpdate).toHaveBeenCalledWith(priceAlerts)
+    expect(updateChain.set).toHaveBeenCalledWith({ status: 'cancelled' })
+    expect(updateChain.where).toHaveBeenCalledWith(eq(priceAlerts.email, 'user@example.com'))
+
+    const suppressionCallIndex = mockInsert.mock.calls.findIndex(c => c[0] === emailSuppressions)
+    const suppressionChainObj = mockInsert.mock.results[suppressionCallIndex].value as Chain
+    expect(suppressionChainObj.values).toHaveBeenCalledWith({
+      email: 'user@example.com',
+      reason: 'global_optout',
+    })
+
+    const consentCallIndex = mockInsert.mock.calls.findIndex(c => c[0] === consentLog)
+    const consentChainObj = mockInsert.mock.results[consentCallIndex].value as Chain
+    expect(consentChainObj.values).toHaveBeenCalledWith({
+      email_hash: 'hash-abc',
+      action: 'suppressed',
+      source: 'user',
+    })
+  })
+
+  test('existing overridable suppression (global_optout/user_request): idempotent, no duplicate writes', async () => {
+    mockSelect
+      .mockReturnValueOnce(chain([{ email: 'user@example.com', emailHash: 'hash-abc' }]))
+      .mockReturnValueOnce(chain([{ reason: 'user_request' }]))
+    mockUpdate.mockReturnValueOnce(chain(undefined))
+
+    const result = await unsubscribeAllAlertsByToken('tok-active')
+
+    expect(result).toEqual({ outcome: 'suppressed' })
+    // Alerts are still cancelled even on a replay, but no second suppression/consent_log row.
+    expect(mockUpdate).toHaveBeenCalledWith(priceAlerts)
+    expect(mockInsert).not.toHaveBeenCalled()
+  })
+
+  test('existing permanent suppression (hard_bounce/complaint): alerts still cancelled, never overridden', async () => {
+    mockSelect
+      .mockReturnValueOnce(chain([{ email: 'user@example.com', emailHash: 'hash-abc' }]))
+      .mockReturnValueOnce(chain([{ reason: 'hard_bounce' }]))
+    mockUpdate.mockReturnValueOnce(chain(undefined))
+
+    const result = await unsubscribeAllAlertsByToken('tok-active')
+
+    expect(result).toEqual({ outcome: 'suppressed' })
+    expect(mockUpdate).toHaveBeenCalledWith(priceAlerts)
+    expect(mockInsert).not.toHaveBeenCalled()
+  })
+
+  test('consent_log insert failure: rethrows and does not report success', async () => {
+    mockSelect
+      .mockReturnValueOnce(chain([{ email: 'user@example.com', emailHash: 'hash-abc' }]))
+      .mockReturnValueOnce(chain([]))
+    mockUpdate.mockReturnValueOnce(chain(undefined))
+    const consentLogError = new Error('consent_log insert failed')
+    mockInsert.mockImplementation((table: unknown) => {
+      if (table === emailSuppressions) return chain(undefined)
+      const failingChain = chain(undefined)
+      failingChain.then = (resolve, reject) => Promise.reject(consentLogError).then(resolve, reject)
+      return failingChain
+    })
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await expect(unsubscribeAllAlertsByToken('tok-boom')).rejects.toThrow(consentLogError)
+    expect(consoleErrorSpy).toHaveBeenCalled()
+
+    consoleErrorSpy.mockRestore()
   })
 })
