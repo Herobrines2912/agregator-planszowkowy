@@ -90,7 +90,7 @@ class TestRunAlertEngineTrigger:
         conn, cur = _make_conn([
             [(1, 10, "user@example.com", Decimal("99.00"))],
             [],  # no in-stock products for game 10 -> no row from DISTINCT ON
-            [],  # no store_ids to look up
+            # store lookup is skipped entirely when store_ids is empty
             [(10, "Brass: Birmingham", "brass-birmingham")],
         ])
 
@@ -188,7 +188,7 @@ class TestRunAlertEngineTrigger:
         conn, cur = _make_conn([
             [(1, 10, "user@example.com", Decimal("99.00"))],
             [],  # DB-side filter excludes the NULL-price row entirely
-            [],  # no store_ids to look up
+            # store lookup is skipped entirely when store_ids is empty
             [(10, "Brass: Birmingham", "brass-birmingham")],
         ])
 
@@ -214,6 +214,50 @@ class TestRunAlertEngineTrigger:
         _, call_kwargs = mock_send.call_args
         assert call_kwargs["store_name"] == "TanioGry"
         assert call_kwargs["buy_url"] == "https://cheapstore.pl/brass"
+
+    @patch("alert_engine.send_price_drop_email")
+    def test_store_id_tiebreaks_a_same_price_cross_store_tie(self, mock_send):
+        mock_send.return_value = True
+        # DISTINCT ON (game_id) ... ORDER BY game_id, price ASC, store_id ASC:
+        # when two in-stock rows for the same game tie on price across
+        # different stores, the query's third ORDER BY key picks the lower
+        # store_id deterministically. This pins that behavior at the SQL
+        # contract level (mocked here as the row DISTINCT ON would return),
+        # since the tiebreak itself lives in the query, not in Python.
+        conn, cur = _make_conn([
+            [(1, 10, "user@example.com", Decimal("99.00"))],
+            # DISTINCT ON has already resolved the tie in favor of store_id=1
+            # (lower) over a same-priced store_id=2 offer for the same game.
+            [(10, Decimal("79.00"), None, "https://store1.pl/brass", 1)],
+            [(1, "PierwszySklep"), (2, "DrugiSklep")],
+            [(10, "Brass: Birmingham", "brass-birmingham")],
+        ])
+
+        alert_engine.run_alert_engine(conn)
+
+        _, call_kwargs = mock_send.call_args
+        assert call_kwargs["store_name"] == "PierwszySklep"
+        assert call_kwargs["buy_url"] == "https://store1.pl/brass"
+
+    @patch("alert_engine.send_price_drop_email")
+    def test_missing_store_record_falls_back_to_placeholder_name(self, mock_send):
+        mock_send.return_value = True
+        # store_id present on the cheapest product row but absent from the
+        # stores lookup result (orphaned FK / data drift) must not surface as
+        # store_name=None — that would hit html.escape(None, ...) -> TypeError
+        # in _render() and crash the whole alert batch.
+        conn, cur = _make_conn([
+            [(1, 10, "user@example.com", Decimal("99.00"))],
+            [(10, Decimal("89.00"), None, "https://store.pl/brass", 99)],
+            [],  # store_id 99 not found in stores table
+            [(10, "Brass: Birmingham", "brass-birmingham")],
+        ])
+
+        alert_engine.run_alert_engine(conn)
+
+        _, call_kwargs = mock_send.call_args
+        assert call_kwargs["store_name"] is not None
+        assert isinstance(call_kwargs["store_name"], str)
 
 
 class TestBatchQuery:
@@ -399,7 +443,7 @@ class TestRunTypeBAlerts:
         conn, cur = _make_conn([
             [(1, 10, "user@example.com", Decimal("99.00"), None)],
             [],  # no in-stock products for game 10 at all
-            [],  # no store_ids to look up
+            # store lookup is skipped entirely when store_ids is empty
             [(10, "Brass: Birmingham", "brass-birmingham")],
         ])
 

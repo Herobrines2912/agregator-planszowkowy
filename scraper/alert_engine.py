@@ -48,19 +48,24 @@ def _cheapest_in_stock_offers(conn, game_ids: list[int]) -> dict[int, dict]:
 
     store_ids = list({row[4] for row in cheapest_rows})
 
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT id, name FROM stores WHERE id = ANY(%s)",
-            (store_ids,),
-        )
-        store_names_by_id = dict(cur.fetchall())
+    store_names_by_id: dict[int, str] = {}
+    if store_ids:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id, name FROM stores WHERE id = ANY(%s)",
+                (store_ids,),
+            )
+            store_names_by_id = dict(cur.fetchall())
 
     return {
         game_id: {
             "price": price,
             "price_orig": price_orig,
             "url": url,
-            "store_name": store_names_by_id.get(store_id),
+            # A store_id with no matching stores row (orphaned FK/data drift)
+            # must not surface as None here — None reaches html.escape() in
+            # _render() and raises TypeError, crashing the whole alert batch.
+            "store_name": store_names_by_id.get(store_id) or "sklep",
         }
         for game_id, price, price_orig, url, store_id in cheapest_rows
     }

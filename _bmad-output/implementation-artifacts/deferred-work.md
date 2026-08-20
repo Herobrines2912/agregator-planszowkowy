@@ -1,3 +1,8 @@
+## Deferred from: code review of story-6.6 (2026-08-19)
+
+- Non-deterministic pick among rows with identical `(game_id, price, store_id)` (duplicate SKU same store) [scraper/alert_engine.py] — `DISTINCT ON` has no defined tiebreak beyond `store_id`; low-value edge case requiring duplicate product rows for the same store/price, and this story's own Dev Notes discourage adding further ORDER BY keys without a test demanding it. Revisit only if data drift ever produces true store/price duplicates.
+- "Wyłącz powiadomienia" footer link points at `game_url`, not a real unsubscribe [scraper/templates/price_drop_email.html] — explicitly scoped to Story 6.3 (unsubscribe_token infrastructure) per this story's Prerequisite section; same pattern already deferred for `doi_email.html` in story-6.4.
+
 ## Deferred from: code review of story-6.5 (2026-08-03)
 
 - `MIN(price)` over an in-stock product group where every row has a NULL `price` is indistinguishable in logs from "no in-stock products at all" [scraper/alert_engine.py] — low-value observability gap, alert is correctly skipped either way; no reported occurrence.

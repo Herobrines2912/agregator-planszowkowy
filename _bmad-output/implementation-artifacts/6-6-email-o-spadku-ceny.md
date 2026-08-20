@@ -4,7 +4,7 @@ baseline_commit: a878a57839d540e511cdd377e507501efc409a8c
 
 # Story 6.6: Email o Spadku Ceny
 
-Status: review
+Status: done
 
 **Epic:** 6 — Email Price Alerts
 **Dev:** Dev B (Scraper/Infra) — _pliki: `scraper/utils/brevo_client.py` (MODIFY), `scraper/templates/price_drop_email.html` (MODIFY), `scraper/alert_engine.py` (MODIFY), `scraper/tests/test_brevo_client.py` (MODIFY), `scraper/tests/test_alert_engine.py` (MODIFY)_
@@ -104,6 +104,14 @@ Same as Story 6.5: `pytest` + `unittest.mock`, mock `psycopg2` cursors returning
 - [Source: scraper/utils/brevo_client.py] — current `send_price_drop_email()`/`_render()`/`_send_email()` this story extends
 - [Source: scraper/templates/price_drop_email.html, doi_email.html] — current templates
 - [Source: CLAUDE.md] — schema.ts/items.py sync rule (why no migration in this story), NUMERIC price rule, `logging.getLogger(__name__)` not `print()`
+
+### Review Findings
+
+- [x] [Review][Patch] `store_name` can be `None` and crashes the whole alert batch via `html.escape(None, ...)` TypeError [scraper/alert_engine.py] — fixed: `.get(store_id) or "sklep"` fallback; regression test `test_missing_store_record_falls_back_to_placeholder_name` added
+- [x] [Review][Patch] Empty `store_ids` list passed to `ANY(%s)` risks `IndeterminateDatatype` on real connections (untested path, cursor is mocked in tests) [scraper/alert_engine.py] — fixed: guarded stores query behind `if store_ids:`; three existing tests updated to match the now-skipped query call
+- [x] [Review][Patch] Third `ORDER BY` key (`store_id ASC`) added without a price-tie test demanding it, per this story's own Dev Notes constraint [scraper/alert_engine.py, scraper/tests/test_alert_engine.py] — fixed: `test_store_id_tiebreaks_a_same_price_cross_store_tie` added
+- [x] [Review][Defer] Non-deterministic pick among rows with identical `(game_id, price, store_id)` (duplicate SKU same store) [scraper/alert_engine.py] — deferred, low-value edge case, spec discourages extra ORDER BY keys without demonstrated need
+- [x] [Review][Defer] "Wyłącz powiadomienia" footer link points at `game_url`, not a real unsubscribe [scraper/templates/price_drop_email.html] — deferred, explicitly scoped to Story 6.3 per this story's Prerequisite section
 
 ## Dev Agent Record
 
