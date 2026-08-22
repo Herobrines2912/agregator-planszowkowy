@@ -37,7 +37,7 @@
 #   fully completed story or fix (see CLAUDE.md "Sprint status" section)
 
 generated: 2026-07-20
-last_updated: 2026-08-22  # 7-1 spike executed, PASSED, review; 2-2c raised as follow-up bug
+last_updated: 2026-08-22  # 7-1 spike executed, PASSED, review; 2-2c raised as follow-up bug; 7-4 implemented, code-reviewed, done
 project: board_games_app
 project_key: NOKEY
 tracking_system: file-system
@@ -113,7 +113,7 @@ development_status:
   7-1-spike-walidacja-danych-flipper-mode: review  # PASSED — see docs/spike-results/flipper-margin-proxy.md
   7-2-flipper-route-shell-empty-state-guard: backlog
   7-3-flipperrow-component-table-layout: backlog
-  7-4-flipper-db-query-calc-margin-proxy: backlog
+  7-4-flipper-db-query-calc-margin-proxy: done
   7-5-flipper-filters-sorting: backlog
   7-6-type-b-alert-subscription-z-flipper-mode: backlog
   epic-7-retrospective: optional
