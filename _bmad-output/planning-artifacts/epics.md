@@ -2050,6 +2050,8 @@ So that we don't build a page that shows "—" in every row at launch.
 **When** documented
 **Then** wynik wpisany jako komentarz w `epics.md` przy Story 7.1 i jako ADR-005 jeśli decyzja techniczna zmienia architekturę
 
+**Wynik spike'a (2026-08-22): PASSED.** (1) 4155/4159 gier (99.9%) ma ≥5 unikalnych dat w `price_history`. (2) 830/2558 gier w magazynie (32.4%; 31.5% po wykluczeniu zanieczyszczonych `game_id`) ma sensowny margin proxy (>0%, ≤200%) — powyżej progu 30%. (3) 1017/2558 gier (39.8%) miałoby widoczne dane w Flipper Mode. Kontynuujemy Epic 7 zgodnie z planem, bez zmiany architektury (brak nowego ADR). Caveat: spike wykrył pre-istniejący bug w mapowaniu `products.game_id` (208/4159 gier ma ≥4 różne, niepowiązane produkty pod jednym `game_id`), który zanieczyszcza 13/20 najwyższych wyników margin_pct — rekomendacja: osobna story naprawiająca dedup przed shipowaniem 7.3/7.4. Pełne wyniki: `docs/spike-results/flipper-margin-proxy.md`.
+
 ---
 
 ### Story 7.2: /flipper Route Shell & Empty State Guard
