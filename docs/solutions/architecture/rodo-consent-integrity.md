@@ -320,7 +320,7 @@ analiza nie objęła:
 | `ip_hash` przy `opt_in_confirmed` | **Wdrożone** 2026-07-22 (znalezione w code review) |
 | TTL liczony od `created_at`, którego ponowny zapis nie odświeża | **Wdrożone** 2026-07-22 — kolumna `token_issued_at` + rotacja tokenu gdy jest bezużyteczny |
 | Odwrócona kolejność / dodatkowa warstwa zapisu | **Odrzucone** — uzasadnienie wyżej |
-| Skanery linków (GET vs POST-confirm) | **Rozstrzygnięte 2026-07-24 (party-mode): wariant (b) POST-confirm** dla 6.2 i 6.3; (c) tylko jako metadana. 6.2 = correct-course, 6.3 = greenfield mirror |
+| Skanery linków (GET vs POST-confirm) | **Rozstrzygnięte 2026-07-24 (party-mode): wariant (b) POST-confirm** dla 6.2 i 6.3; (c) tylko jako metadana. 6.2 = correct-course, 6.3 = greenfield mirror. **6.2: zaplanowane, niezaimplementowane (Task 6, in-progress). 6.3: zbudowana 2026-08-20 mirrorując wtedy jeszcze niepoprawiony `confirm/route.ts` — luka odkryta na produkcji 2026-08-24, correct-course otwarty (Task 7), patrz `_bmad-output/planning-artifacts/sprint-change-proposal-2026-08-24.md`.** |
 | Rotacja tokenu po użyciu | **Odroczone 2026-07-24** — wyciek eksponuje tylko nazwę gry + próg (zerowa wrażliwość); „zrób gdy tanio", nie MUST |
 | Rate limiting na `/api/alerts/*` | **Rozstrzygnięte 2026-07-24: MUST-before-launch, osobna historyjka (6.10)** owijająca 3 POST-y (subscribe + confirm + unsubscribe). Wektor abuse: wpisywanie cudzego maila → spam potwierdzeń + log twierdzący „wyraziła zgodę". Per-IP + per-email throttle, może być prymitywny; brak Redis (stack=Neon) → tabela + okno `now()` albo Upstash |
 | RODO art. 15/17 vs append-only `consent_log` | **Rozstrzygnięte 2026-07-24: proces ręczny udokumentowany w Story 6.9**, ZERO kodu erasure. Szczegóły niżej |

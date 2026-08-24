@@ -1758,19 +1758,34 @@ So that I'm sure I'll receive notifications, no one (including an automated scan
 
 ---
 
-### Story 6.3: Wyłączanie Powiadomień
+### Story 6.3: Wyłączanie Powiadomień — GET /alerts/unsubscribe (page) + POST /api/alerts/unsubscribe
 
-**Dev: Dev A (Web)** — _pliki: `app/api/alerts/unsubscribe/route.ts`, `app/alerts/unsubscribed/page.tsx`_
+**Dev: Dev A (Web)** — _pliki: `app/api/alerts/unsubscribe/route.ts`, `app/alerts/unsubscribe/page.tsx`, `components/AlertTokenActionButton.tsx`, `app/alerts/unsubscribed/page.tsx`_
+
+> **Correct-course 2026-08-24 (extends the 2026-07-24 party-mode RODO decision to 6.3):** the
+> unsubscribe link no longer mutates state on `GET` — the same mail-scanner-prefetch risk that
+> motivated 6.2's fix applies here, and per the RODO doc is "jeszcze ważniejszy" (silent,
+> invisible retention sabotage: the user just stops receiving emails they wanted, no error, no
+> visible symptom). `GET` now renders a side-effect-free page with a muted "Wyłącz powiadomienia"
+> button; the click does a `POST`. Full rationale: `docs/solutions/architecture/rodo-consent-integrity.md`.
 
 As a **user**,
 I want a one-click link in every alert email to turn off notifications,
-So that I can stop receiving them at any time without needing to log in.
+So that I can stop receiving them at any time without needing to log in, and so that no one — including an automated scanner — can unsubscribe me without a real click from me.
 
 **Acceptance Criteria:**
 
-**Given** `GET /api/alerts/unsubscribe?token=<uuid>`
-**When** called with a valid unsubscribe token
-**Then** it sets `price_alerts.status = 'cancelled'`, writes `consent_log` row with `action = 'unsubscribed'`, `SHA-256(email)`, timestamp, redirects to `/alerts/unsubscribed`
+**Given** `GET /alerts/unsubscribe?token=<uuid>` (a page, not an API route)
+**When** the token resolves to any `price_alerts` row (any status)
+**Then** it renders — with zero DB writes — the game name and a muted "Wyłącz powiadomienia" button; clicking it fires `POST /api/alerts/unsubscribe`
+
+**Given** `GET /alerts/unsubscribe?token=<uuid>`
+**When** the token is missing or not found
+**Then** it redirects (zero DB writes) to `/alerts/unsubscribed?invalid=1` — message "Ten link wygasł — jeśli chcesz wyłączyć powiadomienia, skontaktuj się z nami" — unsubscribing must never silently fail from the user's point of view, even when the token itself is bad
+
+**Given** `POST /api/alerts/unsubscribe` with `{ token }`
+**When** the token is valid
+**Then** it sets `price_alerts.status = 'cancelled'` and writes a `consent_log` row (`action = 'unsubscribed'`, `SHA-256(email)`, timestamp) only for a fresh cancellation (idempotent for an already-`cancelled` alert), returning `ApiResponse<T>` — the client then navigates to `/alerts/unsubscribed`
 
 **Given** `/alerts/unsubscribed` page
 **When** rendered
@@ -1778,12 +1793,8 @@ So that I can stop receiving them at any time without needing to log in.
 
 **Given** user clicks "Wyłącz wszystkie powiadomienia"
 **When** confirmed (single confirm dialog / inline expand — no modal)
-**Then** `POST /api/alerts/unsubscribe-all` fires: sets all `price_alerts` for that email to `status = 'cancelled'`, inserts row in `email_suppressions` with the **raw email address** (not hashed — the alert-engine suppression join in arch L-3 matches on raw email; the row is anonymized after 3 years per L-5) and `reason = 'global_optout'`, and writes a `consent_log` row with `action = 'suppressed'`, `SHA-256(email)`, timestamp (L-4 rule: every `email_suppressions` write has a matching `consent_log` entry)
+**Then** `POST /api/alerts/unsubscribe-all` fires: sets all `price_alerts` for that email to `status = 'cancelled'`, inserts row in `email_suppressions` with the **raw email address** (not hashed — the alert-engine suppression join in arch L-3 matches on raw email; the row is anonymized after 3 years per L-5) and `reason = 'global_optout'`, and writes a `consent_log` row with `action = 'suppressed'`, `SHA-256(email)`, timestamp (L-4 rule: every `email_suppressions` write has a matching `consent_log` entry) — **unchanged, already `POST`-based, already correct**
 **And** future `POST /api/alerts` calls with this email return 200 with generic message but never insert to DB (email_suppressions check in Story 6.1)
-
-**Given** an unsubscribe token that's expired or invalid
-**When** `GET /api/alerts/unsubscribe` fires
-**Then** still redirects to `/alerts/unsubscribed` with message "Ten link wygasł — jeśli chcesz wyłączyć powiadomienia, skontaktuj się z nami" — wyłączanie powiadomień musi zawsze skutkować, nigdy po cichu nie zawieść
 
 **Given** RODO data retention
 **When** `consent_log` is reviewed

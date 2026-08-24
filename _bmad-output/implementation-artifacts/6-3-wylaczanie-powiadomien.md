@@ -2,13 +2,28 @@
 baseline_commit: 0d6458e
 ---
 
-# Story 6.3: Wyłączanie Powiadomień
+# Story 6.3: Wyłączanie Powiadomień — GET /alerts/unsubscribe (page) + POST /api/alerts/unsubscribe
 
-Status: done
+Status: in-progress
+
+> **Correct-course (2026-08-24):** extends the 2026-07-24 party-mode RODO decision (Story 6.2)
+> to this story. The original implementation unsubscribed on a plain `GET`, which email
+> security scanners (SafeLinks, Proofpoint, etc.) request automatically before a human ever
+> clicks — silently cancelling alerts and writing a `consent_log` row (`source='user'`) for
+> an action the user never took. Per the RODO doc this is "jeszcze ważniejszy" than the confirm
+> case — a scanner-triggered unsubscribe is silent, invisible retention sabotage (no error, no
+> visible symptom, the user just stops getting emails they wanted). The design for this fix was
+> already decided at the 2026-07-24 session (`docs/solutions/architecture/rodo-consent-integrity.md`,
+> "ROZSTRZYGNIĘTE: skanery linków", "6.3 = greenfield mirror") but was never carried into this
+> story's own ACs or into `epics.md`'s Story 6.3 section — it was only discovered live, in
+> production, on 2026-08-24. Full rationale: `docs/solutions/architecture/rodo-consent-integrity.md`
+> and `_bmad-output/planning-artifacts/sprint-change-proposal-2026-08-24.md`.
+> Status reopened `done` → `in-progress`; Tasks 1–6 below are the **original** implementation
+> (kept for history, still valid — see notes inline), Task 7 is the correction.
 
 **Epic:** 6 — Email Price Alerts
-**Dev:** Dev A (Web) per epics.md — _pliki: `app/api/alerts/unsubscribe/route.ts`, `app/alerts/unsubscribed/page.tsx`_, plus shared files this story must also touch: `web/src/db/schema.ts`, `db/migrations/0007_*.sql`, `web/src/db/queries/alerts.ts`, `app/api/alerts/unsubscribe-all/route.ts`
-**Depends on:** Story 6.1 (done) — `subscribeAlert()` in `alerts.ts`, `price_alerts`/`consent_log`/`email_suppressions` schema. Story 6.2 (in-progress) — `confirmAlert()` and the redirect-only GET-route pattern this story mirrors exactly (`app/api/alerts/confirm/route.ts`).
+**Dev:** Dev A (Web) per epics.md — _pliki: `app/api/alerts/unsubscribe/route.ts`, `app/alerts/unsubscribe/page.tsx` (new), `app/alerts/unsubscribed/page.tsx`, `components/AlertTokenActionButton.tsx` (new, shared with Story 6.2)_, plus shared files this story must also touch: `web/src/db/schema.ts`, `db/migrations/0007_*.sql`, `web/src/db/queries/alerts.ts`, `app/api/alerts/unsubscribe-all/route.ts`
+**Depends on:** Story 6.1 (done) — `subscribeAlert()` in `alerts.ts`, `price_alerts`/`consent_log`/`email_suppressions` schema. Story 6.2 (in-progress) — `confirmAlert()`/`AlertConfirmButton` and the side-effect-free-GET-page + POST pattern this story's Task 7 mirrors exactly (implement together in the same pass; extract the shared `AlertTokenActionButton` from whichever story's button is built first).
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -28,16 +43,23 @@ so that I can stop receiving them at any time without needing to log in.
 
 ## Acceptance Criteria
 
-1. **Given** `GET /api/alerts/unsubscribe?token=<value>`, **when** the token resolves to a `price_alerts` row (any status), **then** it sets `status = 'cancelled'`, writes a `consent_log` row (`action = 'unsubscribed'`, `source = 'user'`, `email_hash = SHA-256(email.toLowerCase())`, `token_id` = the alert's id), and redirects (302) to `/alerts/unsubscribed?token=<value>` — zero JSON response, same redirect-only contract as `confirm/route.ts` (this is a link a human clicks from an email client, never `fetch()`-ed).
-2. **Given** an alert already `cancelled` (token reused / double-click), **when** `GET /api/alerts/unsubscribe` fires, **then** it is idempotent: no second `consent_log` row is written, still redirects to `/alerts/unsubscribed?token=<value>` with the same success message — not an error.
-3. **Given** a missing, unknown, or malformed token, **when** `GET /api/alerts/unsubscribe` fires, **then** it still redirects (zero DB writes) to `/alerts/unsubscribed?invalid=1` — message "Ten link wygasł — jeśli chcesz wyłączyć powiadomienia, skontaktuj się z nami" — unsubscribing must never silently fail from the user's point of view, even when the token itself is bad.
-4. **Given** `/alerts/unsubscribed` page with a valid `?token=`, **when** rendered, **then** it shows "Wyłączono powiadomienia. Nie będziesz już otrzymywał powiadomień dla tej gry." and a secondary "Wyłącz wszystkie powiadomienia" control (inline expand + confirm, not a modal — matches the epics AC's explicit "no modal" instruction).
-5. **Given** the user clicks "Wyłącz wszystkie powiadomienia" and confirms, **when** `POST /api/alerts/unsubscribe-all` fires with `{ token }` (the same unsubscribe token already on the page — never a client-supplied raw email, so the request can't be used to suppress an address the caller doesn't hold a token for), **then** it: resolves the email from the token's alert row, sets **every** `price_alerts` row for that (normalized, lowercased) email to `status = 'cancelled'`, inserts one `email_suppressions` row (`email` = raw normalized email — not hashed, per architecture L-2/L-3's exact-match join requirement; `reason = 'global_optout'`), and writes one `consent_log` row (`action = 'suppressed'`, `email_hash`, `source = 'user'`). Returns `ApiResponse<{ message: string }>`.
-6. **Given** an email already in `email_suppressions` with `reason = 'global_optout'` or `'user_request'`, **when** `POST /api/alerts/unsubscribe-all` fires again for that email, **then** it is idempotent — no duplicate `email_suppressions` row, no duplicate `consent_log` entry, still returns success. (Permanent reasons `hard_bounce`/`complaint` are Story 6.8's concern — this story never writes or overrides those.)
-7. **Given** a future `POST /api/alerts/subscribe` call for a globally-suppressed email, **when** it fires, **then** it already returns the generic 200 without inserting (existing `email_suppressions` check in `subscribeAlert()`, Story 6.1 — this story adds no new logic there, just confirms the existing check now has a real path that populates the table with `reason = 'global_optout'`).
-8. **Given** `price_alerts.unsubscribe_token`, **when** an alert is first created via `subscribeAlert()`, **then** a token is generated once and **never rotated** — unlike `confirmation_token` (which rotates on a stale re-subscribe), the unsubscribe token must keep working for the lifetime of every email already sent, including ones sitting unread in an inbox for months. A re-subscribe (`onConflictDoUpdate`) must not touch this column.
-9. **Given** existing `price_alerts` rows created before this migration, **when** the migration runs, **then** every row is backfilled with a generated token (never left NULL) — an already-active alert must not lose its ability to unsubscribe.
-10. **Given** RODO data retention, **when** `consent_log` is reviewed, **then** every unsubscribe event is present with `action = 'unsubscribed'` (per-alert) or `action = 'suppressed'` (global opt-out) — append-only, no deletes.
+> AC 1–4 are the correct-course replacement for the original AC-1/AC-2/AC-3 (below, in that
+> order): a mail-clicked `GET` may never mutate state — same reasoning as Story 6.2. AC 5–11 are
+> the original AC-4..10, renumbered, unchanged in substance. AC 12 is new (UX tone), mirroring
+> Story 6.2's AC-10.
+
+1. **Given** `GET /alerts/unsubscribe?token=<value>` (a **page**, not an API route) **When** the token resolves to any `price_alerts` row (any status) **Then** it renders a side-effect-free page — **zero DB writes, zero `consent_log` writes** — showing the game name and a muted "Wyłącz powiadomienia" button (`AlertTokenActionButton`, `'use client'`), plus a small reassurance line that the user can resubscribe later. No modal, no "na pewno?" dialog — landing here having clicked the email link already signals intent.
+2. **Given** `GET /alerts/unsubscribe?token=<value>` **When** the token is missing or not found **Then** it redirects (zero DB writes) to `/alerts/unsubscribed?invalid=1` — same message as before: "Ten link wygasł — jeśli chcesz wyłączyć powiadomienia, skontaktuj się z nami".
+3. **Given** `POST /api/alerts/unsubscribe` with JSON body `{ token: string }` **When** `unsubscribeAlert(token)` (unchanged) returns `'unsubscribed'` or `'already_unsubscribed'` **Then** it returns `200 { success: true, data: { outcome } }` (`ApiResponse<{ outcome: 'unsubscribed' | 'already_unsubscribed' }>`) — writes exactly one `consent_log` row for a fresh `'unsubscribed'`, zero for `'already_unsubscribed'` (idempotency preserved verbatim from the existing query layer — this is the original AC-1's mutation half + AC-2's idempotency, now behind `POST`).
+4. **Given** `POST /api/alerts/unsubscribe` **When** `unsubscribeAlert()` returns `'not_found'` (a rare race — token deleted between page render and button click, or throws) **Then** it returns a non-2xx `ApiResponse<never>` and the button's client component renders a warm inline error (no navigation) — the common not-found case is already intercepted at GET-time by AC-2.
+5. **Given** `/alerts/unsubscribed` page with a valid `?token=`, **When** rendered, **Then** it shows "Wyłączono powiadomienia. Nie będziesz już otrzymywał powiadomień dla tej gry." and a secondary "Wyłącz wszystkie powiadomienia" control (inline expand + confirm, not a modal — matches the epics AC's explicit "no modal" instruction). **Unchanged — no code change required.**
+6. **Given** the user clicks "Wyłącz wszystkie powiadomienia" and confirms, **When** `POST /api/alerts/unsubscribe-all` fires with `{ token }` (the same unsubscribe token already on the page — never a client-supplied raw email, so the request can't be used to suppress an address the caller doesn't hold a token for), **Then** it: resolves the email from the token's alert row, sets **every** `price_alerts` row for that (normalized, lowercased) email to `status = 'cancelled'`, inserts one `email_suppressions` row (`email` = raw normalized email — not hashed, per architecture L-2/L-3's exact-match join requirement; `reason = 'global_optout'`), and writes one `consent_log` row (`action = 'suppressed'`, `email_hash`, `source = 'user'`). Returns `ApiResponse<{ message: string }>`. **Unchanged — already `POST`-based, already correct.**
+7. **Given** an email already in `email_suppressions` with `reason = 'global_optout'` or `'user_request'`, **When** `POST /api/alerts/unsubscribe-all` fires again for that email, **Then** it is idempotent — no duplicate `email_suppressions` row, no duplicate `consent_log` entry, still returns success. (Permanent reasons `hard_bounce`/`complaint` are Story 6.8's concern — this story never writes or overrides those.) **Unchanged.**
+8. **Given** a future `POST /api/alerts/subscribe` call for a globally-suppressed email, **When** it fires, **Then** it already returns the generic 200 without inserting (existing `email_suppressions` check in `subscribeAlert()`, Story 6.1). **Unchanged.**
+9. **Given** `price_alerts.unsubscribe_token`, **When** an alert is first created via `subscribeAlert()`, **Then** a token is generated once and **never rotated** — unlike `confirmation_token` (which rotates on a stale re-subscribe), the unsubscribe token must keep working for the lifetime of every email already sent, including ones sitting unread in an inbox for months. A re-subscribe (`onConflictDoUpdate`) must not touch this column. **Unchanged.**
+10. **Given** existing `price_alerts` rows created before this migration, **When** the migration runs, **Then** every row is backfilled with a generated token (never left NULL) — an already-active alert must not lose its ability to unsubscribe. **Unchanged.**
+11. **Given** RODO data retention, **When** `consent_log` is reviewed, **Then** every unsubscribe event is present with `action = 'unsubscribed'` (per-alert) or `action = 'suppressed'` (global opt-out) — append-only, no deletes — now also covering `getUnsubscribePreviewByToken` (read-only) and the `POST` route. **Substance unchanged, scope widened.**
+12. **Given** `/alerts/unsubscribe` page **When** rendered **Then** the tone is matter-of-fact and muted — **not** festive, **not** apologetic, no sad-face copy, no "are you sure?" modal (the landing itself is the confirmation of intent) — with a short, honest reassurance that the user can subscribe again later. Same design tokens as the rest of `/alerts/*` (`var(--color-text-primary)`, `var(--font-playfair)`, etc.), but the visual weight of the button is secondary/neutral, not primary/celebratory like `AlertConfirmButton`.
 
 ## Tasks / Subtasks
 
@@ -66,6 +88,18 @@ so that I can stop receiving them at any time without needing to log in.
   - [x] 6.1–6.3 All specified cases covered; 348/348 web tests pass (30 files), including 12 new tests in `alerts.test.ts`, 14 in the two route test files, 10 across the page/component tests.
   - [x] 6.4 No migration-testing convention exists anywhere in the repo (`db/migrations/`) — confirmed via search, correctly skipped per the task's own instruction rather than inventing a new pattern.
 
+- [ ] **Task 7 — Correct-course: side-effect-free GET page + POST unsubscribe** (AC: 1, 2, 3, 4, 12) — see Dev Notes → "Correct-course decision table" before starting
+  - [ ] 7.1 `web/src/db/queries/alerts.ts` (MODIFY): add `getUnsubscribePreviewByToken(token: string): Promise<{ status: 'pending_doi' | 'active' | 'cancelled'; gameName: string; gameSlug: string } | null>` — read-only `SELECT … WHERE unsubscribe_token = token`, join `price_alerts` → `games`, **no status filter and no TTL check** (unlike `getAlertPreviewByToken`, `unsubscribe_token` never rotates/expires per AC-9 — there is no expired branch to compute). `unsubscribeAlert()` itself: zero changes.
+  - [ ] 7.2 `web/src/app/alerts/unsubscribe/page.tsx` (CREATE): async server component, `searchParams: Promise<{ token?: string }>` (same pattern as `alerts/confirm/page.tsx` from Story 6.2). Missing token → `redirect('/alerts/unsubscribed?invalid=1')`. Calls `getUnsubscribePreviewByToken`; not found → same redirect. Found (any status) → render game name + `AlertTokenActionButton` per AC-1/AC-12. A `redirect()` call is not a mutation — GET stays pure.
+  - [ ] 7.3 `web/src/components/AlertTokenActionButton.tsx` (CREATE or EXTRACT, `'use client'`): shared component per the RODO doc's DRY note. Props: `{ token: string; endpoint: string; successPath: string; label: string; tone: 'primary' | 'muted' }`. On click: `fetch(endpoint, { method: 'POST', body: JSON.stringify({ token }) })`, parse `ApiResponse<{ outcome }>`; success → `router.push(successPath + '?token=' + token)`; failure → local inline error state. **If Story 6.2's Task 6 lands first in the same dev pass, extract this from the already-built `AlertConfirmButton` and have both stories' buttons consume it (re-verify 6.2's own tests still pass after the extraction). If this task lands first, build it directly here and flag 6.2's Task 6.3 to consume it instead of building its own.**
+  - [ ] 7.4 `web/src/app/api/alerts/unsubscribe/route.ts` (MODIFY): **remove the `GET` handler entirely** (moves to the page). Add `POST`: parse JSON body, validate `token` is a non-empty string (400 `ApiResponse<never>` if not), call `unsubscribeAlert(token)` (unchanged), map outcome to `ApiResponse<T>` per AC-3/AC-4.
+  - [ ] 7.5 `web/src/app/api/alerts/unsubscribe/route.test.ts` (MODIFY): rewrite from `GET(...)`/`Location`-header assertions to `POST(...)`/`ApiResponse<T>` body assertions.
+  - [ ] 7.6 `web/src/app/alerts/unsubscribe/page.test.tsx` (CREATE): RTL, mock `next/navigation` `redirect`, `next/link`, `@/db/queries/alerts`. Cover: any found status renders the button; missing/unknown token redirects to `/alerts/unsubscribed?invalid=1`.
+  - [ ] 7.7 `AlertTokenActionButton.test.tsx` (CREATE, or extend if extracted from `AlertConfirmButton.test.tsx`): RTL + mocked `fetch`. Cover both `tone` variants if the extraction changes rendering, success → `router.push`, failure → inline error, no navigation.
+  - [ ] 7.8 `web/src/db/queries/alerts.test.ts` (MODIFY): add coverage for `getUnsubscribePreviewByToken` — found (`active`), found (`pending_doi`), found (`cancelled`), not found.
+  - [ ] 7.9 Doc sync: `AGENTS.md` route table, `_bmad-output/planning-artifacts/epics.md` Story 6.3 AC text, `docs/solutions/architecture/rodo-consent-integrity.md` "Status decyzji" table row (mark 6.3 implemented, not just decided).
+  - [ ] 7.10 verify — `npx tsc --noEmit`, `npx eslint`, `npm run test:run` clean; add an explicit test asserting `GET /alerts/unsubscribe` performs **zero** DB writes under every input (the exact property that was violated).
+
 ## Dev Notes
 
 ### What NOT to touch
@@ -77,7 +111,28 @@ so that I can stop receiving them at any time without needing to log in.
 
 ### Reference implementation: mirror `confirmAlert()` / `confirm/route.ts` almost exactly
 
-Story 6.2's `confirmAlert()` (`web/src/db/queries/alerts.ts`) and `app/api/alerts/confirm/route.ts` already establish every pattern this story needs: the redirect-only GET route (not `ApiResponse<T>` — documented exception, same rationale applies here), the atomic single-CTE-statement UPDATE+INSERT (required because the neon-http driver has no `db.transaction()`), the idempotent-replay-returns-success (not error) semantics, and the `assertNever`-guarded switch on outcome. Read both files fully before writing any code — this story is a close structural sibling, not a fresh design.
+Story 6.2's `confirmAlert()` (`web/src/db/queries/alerts.ts`) and `app/api/alerts/confirm/route.ts` already establish every pattern this story needs: the atomic single-CTE-statement UPDATE+INSERT (required because the neon-http driver has no `db.transaction()`) and the idempotent-replay-returns-success (not error) semantics, and the `assertNever`-guarded switch on outcome. Read both files fully before writing any code — this story is a close structural sibling, not a fresh design.
+
+> **Superseded by the 2026-08-24 correct-course below:** the line that used to be here — "the
+> redirect-only GET route (not `ApiResponse<T>` — documented exception, same rationale applies
+> here)" — described the *original* implementation of `confirm/route.ts`, which is itself being
+> corrected by Story 6.2's Task 6 in the same dev pass. Do **not** build a new redirect-only GET
+> route for unsubscribe; mirror `confirm/route.ts`'s **corrected** (page + POST) shape instead.
+> See "Correct-course decision table" immediately below.
+
+### Correct-course decision table (2026-08-24) — GET page vs. POST, and why
+
+Same reasoning as Story 6.2 (party-mode 2026-07-24, `docs/solutions/architecture/rodo-consent-integrity.md`, "ROZSTRZYGNIĘTE: skanery linków"): a plain `GET` mutating state lets email security scanners (Outlook SafeLinks, Proofpoint, antivirus link-preview) silently unsubscribe a user before a human clicks — RFC 7231 requires GET to be *safe*, and the resulting `consent_log` row would carry the scanner's context as if it were the user's, falsely tagged `source='user'`. Per the RODO doc this case is **more consequential** than confirm's: it is a *silent* failure with no visible symptom — the user simply stops receiving emails they wanted, with no error for anyone to notice.
+
+Unlike Story 6.2's `confirmAlert()`, `unsubscribeAlert()` has **no TTL to evaluate** — `unsubscribe_token` never rotates or expires (AC-9), so `getUnsubscribePreviewByToken` has no expired branch:
+
+| `getUnsubscribePreviewByToken` result | `GET /alerts/unsubscribe` renders | `POST /api/alerts/unsubscribe` (on click) |
+|---|---|---|
+| Not found | `redirect('/alerts/unsubscribed?invalid=1')` | never reached |
+| Found (`status` = `pending_doi`, `active`, or `cancelled` — any status) | Game name + `AlertTokenActionButton` (idempotent replay is fine even if already `cancelled` — button still works, returns `already_unsubscribed`) | `unsubscribeAlert()` → `'unsubscribed'` (fresh) or `'already_unsubscribed'` |
+| (rare race: found at GET, deleted by click time — not a real scenario today, no delete path exists, but the branch must not crash) | — | `unsubscribeAlert()` → `'not_found'` → `ApiResponse<never>`, inline error, no redirect (AC-4) |
+
+`unsubscribe-all` (AC-6/AC-7) is untouched by this correct-course — it was already `POST`-based, already returns `ApiResponse<T>`, and already requires an explicit click on `UnsubscribeAllControl`. Only the single-alert path had the gap.
 
 ### Token generation and lifecycle (why it differs from `confirmation_token`)
 
@@ -105,6 +160,14 @@ Vitest, same mocking style as `subscribe/route.test.ts` (`vi.mock('@/db/queries/
 - New: `web/src/app/alerts/unsubscribed/page.tsx` (+ a small client component for the inline-expand "unsubscribe all" control)
 - New/modified: corresponding `*.test.ts`/`*.test.tsx` for every file above
 - No `scraper/` changes, no `items.py` changes (see Task 1.3, Prerequisite)
+
+**Correct-course additions (Task 7):**
+
+- Modified: `web/src/db/queries/alerts.ts` (`getUnsubscribePreviewByToken`), `alerts.test.ts`
+- New: `web/src/app/alerts/unsubscribe/page.tsx` (+ `page.test.tsx`)
+- New or extracted: `web/src/components/AlertTokenActionButton.tsx` (+ test) — shared with Story 6.2
+- Modified: `web/src/app/api/alerts/unsubscribe/route.ts` (`GET` → `POST`) + `route.test.ts`
+- No new migration, no schema change (AC unchanged: `status='cancelled'`, `consent_log.action='unsubscribed'` already exist)
 
 ### References
 
@@ -162,3 +225,10 @@ Claude Sonnet 5 (claude-sonnet-5)
 - [x] [Review][Patch] `unsubscribeAllAlertsByToken()` not atomic — concurrent double-submit produces duplicate `email_suppressions`/`consent_log` rows (violates AC6 idempotency); a failure after the `price_alerts` cancel but before the suppression/consent writes leaves alerts cancelled with no matching audit trail (AC10 gap). Fixed: added unique constraint on `email_suppressions.email` (migration `0008`) and rewrote the function as one atomic CTE mirroring `unsubscribeAlert()` — cancel + `INSERT ... ON CONFLICT (email) DO NOTHING` + conditional `consent_log` insert, all in a single `db.execute(sql\`...\`)`. [web/src/db/queries/alerts.ts:1107-1157]
 - [x] [Review][Patch] Migration comment claims "122 bits of entropy" but the backfill concatenates two UUIDs (~244 bits) — fixed the comment. [db/migrations/0007_price_alerts_unsubscribe_token.sql:203-204]
 - [x] [Review][Defer] Migration's backfill→`SET NOT NULL` window is not wrapped in an explicit transaction — a concurrent insert from old app code during a rolling deploy could insert a NULL row between steps and abort the migration. Pre-existing pattern (same three-step approach as migration `0004`), not introduced by this story — deferred, pre-existing.
+
+## Change Log
+
+| Date | Change |
+|---|---|
+| 2026-08-20 | Story implemented: `unsubscribe_token` column/migration, `unsubscribeAlert()`/`unsubscribeAllAlertsByToken()`, redirect-only `GET /api/alerts/unsubscribe`, `POST /api/alerts/unsubscribe-all`, `/alerts/unsubscribed` page. 348/348 web tests pass. Code review: 2 patches applied (atomicity fix for `unsubscribeAllAlertsByToken`, entropy comment), 1 deferred. |
+| 2026-08-24 | **Correct-course, discovered during branch-divergence reconciliation:** `GET /api/alerts/unsubscribe` mutates state on a bare GET — the same mail-scanner-prefetch vulnerability the 2026-07-24 RODO party-mode session already decided to fix for this story (`docs/solutions/architecture/rodo-consent-integrity.md`, never carried into this story's ACs or `epics.md` at the time). Status → `in-progress`. New ACs 1–4 + 12 and Task 7 added, mirroring Story 6.2's already-approved side-effect-free-GET-page + POST pattern. See `_bmad-output/planning-artifacts/sprint-change-proposal-2026-08-24.md`. |
