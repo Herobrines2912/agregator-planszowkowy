@@ -368,6 +368,18 @@ NO_CATEGORY_RANK_XML = """<?xml version="1.0" encoding="utf-8"?>
   </item>
 </items>"""
 
+# Item with several <name type="alternate"> entries, including the Polish edition title —
+# the shape Story 2.7's alternate-names spike measures coverage against.
+MULTIPLE_ALTERNATE_NAMES_XML = """<?xml version="1.0" encoding="utf-8"?>
+<items>
+  <item type="boardgame" id="9209">
+    <name type="alternate" sortindex="1" value="Zug um Zug" />
+    <name type="primary" sortindex="1" value="Ticket to Ride" />
+    <name type="alternate" sortindex="1" value="Wsiąść do Pociągu" />
+    <name type="alternate" sortindex="1" value="Les Aventuriers du Rail" />
+  </item>
+</items>"""
+
 # Expansion item pointing to its base game via an inbound="true" boardgameexpansion link
 EXPANSION_WITH_BASE_GAME_LINK_XML = """<?xml version="1.0" encoding="utf-8"?>
 <items>
@@ -452,41 +464,41 @@ class TestParseThing_Extended:
 # Tests for alternate_names — Task 1 (Story 2.7)
 # ---------------------------------------------------------------------------
 
-MULTIPLE_ALTERNATE_NAMES_XML = """<?xml version="1.0" encoding="utf-8"?>
-<items>
-  <item type="boardgame" id="437106">
-    <name type="primary" sortindex="1" value="Simsala Spin" />
-    <name type="alternate" sortindex="1" value="Simsala Spin (Makoto edycja polska)" />
-    <name type="alternate" sortindex="1" value="Simsala Grande" />
-  </item>
-</items>"""
-
-NO_ALTERNATE_NAMES_XML = """<?xml version="1.0" encoding="utf-8"?>
-<items>
-  <item type="boardgame" id="1">
-    <name type="primary" value="Test Game" />
-  </item>
-</items>"""
-
-
 class TestParseThing_AlternateNames:
     def setup_method(self):
         self.client = BggClient(token="test-token")
 
-    def test_multiple_alternate_names_returned_in_document_order(self):
-        result = self.client._parse_thing(MULTIPLE_ALTERNATE_NAMES_XML, 437106)
+    def test_alternate_names_collected_in_document_order(self):
+        result = self.client._parse_thing(MULTIPLE_ALTERNATE_NAMES_XML, 9209)
         assert result["alternate_names"] == [
-            "Simsala Spin (Makoto edycja polska)",
-            "Simsala Grande",
+            "Zug um Zug",
+            "Wsiąść do Pociągu",
+            "Les Aventuriers du Rail",
         ]
 
-    def test_single_alternate_name_from_brass_birmingham_fixture(self):
+    def test_primary_name_excluded_from_alternate_names(self):
+        result = self.client._parse_thing(MULTIPLE_ALTERNATE_NAMES_XML, 9209)
+        assert result["name"] == "Ticket to Ride"
+        assert "Ticket to Ride" not in result["alternate_names"]
+
+    def test_single_alternate_name_returns_one_element_list(self):
         result = self.client._parse_thing(BRASS_BIRMINGHAM_XML, 224517)
         assert result["alternate_names"] == ["Bronce: Birmingham"]
 
     def test_no_alternate_names_returns_empty_list(self):
-        result = self.client._parse_thing(NO_ALTERNATE_NAMES_XML, 1)
+        result = self.client._parse_thing(NO_CATEGORY_RANK_XML, 1)
         assert result["alternate_names"] == []
+
+    def test_malformed_xml_fallback_omits_alternate_names_key(self):
+        """Parse-failure fallback stays the existing minimal dict — the key is absent.
+
+        Asserted as absence, not via .get() with a default: a defaulted read passes
+        whether the key is missing or present-and-empty, so it could not fail. Callers
+        that need to tell a parse failure apart from a genuinely alias-free game must
+        check for the key itself.
+        """
+        result = self.client._parse_thing(MALFORMED_XML, 224517)
+        assert "alternate_names" not in result
 
 
 # ---------------------------------------------------------------------------

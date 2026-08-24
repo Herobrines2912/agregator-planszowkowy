@@ -149,8 +149,11 @@ class BggClient:
             "is_expansion": item.get("type") == "boardgameexpansion",
             "base_game_bgg_id": get_base_game_bgg_id(),
             "bgg_category_rank": bgg_category_rank,
+            # Localised/international edition titles. BGG commonly carries the Polish
+            # edition title here, which makes a PL store title matchable PL↔PL instead
+            # of PL↔EN against the primary name (Story 2.7 spike).
+            "alternate_names": get_list("name[@type='alternate']"),
             "mechanics": get_list("link[@type='boardgamemechanic']"),
             "designers": get_list("link[@type='boardgamedesigner']"),
             "publishers": get_list("link[@type='boardgamepublisher']"),
-            "alternate_names": get_list("name[@type='alternate']"),
         }
