@@ -6,7 +6,7 @@ import { assertNever } from '@/lib/utils'
 import { and, eq, sql } from 'drizzle-orm'
 
 /** Confirmation links stay valid for 48h — the window promised to the user in the DOI email. */
-const CONFIRMATION_TOKEN_TTL_MS = 48 * 60 * 60 * 1000
+export const CONFIRMATION_TOKEN_TTL_MS = 48 * 60 * 60 * 1000
 
 export type SubscribeAlertInput = {
   email: string
@@ -270,6 +270,81 @@ export async function getAlertSummaryByToken(token: string): Promise<AlertSummar
     .from(priceAlerts)
     .innerJoin(games, eq(priceAlerts.game_id, games.id))
     .where(and(eq(priceAlerts.confirmation_token, token), eq(priceAlerts.status, 'active')))
+    .limit(1)
+
+  return rows[0] ?? null
+}
+
+export type AlertPreview = {
+  status: 'pending_doi' | 'active' | 'cancelled'
+  gameName: string
+  gameSlug: string
+  targetPrice: string | null
+  tokenIssuedAt: Date
+}
+
+/**
+ * Read-only lookup backing the /alerts/confirm page (Story 6.2 correct-course). Unlike
+ * getAlertSummaryByToken, this has no status filter — the page needs to see pending_doi,
+ * active, and cancelled alike to decide render-vs-redirect (see the story's Dev Notes
+ * "Correct-course decision table"). Never mutates anything; the page's TTL check is
+ * display-only and must import CONFIRMATION_TOKEN_TTL_MS from here, never redeclare it.
+ */
+export async function getAlertPreviewByToken(token: string): Promise<AlertPreview | null> {
+  const db = getDb()
+
+  const rows = await db
+    .select({
+      status: priceAlerts.status,
+      gameName: games.name,
+      gameSlug: games.slug,
+      targetPrice: priceAlerts.target_price,
+      tokenIssuedAt: priceAlerts.token_issued_at,
+    })
+    .from(priceAlerts)
+    .innerJoin(games, eq(priceAlerts.game_id, games.id))
+    .where(eq(priceAlerts.confirmation_token, token))
+    .limit(1)
+
+  return rows[0] ?? null
+}
+
+/**
+ * Display-only TTL check for the /alerts/confirm page (Story 6.2 correct-course). Lives here,
+ * not in the page component, because ESLint's react-hooks/purity rule forbids calling the
+ * impure Date.now() directly inside a component body — and centralizing it here is also what
+ * keeps the page's check from ever drifting from what confirmAlert() actually enforces.
+ */
+export function isConfirmPreviewExpired(preview: Pick<AlertPreview, 'status' | 'tokenIssuedAt'>): boolean {
+  return (
+    preview.status === 'pending_doi' &&
+    Date.now() - preview.tokenIssuedAt.getTime() > CONFIRMATION_TOKEN_TTL_MS
+  )
+}
+
+export type UnsubscribePreview = {
+  status: 'pending_doi' | 'active' | 'cancelled'
+  gameName: string
+  gameSlug: string
+}
+
+/**
+ * Read-only lookup backing the /alerts/unsubscribe page (Story 6.3 correct-course). No TTL
+ * branch needed here — unlike confirmation_token, unsubscribe_token never rotates or expires
+ * (AC-9), so every found row is renderable regardless of status.
+ */
+export async function getUnsubscribePreviewByToken(token: string): Promise<UnsubscribePreview | null> {
+  const db = getDb()
+
+  const rows = await db
+    .select({
+      status: priceAlerts.status,
+      gameName: games.name,
+      gameSlug: games.slug,
+    })
+    .from(priceAlerts)
+    .innerJoin(games, eq(priceAlerts.game_id, games.id))
+    .where(eq(priceAlerts.unsubscribe_token, token))
     .limit(1)
 
   return rows[0] ?? null

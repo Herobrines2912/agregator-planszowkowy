@@ -4,7 +4,7 @@ baseline_commit: 9358c7ef32d5a3934d2c4e33a2eb1fd97323fd28
 
 # Story 6.2: Double Opt-In Confirmation — GET /alerts/confirm (page) + POST /api/alerts/confirm
 
-Status: in-progress
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -70,17 +70,17 @@ so that I'm sure I'll receive notifications, no one (including an email scanner)
   - [x] 4.3 `web/src/app/alerts/expired/page.test.tsx` (CREATE) — asserts correct link target for both the `slug` and no-`slug` cases.
 - [x] **Task 5 — verify** — `npx tsc --noEmit` and `npx eslint` clean on all new/changed files; `npm run test:run` green.
 
-- [ ] **Task 6 — Correct-course: side-effect-free GET page + POST confirm** (AC: 1, 2, 3, 4, 10) — see Dev Notes → "Correct-course decision table" before starting
-  - [ ] 6.1 `web/src/db/queries/alerts.ts` (MODIFY): add `getAlertPreviewByToken(token: string): Promise<{ status: 'pending_doi' | 'active' | 'cancelled'; gameName: string; gameSlug: string; targetPrice: string | null; tokenIssuedAt: Date } | null>` — same read-only `SELECT … WHERE confirmation_token = token` shape `confirmAlert()` already does (join `price_alerts` → `games`), no status filter (needs to see `pending_doi`/`active`/`cancelled` alike to decide render-vs-redirect). Reuse the exported `CONFIRMATION_TOKEN_TTL_MS` for the page's display-only TTL check — do not hardcode 48h again. **`confirmAlert()` itself: zero changes.**
-  - [ ] 6.2 `web/src/app/alerts/confirm/page.tsx` (CREATE): async server component, `searchParams: Promise<{ token?: string }>` (same pattern as `alerts/confirmed/page.tsx`). Missing token → `redirect('/alerts/expired')` (`next/navigation`). Calls `getAlertPreviewByToken`; not found → `redirect('/alerts/expired')`; `cancelled` or (`pending_doi` and TTL expired) → `redirect('/alerts/expired?slug=' + gameSlug)`; `pending_doi` (TTL valid) or `active` → render summary + `AlertConfirmButton`. A `redirect()` call is not a mutation — GET stays pure per AC-1/AC-2.
-  - [ ] 6.3 `web/src/components/AlertConfirmButton.tsx` (CREATE, `'use client'`): props `{ token: string }`. On click: `fetch('/api/alerts/confirm', { method: 'POST', body: JSON.stringify({ token }) })`, parse `ApiResponse<{ outcome }>`; success → `router.push('/alerts/confirmed?token=' + token)`; failure → local error state rendered inline (AC-4). Mirror the fetch/error-state shape already used in `AlertSubscribeForm.tsx`.
-  - [ ] 6.4 `web/src/app/api/alerts/confirm/route.ts` (MODIFY): **remove the `GET` handler entirely** (moves to the page). Add `POST`: parse JSON body, validate `token` is a non-empty string (400 `ApiResponse<never>` if not), derive `ipHash` exactly as the old `GET` did (`x-forwarded-for` → `sha256Hex`, unchanged), call `confirmAlert(token, ipHash)` (unchanged), map outcome to `ApiResponse<T>` per AC-3/AC-4.
-  - [ ] 6.5 `web/src/app/api/alerts/confirm/route.test.ts` (MODIFY): rewrite from `GET(...)`/`Location`-header assertions to `POST(...)`/`ApiResponse<T>` body assertions.
-  - [ ] 6.6 `web/src/app/alerts/confirm/page.test.tsx` (CREATE): RTL, mock `next/navigation` `redirect`, `next/link`, `@/db/queries/alerts`. Cover: `pending_doi`-valid renders button; `active` renders button; `cancelled`/expired-`pending_doi`/missing/unknown token all redirect to `/alerts/expired` with correct `?slug=` presence (mirror the existing oracle rule test coverage).
-  - [ ] 6.7 `web/src/components/AlertConfirmButton.test.tsx` (CREATE): RTL + mocked `fetch`. Cover: success → `router.push` called with the right URL; failure → inline error rendered, no navigation.
-  - [ ] 6.8 `web/src/db/queries/alerts.test.ts` (MODIFY): add coverage for `getAlertPreviewByToken` — found (`pending_doi`), found (`active`), found (`cancelled`), not found.
-  - [ ] 6.9 Doc sync (tracked here, already partially done by the correct-course pass itself — verify still consistent after implementation): `AGENTS.md` route table, this story's own "Why POST now returns `ApiResponse<T>`" note below, `docs/solutions/architecture/rodo-consent-integrity.md` retraction, `_bmad-output/planning-artifacts/epics.md` Story 6.2 AC text.
-  - [ ] 6.10 verify — `npx tsc --noEmit`, `npx eslint`, `npm run test:run` clean; add an explicit test asserting `GET /alerts/confirm` performs **zero** DB writes under every input (not just inspection — this is the exact property that was violated).
+- [x] **Task 6 — Correct-course: side-effect-free GET page + POST confirm** (AC: 1, 2, 3, 4, 10) — see Dev Notes → "Correct-course decision table" before starting
+  - [x] 6.1 `web/src/db/queries/alerts.ts` (MODIFY): add `getAlertPreviewByToken(token: string): Promise<{ status: 'pending_doi' | 'active' | 'cancelled'; gameName: string; gameSlug: string; targetPrice: string | null; tokenIssuedAt: Date } | null>` — same read-only `SELECT … WHERE confirmation_token = token` shape `confirmAlert()` already does (join `price_alerts` → `games`), no status filter (needs to see `pending_doi`/`active`/`cancelled` alike to decide render-vs-redirect). Reuse the exported `CONFIRMATION_TOKEN_TTL_MS` for the page's display-only TTL check — do not hardcode 48h again. **`confirmAlert()` itself: zero changes.**
+  - [x] 6.2 `web/src/app/alerts/confirm/page.tsx` (CREATE): async server component, `searchParams: Promise<{ token?: string }>` (same pattern as `alerts/confirmed/page.tsx`). Missing token → `redirect('/alerts/expired')` (`next/navigation`). Calls `getAlertPreviewByToken`; not found → `redirect('/alerts/expired')`; `cancelled` or (`pending_doi` and TTL expired) → `redirect('/alerts/expired?slug=' + gameSlug)`; `pending_doi` (TTL valid) or `active` → render summary + `AlertConfirmButton`. A `redirect()` call is not a mutation — GET stays pure per AC-1/AC-2.
+  - [x] 6.3 `web/src/components/AlertConfirmButton.tsx` (CREATE, `'use client'`): props `{ token: string }`. On click: `fetch('/api/alerts/confirm', { method: 'POST', body: JSON.stringify({ token }) })`, parse `ApiResponse<{ outcome }>`; success → `router.push('/alerts/confirmed?token=' + token)`; failure → local error state rendered inline (AC-4). Mirror the fetch/error-state shape already used in `AlertSubscribeForm.tsx`.
+  - [x] 6.4 `web/src/app/api/alerts/confirm/route.ts` (MODIFY): **remove the `GET` handler entirely** (moves to the page). Add `POST`: parse JSON body, validate `token` is a non-empty string (400 `ApiResponse<never>` if not), derive `ipHash` exactly as the old `GET` did (`x-forwarded-for` → `sha256Hex`, unchanged), call `confirmAlert(token, ipHash)` (unchanged), map outcome to `ApiResponse<T>` per AC-3/AC-4.
+  - [x] 6.5 `web/src/app/api/alerts/confirm/route.test.ts` (MODIFY): rewrite from `GET(...)`/`Location`-header assertions to `POST(...)`/`ApiResponse<T>` body assertions.
+  - [x] 6.6 `web/src/app/alerts/confirm/page.test.tsx` (CREATE): RTL, mock `next/navigation` `redirect`, `next/link`, `@/db/queries/alerts`. Cover: `pending_doi`-valid renders button; `active` renders button; `cancelled`/expired-`pending_doi`/missing/unknown token all redirect to `/alerts/expired` with correct `?slug=` presence (mirror the existing oracle rule test coverage).
+  - [x] 6.7 `web/src/components/AlertConfirmButton.test.tsx` (CREATE): RTL + mocked `fetch`. Cover: success → `router.push` called with the right URL; failure → inline error rendered, no navigation.
+  - [x] 6.8 `web/src/db/queries/alerts.test.ts` (MODIFY): add coverage for `getAlertPreviewByToken` — found (`pending_doi`), found (`active`), found (`cancelled`), not found.
+  - [x] 6.9 Doc sync (tracked here, already partially done by the correct-course pass itself — verify still consistent after implementation): `AGENTS.md` route table, this story's own "Why POST now returns `ApiResponse<T>`" note below, `docs/solutions/architecture/rodo-consent-integrity.md` retraction, `_bmad-output/planning-artifacts/epics.md` Story 6.2 AC text.
+  - [x] 6.10 verify — `npx tsc --noEmit`, `npx eslint`, `npm run test:run` clean; add an explicit test asserting `GET /alerts/confirm` performs **zero** DB writes under every input (not just inspection — this is the exact property that was violated).
 
 ## Dev Notes
 
@@ -245,6 +245,19 @@ claude-opus-4-8 (Claude Code, bmad-dev-story workflow)
 - `_bmad-output/implementation-artifacts/6-2-double-opt-in-confirmation-get-api-alerts-confirm.md` (MODIFY)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (MODIFY — left uncommitted, carries an unrelated workstream's status lines)
 
+**Task 6 additions (2026-08-24):**
+
+- `web/src/db/queries/alerts.ts` (MODIFY) — added `getAlertPreviewByToken`, `AlertPreview`, `isConfirmPreviewExpired`
+- `web/src/db/queries/alerts.test.ts` (MODIFY) — tests for both
+- `web/src/app/alerts/confirm/page.tsx` (NEW)
+- `web/src/app/alerts/confirm/page.test.tsx` (NEW)
+- `web/src/components/AlertTokenActionButton.tsx` (NEW) — shared with Story 6.3
+- `web/src/components/AlertTokenActionButton.test.tsx` (NEW)
+- `web/src/components/AlertConfirmButton.tsx` (NEW) — thin wrapper around the shared button
+- `web/src/components/AlertConfirmButton.test.tsx` (NEW)
+- `web/src/app/api/alerts/confirm/route.ts` (MODIFY) — `GET` → `POST`
+- `web/src/app/api/alerts/confirm/route.test.ts` (MODIFY) — rewritten for `POST`
+
 ### Code review outcome (2026-07-22)
 
 11-reviewer pass. Applied here: the atomic CTE, `ip_hash`, the reconciliation query, a `try/catch`
@@ -266,6 +279,38 @@ Open, deliberately not in this commit:
   embeds query params); unauthenticated `subscribe` can rewrite a confirmed subscriber's target
   price. All pre-existing, on the backlog.
 
+### Task 6 — Correct-course implementation (2026-08-24)
+
+Implemented together with Story 6.3's Task 7 in one pass (shared component), per Sprint Change
+Proposal 2026-08-24.
+
+- `getAlertPreviewByToken()` added: read-only, no status filter (unlike `getAlertSummaryByToken`,
+  which stays scoped to `status='active'` and unchanged — `/alerts/confirmed` still uses it).
+  `confirmAlert()` itself: zero changes, exactly as the decision table specified.
+- **Deviation from the task text, documented:** `isConfirmPreviewExpired()` was added as a small
+  exported helper in `alerts.ts` rather than computing `Date.now() - tokenIssuedAt` inline in the
+  page component. Reason: this repo's ESLint config enforces `react-hooks/purity`
+  (React Compiler), which forbids calling the impure `Date.now()` directly inside a component
+  body. The helper still imports `CONFIRMATION_TOKEN_TTL_MS` as the task specified — it's the
+  single source of truth either way, just called from the query layer instead of the page.
+- `web/src/app/alerts/confirm/page.tsx`: renders game name + `formatPrice(targetPrice)` +
+  `AlertConfirmButton`; redirects to `/alerts/expired` (with `?slug=` when a row was found) for
+  missing/unknown/cancelled/expired-pending tokens, matching the decision table exactly. Zero DB
+  writes on every redirect path — enforced structurally in tests: the page test's
+  `@/db/queries/alerts` mock exposes only `getAlertPreviewByToken`/`isConfirmPreviewExpired`, so
+  any accidental call to a mutating function would fail the test with an import error, not just
+  an unasserted no-op.
+- `web/src/components/AlertTokenActionButton.tsx` (new): the shared component per the RODO doc's
+  DRY note, built directly here (not extracted after-the-fact) since both stories were done in
+  the same pass. `AlertConfirmButton.tsx` is now a thin wrapper supplying confirm-specific props
+  (`endpoint`, `successPath`, label "Potwierdzam", `tone: 'primary'`) — the component name and
+  file both still exist exactly as Task 6.3 named them.
+- `POST /api/alerts/confirm` (rewritten from `GET`): same body-shape/validation pattern as
+  `subscribe/route.ts` and `unsubscribe-all/route.ts`; `confirmAlert()` and its `ipHash`
+  derivation are byte-for-byte unchanged from the old `GET` handler, just called from `POST` now.
+- 399/399 web tests pass (up from 348 pre-change — this Task plus Story 6.3's Task 7 together
+  added 51 tests across both stories). `npx tsc --noEmit` and `npx eslint .` both clean.
+
 ## Change Log
 
 | Date | Change |
@@ -273,3 +318,4 @@ Open, deliberately not in this commit:
 | 2026-07-21 | Story 6.2 implemented: `confirmAlert`/`getAlertSummaryByToken` queries, `GET /api/alerts/confirm` redirect route, `/alerts/confirmed` and `/alerts/expired` pages. 27 new tests; suite 300 passed. Status → review. |
 | 2026-07-22 | Code review applied: activation collapsed into one atomic CTE, `ip_hash` recorded on confirmation, `findActiveAlertsMissingConsent()` reconciliation query, error handling on the confirmed page, query-predicate assertions, and a flaky 48h-boundary test fixed. Suite 306 passed. |
 | 2026-07-26 | Correct-course (party-mode 2026-07-24 RODO decision): status `done` → `in-progress`. AC 1–4 replace the old GET-mutates flow with a side-effect-free GET page + explicit POST; AC 10 added (UX tone). `ApiResponse<T>` exception reversed for `POST`. Task 6 added. Zero changes to `confirmAlert()`. See `sprint-change-proposal-2026-07-26.md`. |
+| 2026-08-25 | Task 6 implemented (together with Story 6.3's Task 7, shared `AlertTokenActionButton`): `getAlertPreviewByToken`/`isConfirmPreviewExpired` added, `/alerts/confirm` page built, `POST /api/alerts/confirm` replaces the old `GET` handler. 399/399 web tests pass, `tsc`/`eslint` clean. Status → review. |

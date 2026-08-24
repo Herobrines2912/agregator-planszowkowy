@@ -3,9 +3,12 @@ import {
   subscribeAlert,
   confirmAlert,
   getAlertSummaryByToken,
+  getAlertPreviewByToken,
+  isConfirmPreviewExpired,
   findActiveAlertsMissingConsent,
   unsubscribeAlert,
   unsubscribeAllAlertsByToken,
+  getUnsubscribePreviewByToken,
 } from './alerts'
 import { priceAlerts, consentLog, emailSuppressions } from '@/db/schema'
 import { and, eq, type SQL } from 'drizzle-orm'
@@ -470,6 +473,145 @@ describe('getAlertSummaryByToken', () => {
     const summary = await getAlertSummaryByToken('tok-unknown')
 
     expect(summary).toBeNull()
+    expect(mockUpdate).not.toHaveBeenCalled()
+    expect(mockInsert).not.toHaveBeenCalled()
+  })
+})
+
+describe('getAlertPreviewByToken', () => {
+  test('pending_doi alert: returns status, game, price and tokenIssuedAt — no status filter', async () => {
+    const tokenIssuedAt = new Date('2026-08-01T00:00:00Z')
+    const selectChain = chain([
+      {
+        status: 'pending_doi',
+        gameName: 'Brass: Birmingham',
+        gameSlug: 'brass-birmingham',
+        targetPrice: '89.99',
+        tokenIssuedAt,
+      },
+    ])
+    mockSelect.mockReturnValueOnce(selectChain)
+
+    const preview = await getAlertPreviewByToken('tok-pending')
+
+    expect(preview).toEqual({
+      status: 'pending_doi',
+      gameName: 'Brass: Birmingham',
+      gameSlug: 'brass-birmingham',
+      targetPrice: '89.99',
+      tokenIssuedAt,
+    })
+    // Unlike getAlertSummaryByToken, no status filter — the confirm page must see
+    // pending_doi/active/cancelled alike to decide render-vs-redirect.
+    expect(selectChain.where).toHaveBeenCalledWith(eq(priceAlerts.confirmation_token, 'tok-pending'))
+  })
+
+  test('cancelled alert: still returned (page decides what to do with it)', async () => {
+    const selectChain = chain([
+      {
+        status: 'cancelled',
+        gameName: 'Gloomhaven',
+        gameSlug: 'gloomhaven',
+        targetPrice: null,
+        tokenIssuedAt: new Date('2026-01-01T00:00:00Z'),
+      },
+    ])
+    mockSelect.mockReturnValueOnce(selectChain)
+
+    const preview = await getAlertPreviewByToken('tok-cancelled')
+
+    expect(preview?.status).toBe('cancelled')
+  })
+
+  test('unknown token: returns null, no writes', async () => {
+    mockSelect.mockReturnValueOnce(chain([]))
+
+    const preview = await getAlertPreviewByToken('tok-unknown')
+
+    expect(preview).toBeNull()
+    expect(mockUpdate).not.toHaveBeenCalled()
+    expect(mockInsert).not.toHaveBeenCalled()
+  })
+})
+
+describe('isConfirmPreviewExpired', () => {
+  test('pending_doi within TTL: not expired', () => {
+    expect(
+      isConfirmPreviewExpired({ status: 'pending_doi', tokenIssuedAt: new Date() }),
+    ).toBe(false)
+  })
+
+  test('pending_doi past 48h TTL: expired', () => {
+    expect(
+      isConfirmPreviewExpired({
+        status: 'pending_doi',
+        tokenIssuedAt: new Date(Date.now() - 49 * 60 * 60 * 1000),
+      }),
+    ).toBe(true)
+  })
+
+  test('active: never expired regardless of tokenIssuedAt age', () => {
+    expect(
+      isConfirmPreviewExpired({
+        status: 'active',
+        tokenIssuedAt: new Date('2020-01-01'),
+      }),
+    ).toBe(false)
+  })
+
+  test('cancelled: not evaluated as expired by this helper — page handles cancelled separately', () => {
+    expect(
+      isConfirmPreviewExpired({
+        status: 'cancelled',
+        tokenIssuedAt: new Date('2020-01-01'),
+      }),
+    ).toBe(false)
+  })
+})
+
+describe('getUnsubscribePreviewByToken', () => {
+  test('active alert: returns status and game, no TTL field', async () => {
+    const selectChain = chain([
+      { status: 'active', gameName: 'Brass: Birmingham', gameSlug: 'brass-birmingham' },
+    ])
+    mockSelect.mockReturnValueOnce(selectChain)
+
+    const preview = await getUnsubscribePreviewByToken('tok-active')
+
+    expect(preview).toEqual({
+      status: 'active',
+      gameName: 'Brass: Birmingham',
+      gameSlug: 'brass-birmingham',
+    })
+    expect(selectChain.where).toHaveBeenCalledWith(eq(priceAlerts.unsubscribe_token, 'tok-active'))
+  })
+
+  test('pending_doi alert: still returned — unsubscribe_token never expires', async () => {
+    mockSelect.mockReturnValueOnce(
+      chain([{ status: 'pending_doi', gameName: 'Gloomhaven', gameSlug: 'gloomhaven' }]),
+    )
+
+    const preview = await getUnsubscribePreviewByToken('tok-pending')
+
+    expect(preview?.status).toBe('pending_doi')
+  })
+
+  test('already-cancelled alert: still returned (idempotent replay is fine)', async () => {
+    mockSelect.mockReturnValueOnce(
+      chain([{ status: 'cancelled', gameName: 'Gloomhaven', gameSlug: 'gloomhaven' }]),
+    )
+
+    const preview = await getUnsubscribePreviewByToken('tok-cancelled')
+
+    expect(preview?.status).toBe('cancelled')
+  })
+
+  test('unknown token: returns null, no writes', async () => {
+    mockSelect.mockReturnValueOnce(chain([]))
+
+    const preview = await getUnsubscribePreviewByToken('tok-unknown')
+
+    expect(preview).toBeNull()
     expect(mockUpdate).not.toHaveBeenCalled()
     expect(mockInsert).not.toHaveBeenCalled()
   })

@@ -1,38 +1,54 @@
 import { unsubscribeAlert } from '@/db/queries/alerts'
 import { assertNever } from '@/lib/utils'
-import { NextResponse, type NextRequest } from 'next/server'
+import type { ApiResponse } from '@/types/api'
+import type { NextRequest } from 'next/server'
 
-// Same redirect-only exception as /api/alerts/confirm: this route is the target of a link a
-// human clicks from their email client, never fetch()-ed, so a redirect is the only useful
-// response — see confirm/route.ts for the full rationale.
+// Correct-course (2026-08-24): the mail-clicked link is now GET /alerts/unsubscribe, a
+// side-effect-free page — not this route. This route is fetch()-ed from that page's
+// AlertTokenActionButton, so it follows the normal ApiResponse<T> rule like any other route.
+// See docs/solutions/architecture/rodo-consent-integrity.md.
 
-function redirectTo(path: string, request: NextRequest) {
-  return NextResponse.redirect(new URL(path, request.url), 302)
+type UnsubscribeRequestBody = {
+  token?: unknown
 }
 
-const INVALID_PATH = '/alerts/unsubscribed?invalid=1'
+function errorResponse(error: string, status: number) {
+  const body: ApiResponse<never> = { success: false, error }
+  return Response.json(body, { status })
+}
 
-export async function GET(request: NextRequest) {
-  const token = request.nextUrl.searchParams.get('token')
-  if (!token) return redirectTo(INVALID_PATH, request)
-
-  let result
+export async function POST(request: NextRequest) {
+  let payload: UnsubscribeRequestBody
   try {
-    result = await unsubscribeAlert(token)
-  } catch (err) {
-    console.error('[GET /api/alerts/unsubscribe] unsubscribeAlert failed', err)
-    // A backend failure must never read as a silent no-op to the user — the invalid-link
-    // message at least tells them to contact support instead of implying success or nothing.
-    return redirectTo(INVALID_PATH, request)
+    payload = await request.json()
+  } catch {
+    return errorResponse('Nieprawidłowe dane żądania', 400)
   }
 
-  switch (result.outcome) {
-    case 'unsubscribed':
-    case 'already_unsubscribed':
-      return redirectTo(`/alerts/unsubscribed?token=${encodeURIComponent(token)}`, request)
-    case 'not_found':
-      return redirectTo(INVALID_PATH, request)
-    default:
-      return assertNever(result)
+  const { token } = payload
+  if (typeof token !== 'string' || token.length === 0) {
+    return errorResponse('Nieprawidłowy token', 400)
+  }
+
+  try {
+    const result = await unsubscribeAlert(token)
+
+    switch (result.outcome) {
+      case 'unsubscribed':
+      case 'already_unsubscribed': {
+        const body: ApiResponse<{ outcome: typeof result.outcome }> = {
+          success: true,
+          data: { outcome: result.outcome },
+        }
+        return Response.json(body)
+      }
+      case 'not_found':
+        return errorResponse('Nieprawidłowy token', 400)
+      default:
+        return assertNever(result)
+    }
+  } catch (err) {
+    console.error('[POST /api/alerts/unsubscribe] unsubscribeAlert failed', err)
+    return errorResponse('Wystąpił błąd. Spróbuj ponownie.', 500)
   }
 }

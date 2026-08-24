@@ -4,7 +4,7 @@ baseline_commit: 0d6458e
 
 # Story 6.3: Wyłączanie Powiadomień — GET /alerts/unsubscribe (page) + POST /api/alerts/unsubscribe
 
-Status: in-progress
+Status: review
 
 > **Correct-course (2026-08-24):** extends the 2026-07-24 party-mode RODO decision (Story 6.2)
 > to this story. The original implementation unsubscribed on a plain `GET`, which email
@@ -88,17 +88,17 @@ so that I can stop receiving them at any time without needing to log in.
   - [x] 6.1–6.3 All specified cases covered; 348/348 web tests pass (30 files), including 12 new tests in `alerts.test.ts`, 14 in the two route test files, 10 across the page/component tests.
   - [x] 6.4 No migration-testing convention exists anywhere in the repo (`db/migrations/`) — confirmed via search, correctly skipped per the task's own instruction rather than inventing a new pattern.
 
-- [ ] **Task 7 — Correct-course: side-effect-free GET page + POST unsubscribe** (AC: 1, 2, 3, 4, 12) — see Dev Notes → "Correct-course decision table" before starting
-  - [ ] 7.1 `web/src/db/queries/alerts.ts` (MODIFY): add `getUnsubscribePreviewByToken(token: string): Promise<{ status: 'pending_doi' | 'active' | 'cancelled'; gameName: string; gameSlug: string } | null>` — read-only `SELECT … WHERE unsubscribe_token = token`, join `price_alerts` → `games`, **no status filter and no TTL check** (unlike `getAlertPreviewByToken`, `unsubscribe_token` never rotates/expires per AC-9 — there is no expired branch to compute). `unsubscribeAlert()` itself: zero changes.
-  - [ ] 7.2 `web/src/app/alerts/unsubscribe/page.tsx` (CREATE): async server component, `searchParams: Promise<{ token?: string }>` (same pattern as `alerts/confirm/page.tsx` from Story 6.2). Missing token → `redirect('/alerts/unsubscribed?invalid=1')`. Calls `getUnsubscribePreviewByToken`; not found → same redirect. Found (any status) → render game name + `AlertTokenActionButton` per AC-1/AC-12. A `redirect()` call is not a mutation — GET stays pure.
-  - [ ] 7.3 `web/src/components/AlertTokenActionButton.tsx` (CREATE or EXTRACT, `'use client'`): shared component per the RODO doc's DRY note. Props: `{ token: string; endpoint: string; successPath: string; label: string; tone: 'primary' | 'muted' }`. On click: `fetch(endpoint, { method: 'POST', body: JSON.stringify({ token }) })`, parse `ApiResponse<{ outcome }>`; success → `router.push(successPath + '?token=' + token)`; failure → local inline error state. **If Story 6.2's Task 6 lands first in the same dev pass, extract this from the already-built `AlertConfirmButton` and have both stories' buttons consume it (re-verify 6.2's own tests still pass after the extraction). If this task lands first, build it directly here and flag 6.2's Task 6.3 to consume it instead of building its own.**
-  - [ ] 7.4 `web/src/app/api/alerts/unsubscribe/route.ts` (MODIFY): **remove the `GET` handler entirely** (moves to the page). Add `POST`: parse JSON body, validate `token` is a non-empty string (400 `ApiResponse<never>` if not), call `unsubscribeAlert(token)` (unchanged), map outcome to `ApiResponse<T>` per AC-3/AC-4.
-  - [ ] 7.5 `web/src/app/api/alerts/unsubscribe/route.test.ts` (MODIFY): rewrite from `GET(...)`/`Location`-header assertions to `POST(...)`/`ApiResponse<T>` body assertions.
-  - [ ] 7.6 `web/src/app/alerts/unsubscribe/page.test.tsx` (CREATE): RTL, mock `next/navigation` `redirect`, `next/link`, `@/db/queries/alerts`. Cover: any found status renders the button; missing/unknown token redirects to `/alerts/unsubscribed?invalid=1`.
-  - [ ] 7.7 `AlertTokenActionButton.test.tsx` (CREATE, or extend if extracted from `AlertConfirmButton.test.tsx`): RTL + mocked `fetch`. Cover both `tone` variants if the extraction changes rendering, success → `router.push`, failure → inline error, no navigation.
-  - [ ] 7.8 `web/src/db/queries/alerts.test.ts` (MODIFY): add coverage for `getUnsubscribePreviewByToken` — found (`active`), found (`pending_doi`), found (`cancelled`), not found.
-  - [ ] 7.9 Doc sync: `AGENTS.md` route table, `_bmad-output/planning-artifacts/epics.md` Story 6.3 AC text, `docs/solutions/architecture/rodo-consent-integrity.md` "Status decyzji" table row (mark 6.3 implemented, not just decided).
-  - [ ] 7.10 verify — `npx tsc --noEmit`, `npx eslint`, `npm run test:run` clean; add an explicit test asserting `GET /alerts/unsubscribe` performs **zero** DB writes under every input (the exact property that was violated).
+- [x] **Task 7 — Correct-course: side-effect-free GET page + POST unsubscribe** (AC: 1, 2, 3, 4, 12) — see Dev Notes → "Correct-course decision table" before starting
+  - [x] 7.1 `web/src/db/queries/alerts.ts` (MODIFY): add `getUnsubscribePreviewByToken(token: string): Promise<{ status: 'pending_doi' | 'active' | 'cancelled'; gameName: string; gameSlug: string } | null>` — read-only `SELECT … WHERE unsubscribe_token = token`, join `price_alerts` → `games`, **no status filter and no TTL check** (unlike `getAlertPreviewByToken`, `unsubscribe_token` never rotates/expires per AC-9 — there is no expired branch to compute). `unsubscribeAlert()` itself: zero changes.
+  - [x] 7.2 `web/src/app/alerts/unsubscribe/page.tsx` (CREATE): async server component, `searchParams: Promise<{ token?: string }>` (same pattern as `alerts/confirm/page.tsx` from Story 6.2). Missing token → `redirect('/alerts/unsubscribed?invalid=1')`. Calls `getUnsubscribePreviewByToken`; not found → same redirect. Found (any status) → render game name + `AlertTokenActionButton` per AC-1/AC-12. A `redirect()` call is not a mutation — GET stays pure.
+  - [x] 7.3 `web/src/components/AlertTokenActionButton.tsx` (CREATE or EXTRACT, `'use client'`): shared component per the RODO doc's DRY note. Props: `{ token: string; endpoint: string; successPath: string; label: string; tone: 'primary' | 'muted' }`. On click: `fetch(endpoint, { method: 'POST', body: JSON.stringify({ token }) })`, parse `ApiResponse<{ outcome }>`; success → `router.push(successPath + '?token=' + token)`; failure → local inline error state. **If Story 6.2's Task 6 lands first in the same dev pass, extract this from the already-built `AlertConfirmButton` and have both stories' buttons consume it (re-verify 6.2's own tests still pass after the extraction). If this task lands first, build it directly here and flag 6.2's Task 6.3 to consume it instead of building its own.**
+  - [x] 7.4 `web/src/app/api/alerts/unsubscribe/route.ts` (MODIFY): **remove the `GET` handler entirely** (moves to the page). Add `POST`: parse JSON body, validate `token` is a non-empty string (400 `ApiResponse<never>` if not), call `unsubscribeAlert(token)` (unchanged), map outcome to `ApiResponse<T>` per AC-3/AC-4.
+  - [x] 7.5 `web/src/app/api/alerts/unsubscribe/route.test.ts` (MODIFY): rewrite from `GET(...)`/`Location`-header assertions to `POST(...)`/`ApiResponse<T>` body assertions.
+  - [x] 7.6 `web/src/app/alerts/unsubscribe/page.test.tsx` (CREATE): RTL, mock `next/navigation` `redirect`, `next/link`, `@/db/queries/alerts`. Cover: any found status renders the button; missing/unknown token redirects to `/alerts/unsubscribed?invalid=1`.
+  - [x] 7.7 `AlertTokenActionButton.test.tsx` (CREATE, or extend if extracted from `AlertConfirmButton.test.tsx`): RTL + mocked `fetch`. Cover both `tone` variants if the extraction changes rendering, success → `router.push`, failure → inline error, no navigation.
+  - [x] 7.8 `web/src/db/queries/alerts.test.ts` (MODIFY): add coverage for `getUnsubscribePreviewByToken` — found (`active`), found (`pending_doi`), found (`cancelled`), not found.
+  - [x] 7.9 Doc sync: `AGENTS.md` route table, `_bmad-output/planning-artifacts/epics.md` Story 6.3 AC text, `docs/solutions/architecture/rodo-consent-integrity.md` "Status decyzji" table row (mark 6.3 implemented, not just decided).
+  - [x] 7.10 verify — `npx tsc --noEmit`, `npx eslint`, `npm run test:run` clean; add an explicit test asserting `GET /alerts/unsubscribe` performs **zero** DB writes under every input (the exact property that was violated).
 
 ## Dev Notes
 
@@ -165,7 +165,7 @@ Vitest, same mocking style as `subscribe/route.test.ts` (`vi.mock('@/db/queries/
 
 - Modified: `web/src/db/queries/alerts.ts` (`getUnsubscribePreviewByToken`), `alerts.test.ts`
 - New: `web/src/app/alerts/unsubscribe/page.tsx` (+ `page.test.tsx`)
-- New or extracted: `web/src/components/AlertTokenActionButton.tsx` (+ test) — shared with Story 6.2
+- New: `web/src/components/AlertTokenActionButton.tsx` (+ test) — shared with Story 6.2's `AlertConfirmButton` (thin wrapper)
 - Modified: `web/src/app/api/alerts/unsubscribe/route.ts` (`GET` → `POST`) + `route.test.ts`
 - No new migration, no schema change (AC unchanged: `status='cancelled'`, `consent_log.action='unsubscribed'` already exist)
 
@@ -226,9 +226,38 @@ Claude Sonnet 5 (claude-sonnet-5)
 - [x] [Review][Patch] Migration comment claims "122 bits of entropy" but the backfill concatenates two UUIDs (~244 bits) — fixed the comment. [db/migrations/0007_price_alerts_unsubscribe_token.sql:203-204]
 - [x] [Review][Defer] Migration's backfill→`SET NOT NULL` window is not wrapped in an explicit transaction — a concurrent insert from old app code during a rolling deploy could insert a NULL row between steps and abort the migration. Pre-existing pattern (same three-step approach as migration `0004`), not introduced by this story — deferred, pre-existing.
 
+### Task 7 — Correct-course implementation (2026-08-25)
+
+Implemented together with Story 6.2's Task 6 in one pass (shared component), per Sprint Change
+Proposal 2026-08-24.
+
+- `getUnsubscribePreviewByToken()` added: read-only, no status filter and no TTL check (unlike
+  `getAlertPreviewByToken`, `unsubscribe_token` never rotates/expires — AC-9). `unsubscribeAlert()`
+  itself: zero changes.
+- `web/src/app/alerts/unsubscribe/page.tsx`: renders game name + a muted `AlertTokenActionButton`
+  ("Wyłącz powiadomienia") + a resubscribe-reassurance line; redirects to
+  `/alerts/unsubscribed?invalid=1` for missing/unknown tokens. Any found status (`pending_doi`,
+  `active`, `cancelled`) renders the page — idempotent replay on an already-cancelled alert is
+  fine, matching Story 6.2's precedent for an already-`active` confirm.
+- **`AlertTokenActionButton` was built directly as the shared component** (Story 6.2's Task 6
+  landed in the same pass, so there was no separately-built `AlertConfirmButton` to extract
+  from — it was built as a thin wrapper around this component from the start instead). Used here
+  with `endpoint="/api/alerts/unsubscribe"`, `successPath="/alerts/unsubscribed"`,
+  `label="Wyłącz powiadomienia"`, `tone="muted"`. No separate unsubscribe-specific wrapper
+  component was created — the page uses `AlertTokenActionButton` directly, since AC-1 doesn't
+  name one the way Story 6.2's AC-1 names `AlertConfirmButton`.
+- `POST /api/alerts/unsubscribe` (rewritten from `GET`): same body-shape/validation pattern as
+  `unsubscribe-all/route.ts`; `unsubscribeAlert()` is byte-for-byte unchanged, just called from
+  `POST` now instead of a `GET` query-param handler.
+- `unsubscribe-all` (AC-6/AC-7) and the `/alerts/unsubscribed` page (AC-5) were not touched —
+  already correct, as the correct-course anticipated.
+- 399/399 web tests pass (up from 348 pre-change, combined with Story 6.2's Task 6 in the same
+  pass). `npx tsc --noEmit` and `npx eslint .` both clean.
+
 ## Change Log
 
 | Date | Change |
 |---|---|
 | 2026-08-20 | Story implemented: `unsubscribe_token` column/migration, `unsubscribeAlert()`/`unsubscribeAllAlertsByToken()`, redirect-only `GET /api/alerts/unsubscribe`, `POST /api/alerts/unsubscribe-all`, `/alerts/unsubscribed` page. 348/348 web tests pass. Code review: 2 patches applied (atomicity fix for `unsubscribeAllAlertsByToken`, entropy comment), 1 deferred. |
 | 2026-08-24 | **Correct-course, discovered during branch-divergence reconciliation:** `GET /api/alerts/unsubscribe` mutates state on a bare GET — the same mail-scanner-prefetch vulnerability the 2026-07-24 RODO party-mode session already decided to fix for this story (`docs/solutions/architecture/rodo-consent-integrity.md`, never carried into this story's ACs or `epics.md` at the time). Status → `in-progress`. New ACs 1–4 + 12 and Task 7 added, mirroring Story 6.2's already-approved side-effect-free-GET-page + POST pattern. See `_bmad-output/planning-artifacts/sprint-change-proposal-2026-08-24.md`. |
+| 2026-08-25 | Task 7 implemented (together with Story 6.2's Task 6, shared `AlertTokenActionButton`): `getUnsubscribePreviewByToken` added, `/alerts/unsubscribe` page built, `POST /api/alerts/unsubscribe` replaces the old `GET` handler. 399/399 web tests pass, `tsc`/`eslint` clean. Status → review. |
