@@ -27,3 +27,7 @@
 - No URL-scheme allow-list on `confirmation_url` before it's placed in the email's `href` [scraper/utils/brevo_client.py:31-36] — low risk today since the URL is server-generated, not user input; worth a defensive check if the caller contract ever loosens.
 - Network/timeout errors (`httpx.ConnectError`, etc.) propagate uncaught out of `send_doi_email()` [scraper/utils/brevo_client.py:52-58] — explicitly sanctioned by AC-1, but Story 6.5 (alert engine) and any future caller must wrap their own call in a try/except or a single transient network blip will crash the caller.
 - No `List-Unsubscribe` email header; footer link is a static `href="#"` placeholder [scraper/templates/doi_email.html:52-54] — explicitly sanctioned by AC-3 (no unsubscribe token exists at DOI stage); revisit once a token-bearing unsubscribe flow exists at DOI stage, and consider adding `List-Unsubscribe`/`List-Unsubscribe-Post` headers for deliverability.
+
+## Deferred from: code review of 6-3-wylaczanie-powiadomien (2026-08-24)
+
+- Migration `0007_price_alerts_unsubscribe_token.sql`: backfill + `SET NOT NULL` steps not wrapped in an explicit transaction — a concurrent insert during a rolling deploy could land a NULL row between steps and abort the migration. Pre-existing pattern shared with migration `0004`; not caused by this story.

@@ -157,15 +157,23 @@ export const priceAlerts = pgTable(
 // ---------------------------------------------------------------------------
 // email_suppressions  (raw email — needed for L-3 suppression join)
 // ---------------------------------------------------------------------------
-export const emailSuppressions = pgTable('email_suppressions', {
-  id: serial('id').primaryKey(),
-  email: text('email').notNull(),
-  reason: text('reason')
-    .$type<'hard_bounce' | 'complaint' | 'user_request' | 'global_optout'>()
-    .notNull(),
-  is_anonymized: boolean('is_anonymized').notNull().default(false),
-  created_at: timestamptz('created_at').defaultNow(),
-})
+export const emailSuppressions = pgTable(
+  'email_suppressions',
+  {
+    id: serial('id').primaryKey(),
+    email: text('email').notNull(),
+    reason: text('reason')
+      .$type<'hard_bounce' | 'complaint' | 'user_request' | 'global_optout'>()
+      .notNull(),
+    is_anonymized: boolean('is_anonymized').notNull().default(false),
+    created_at: timestamptz('created_at').defaultNow(),
+  },
+  // One suppression row per email — the app checks "does a row exist for this email" (any
+  // reason) before writing a new one, so concurrent writers must be DB-serialized via this
+  // constraint (ON CONFLICT DO NOTHING) rather than relying on an app-level check-then-insert,
+  // which races under concurrent requests (see unsubscribeAllAlertsByToken in queries/alerts.ts).
+  (t) => [unique('uq_email_suppressions_email').on(t.email)],
+)
 
 // ---------------------------------------------------------------------------
 // consent_log  (append-only RODO audit — NEVER DELETE from this table)

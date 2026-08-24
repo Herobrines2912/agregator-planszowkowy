@@ -335,6 +335,13 @@ export type UnsubscribeAllResult = { outcome: 'suppressed' } | { outcome: 'not_f
  * email and records a global_optout email_suppressions row, per architecture L-2/L-3.
  * Idempotent against an existing overridable (user_request/global_optout) suppression, and
  * never overrides a permanent one (hard_bounce/complaint — Story 6.8's territory).
+ *
+ * The cancel + suppress + consent-log write is one atomic CTE (same reason as
+ * unsubscribeAlert(): neon-http has no db.transaction()). email_suppressions.email has a
+ * unique constraint (migration 0008) and the insert uses ON CONFLICT DO NOTHING, so a
+ * concurrent double-submit for the same email can no longer produce duplicate
+ * email_suppressions/consent_log rows — the DB serializes the conflict instead of both
+ * requests racing an app-level "does a row exist" check.
  */
 export async function unsubscribeAllAlertsByToken(token: string): Promise<UnsubscribeAllResult> {
   const db = getDb()
@@ -348,35 +355,28 @@ export async function unsubscribeAllAlertsByToken(token: string): Promise<Unsubs
   const alert = rows[0]
   if (!alert) return { outcome: 'not_found' }
 
-  await db
-    .update(priceAlerts)
-    .set({ status: 'cancelled' })
-    .where(eq(priceAlerts.email, alert.email))
-
-  const existingSuppression = await db
-    .select({ reason: emailSuppressions.reason })
-    .from(emailSuppressions)
-    .where(eq(emailSuppressions.email, alert.email))
-    .limit(1)
-
-  const existing = existingSuppression[0]
-  // Permanent reasons (hard_bounce/complaint) are never overridden by this global-optout path
-  // (architecture L-2) — the alerts above are still cancelled, but no suppression/consent_log
-  // write happens here. An existing overridable reason means this call is a replay — idempotent,
-  // no duplicate row.
-  if (existing) return { outcome: 'suppressed' }
-
-  await db.insert(emailSuppressions).values({ email: alert.email, reason: 'global_optout' })
-
   try {
-    await db.insert(consentLog).values({
-      email_hash: alert.emailHash,
-      action: 'suppressed',
-      source: 'user',
-    })
+    await db.execute(sql`
+      WITH updated AS (
+        UPDATE ${priceAlerts}
+        SET status = 'cancelled'
+        WHERE ${priceAlerts.email} = ${alert.email}
+        RETURNING email_hash
+      ),
+      new_suppression AS (
+        INSERT INTO ${emailSuppressions} (email, reason)
+        VALUES (${alert.email}, 'global_optout')
+        ON CONFLICT (email) DO NOTHING
+        RETURNING id
+      )
+      INSERT INTO ${consentLog} (email_hash, action, source)
+      SELECT email_hash, 'suppressed', 'user' FROM updated LIMIT 1
+      WHERE EXISTS (SELECT 1 FROM new_suppression)
+      RETURNING id
+    `)
   } catch (err) {
     console.error(
-      `[unsubscribeAllAlertsByToken] consent_log write failed after email_suppressions insert for email_hash=${alert.emailHash} — RODO audit trail is now inconsistent`,
+      `[unsubscribeAllAlertsByToken] cancel+suppress failed for email_hash=${alert.emailHash}`,
       err,
     )
     throw err

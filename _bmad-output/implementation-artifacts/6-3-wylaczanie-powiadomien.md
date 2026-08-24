@@ -4,7 +4,7 @@ baseline_commit: 0d6458e
 
 # Story 6.3: Wyłączanie Powiadomień
 
-Status: review
+Status: done
 
 **Epic:** 6 — Email Price Alerts
 **Dev:** Dev A (Web) per epics.md — _pliki: `app/api/alerts/unsubscribe/route.ts`, `app/alerts/unsubscribed/page.tsx`_, plus shared files this story must also touch: `web/src/db/schema.ts`, `db/migrations/0007_*.sql`, `web/src/db/queries/alerts.ts`, `app/api/alerts/unsubscribe-all/route.ts`
@@ -156,3 +156,9 @@ Claude Sonnet 5 (claude-sonnet-5)
 - New: `web/src/app/alerts/unsubscribed/page.test.tsx`
 - New: `web/src/components/UnsubscribeAllControl.tsx`
 - New: `web/src/components/UnsubscribeAllControl.test.tsx`
+
+### Review Findings
+
+- [x] [Review][Patch] `unsubscribeAllAlertsByToken()` not atomic — concurrent double-submit produces duplicate `email_suppressions`/`consent_log` rows (violates AC6 idempotency); a failure after the `price_alerts` cancel but before the suppression/consent writes leaves alerts cancelled with no matching audit trail (AC10 gap). Fixed: added unique constraint on `email_suppressions.email` (migration `0008`) and rewrote the function as one atomic CTE mirroring `unsubscribeAlert()` — cancel + `INSERT ... ON CONFLICT (email) DO NOTHING` + conditional `consent_log` insert, all in a single `db.execute(sql\`...\`)`. [web/src/db/queries/alerts.ts:1107-1157]
+- [x] [Review][Patch] Migration comment claims "122 bits of entropy" but the backfill concatenates two UUIDs (~244 bits) — fixed the comment. [db/migrations/0007_price_alerts_unsubscribe_token.sql:203-204]
+- [x] [Review][Defer] Migration's backfill→`SET NOT NULL` window is not wrapped in an explicit transaction — a concurrent insert from old app code during a rolling deploy could insert a NULL row between steps and abort the migration. Pre-existing pattern (same three-step approach as migration `0004`), not introduced by this story — deferred, pre-existing.
