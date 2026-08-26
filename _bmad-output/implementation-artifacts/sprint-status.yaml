@@ -37,7 +37,7 @@
 #   fully completed story or fix (see CLAUDE.md "Sprint status" section)
 
 generated: 2026-07-20
-last_updated: 2026-08-25  # 6-2 Task 6 + 6-3 Task 7 implemented together (shared AlertTokenActionButton), both → review
+last_updated: 2026-08-26  # 8-2 implemented (7/8 tasks), status review — Task 8.4 (live spider run) left for user before merge
 project: board_games_app
 project_key: NOKEY
 tracking_system: file-system
@@ -118,9 +118,9 @@ development_status:
   7-6-type-b-alert-subscription-z-flipper-mode: backlog
   epic-7-retrospective: optional
 
-  epic-8: backlog
-  8-1-spike-walidacja-zrodla-danych-premier: backlog
-  8-2-upcoming-releases-spider-pipeline: backlog
+  epic-8: in-progress
+  8-1-spike-walidacja-zrodla-danych-premier: done  # PASSED — see docs/spike-results/preorder-source-validation.md
+  8-2-upcoming-releases-spider-pipeline: review  # Task 8.4 (live spider run) left for user before merge
   8-3-availability-trigger-alert-engine: backlog
   8-4-nadchodzace-page-shell-upcomingcard: backlog
   8-5-powiadom-gdy-dostepna-formularz-api: backlog

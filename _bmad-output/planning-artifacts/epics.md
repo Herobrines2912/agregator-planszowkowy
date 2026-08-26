@@ -2288,6 +2288,8 @@ So that the /nadchodzace page shows real games, not a placeholder.
 **When** source is identified
 **Then** Dev B dokumentuje: URL źródła, przykładowy CSS selector, dostępne pola (nazwa, data premiery, okładka, cena pre-order), czy strona wymaga JS renderingu
 
+**Wynik spike'a (2026-08-26): PASSED.** (1) Oba sklepy mają dedykowaną podstronę przedsprzedaży: `aleplanszowki.pl/532-przedsprzedaz` (339 pozycji) i `3trolle.pl/21-przedsprzedaz` (136 pozycji) — obie nieznalezione przez spike 1.7, który sprawdzał tylko listing główny. (2) Selektory potwierdzone działające na dzień 2026-08-26, brak wymogu JS (surowy `curl` zwraca pełne dane produktowe dla obu) — stabilność w czasie nie była mierzona (jednorazowa obserwacja). (3) 339 + 136 pozycji dostępnych "teraz" (2026-08-26), znacznie powyżej progu ≥10. **Aktualizuje decyzję 1.7:** 3Trolle jednak ma wiarygodny sygnał przedsprzedaży (baner tekstowy "PRZEDSPRZEDAŻ:" na stronie produktu) — Epic 8 buduje spider dla **obu** sklepów przeciw ich dedykowanym stronom przedsprzedaży, nie tylko AlePlanszowki + fallback 30-dniowy dla 3Trolle. Daty premier są tekstem przybliżonym ("ok. D miesiąc YYYY") w obu sklepach — wymagają ekstrakcji regex, przechowywać jako `TEXT`, nie `DATE`. Brak zmiany architektury, brak ADR. Pełne wyniki: `docs/spike-results/preorder-source-validation.md`.
+
 ---
 
 ### Story 8.2: UpcomingReleasesSpider & Pipeline

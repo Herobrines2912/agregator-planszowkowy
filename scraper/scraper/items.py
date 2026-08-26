@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 import scrapy
@@ -38,3 +39,20 @@ class PriceRecord(BaseModel):
     price_orig: Decimal | None = None
     in_stock: bool
     scraped_at: AwareDatetime  # use datetime.now(timezone.utc) — CLAUDE.md rule
+
+
+class UpcomingGame(BaseModel):
+    """Maps to the `upcoming_games` table — produced by upcoming-release spiders
+    (Story 8.2), validated/upserted by `UpcomingPipeline`.
+
+    DB-generated fields (id, status, available_since, created_at, updated_at) are
+    omitted/defaulted; the pipeline and database supply them.
+    """
+    store_id: int
+    game_id: int | None = None  # resolved by UpcomingPipeline via BGG match, not the spider
+    name: str
+    expected_release_date: date | None = None
+    expected_release_date_text: str | None = None
+    cover_image_url: str | None = None
+    pre_order_url: str
+    pre_order_price: Decimal | None = None

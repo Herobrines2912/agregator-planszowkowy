@@ -1,11 +1,11 @@
-"""Tests for scraper/scraper/items.py (Story 1.2b)."""
+"""Tests for scraper/scraper/items.py (Story 1.2b, extended by Story 8.2)."""
 from decimal import Decimal
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import pytest
 from pydantic import ValidationError
 
-from scraper.items import PriceRecord, ScrapedProduct
+from scraper.items import PriceRecord, ScrapedProduct, UpcomingGame
 
 
 class TestScrapedProduct:
@@ -114,3 +114,54 @@ class TestPriceRecord:
         )
         assert isinstance(rec.price, Decimal)
         assert isinstance(rec.price_orig, Decimal)
+
+
+class TestUpcomingGame:
+    def test_valid_full_construction(self):
+        g = UpcomingGame(
+            store_id=2,
+            game_id=42,
+            name="Dixit Signature: Złoczyńcy",
+            expected_release_date=date(2026, 10, 9),
+            expected_release_date_text="ok. 9 października 2026",
+            cover_image_url="https://example.com/cover.jpg",
+            pre_order_url="https://aleplanszowki.pl/przedsprzedaz/31855-dixit.html",
+            pre_order_price=Decimal("44.95"),
+        )
+        assert g.store_id == 2
+        assert g.game_id == 42
+        assert isinstance(g.pre_order_price, Decimal)
+        assert g.expected_release_date == date(2026, 10, 9)
+
+    def test_valid_minimal_construction(self):
+        g = UpcomingGame(
+            store_id=1,
+            name="Some Preorder Game",
+            pre_order_url="https://3trolle.pl/12345-game.html",
+        )
+        assert g.game_id is None
+        assert g.expected_release_date is None
+        assert g.expected_release_date_text is None
+        assert g.cover_image_url is None
+        assert g.pre_order_price is None
+
+    def test_pre_order_price_is_decimal_not_float(self):
+        g = UpcomingGame(
+            store_id=1,
+            name="X",
+            pre_order_url="u",
+            pre_order_price=Decimal("139.95"),
+        )
+        assert isinstance(g.pre_order_price, Decimal)
+
+    def test_store_id_is_required(self):
+        with pytest.raises(ValidationError):
+            UpcomingGame(name="X", pre_order_url="u")
+
+    def test_name_is_required(self):
+        with pytest.raises(ValidationError):
+            UpcomingGame(store_id=1, pre_order_url="u")
+
+    def test_pre_order_url_is_required(self):
+        with pytest.raises(ValidationError):
+            UpcomingGame(store_id=1, name="X")

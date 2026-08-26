@@ -1,3 +1,10 @@
+## Deferred from: code review of story-8.1 (2026-08-26)
+
+- Brak zarchiwizowanego surowego HTML jako dowodu reprodukowalności [docs/spike-results/preorder-source-validation.md] — nice-to-have, nie wymagane przez Task 5 tej story; liczby są odtwarzalne przez podane URL-e dopóki strony nie zmienią treści.
+- Brak potwierdzenia zachowania obu sklepowych stron pod domyślnym Scrapy User-Agent [docs/spike-results/preorder-source-validation.md:Methodology] — weryfikacja robiona przez `curl` z custom UA; realne potwierdzenie wymaga uruchomienia faktycznego spidera w Story 8.2.
+- Ryzyko że rekomendowane w Follow-ups dopasowanie `game_id` FK nigdy się nie rozwiąże dla nowych/pre-release gier nieobecnych jeszcze w `games` [docs/spike-results/preorder-source-validation.md:Follow-ups] — realny problem projektowy dla Story 8.2 (`UpcomingPipeline`), nie do rozwiązania w tej spike-story.
+- Założenie zgodności nowych spiderów z `__manifest__.py`'s dynamiczną iteracją niepotwierdzone — drobne, do sprawdzenia przy implementacji Story 8.2.
+
 ## Deferred from: code review of story-6.7 (2026-08-20)
 
 - `priceAlerts.status` TS `.$type<>()` union omits `'triggered'`, a real value the scraper writes and Story 6.7 now formally relies on via `status IN ('active', 'triggered')` [web/src/db/schema.ts:135, web/src/db/queries/alerts.ts:157-215] — pre-existing since Story 6.5 (not introduced by 6.7); `confirmAlert()`'s exhaustive `switch`/`assertNever` is type-unsound as a result, currently unreachable in practice. Revisit by adding `'triggered'` to the union in a follow-up.

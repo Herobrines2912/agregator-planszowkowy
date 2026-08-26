@@ -1,6 +1,7 @@
 import {
   type AnyPgColumn,
   boolean,
+  date,
   index,
   integer,
   jsonb,
@@ -212,3 +213,33 @@ export const dataRetentionLog = pgTable('data_retention_log', {
   step: text('step').notNull(),
   rows_affected: integer('rows_affected').notNull().default(0),
 })
+
+// ---------------------------------------------------------------------------
+// upcoming_games  (preorder/upcoming-release listings scraped weekly, Story 8.2)
+// ---------------------------------------------------------------------------
+export const upcomingGames = pgTable(
+  'upcoming_games',
+  {
+    id: serial('id').primaryKey(),
+    store_id: integer('store_id').notNull().references(() => stores.id),
+    game_id: integer('game_id').references(() => games.id),
+    name: text('name').notNull(),
+    // Exact date, rarely populated — both stores currently only give approximate text
+    // (see expected_release_date_text). Kept for stores/cases that do give a firm date.
+    expected_release_date: date('expected_release_date'),
+    // Approximate free-text release estimate (e.g. "ok. 9 października 2026") — the
+    // common case for both stores today, per Story 8.1's findings.
+    expected_release_date_text: text('expected_release_date_text'),
+    cover_image_url: text('cover_image_url'),
+    pre_order_url: text('pre_order_url').notNull(),
+    pre_order_price: numeric('pre_order_price', { precision: 10, scale: 2 }),
+    status: text('status')
+      .$type<'upcoming' | 'available'>()
+      .notNull()
+      .default('upcoming'),
+    available_since: timestamptz('available_since'),
+    created_at: timestamptz('created_at').defaultNow(),
+    updated_at: timestamptz('updated_at').defaultNow(),
+  },
+  (t) => [unique('uq_upcoming_games_store_name').on(t.store_id, t.name)],
+)
