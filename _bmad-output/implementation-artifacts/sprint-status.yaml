@@ -37,7 +37,7 @@
 #   fully completed story or fix (see CLAUDE.md "Sprint status" section)
 
 generated: 2026-07-20
-last_updated: 2026-08-26  # 8-2 implemented (7/8 tasks), status review — Task 8.4 (live spider run) left for user before merge
+last_updated: 2026-08-30  # 2-2c story contexted → ready-for-dev (bmad-create-story)
 project: board_games_app
 project_key: NOKEY
 tracking_system: file-system
@@ -65,7 +65,7 @@ development_status:
   2-2b-gameupc-key-hardening-data-cleanup: done
   2-7-bgg-corpus-title-matching: done  # Part 1 (spike) only — Part 2 is a future story, gated on this one's result
   2-8-gameupc-crowdsource-vote-back: done  # goodwill addition, sourced from GameUPC maintainer email
-  2-2c-dedup-game-id-contamination-cleanup: backlog  # follow-up bug, sourced from Story 7.1 spike findings
+  2-2c-dedup-game-id-contamination-cleanup: ready-for-dev  # follow-up bug, sourced from Story 7.1 spike findings
   epic-2-retrospective: optional
 
   epic-3: done

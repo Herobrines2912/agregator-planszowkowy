@@ -1,10 +1,10 @@
 ---
-baseline_commit: 547e678
+baseline_commit: a940cb1
 ---
 
 # Story 2.2c: game_id Dedup Contamination — Detection & Cleanup
 
-Status: backlog
+Status: ready-for-dev
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -61,9 +61,29 @@ Story 2.7 (in-progress, spike-only) is about improving PL↔EN fuzzy-match *prec
 
 2.2b's Dev Notes explicitly rejected a broad auto-detection heuristic sweep because several legitimately large, correctly-matched clusters exist (Catan with 21 products, Warhammer: The Old World with 35) where real SKU/expansion names can look just as dissimilar as a poisoned cluster's names. AC 1 inherits this caution — whatever heuristic Task 2 lands on must be validated against those known-good clusters, not just tuned to catch the known-bad ones.
 
+### Current state of the code you'll touch (verified @ a940cb1)
+
+**`scraper/scraper/pipelines/deduplication.py`** — two match paths feed `_upsert_game`:
+- `_try_ean_path` — hardened by 2.2b: evaluates every `bgg_info` candidate, keeps best `_name_match_score` (`token_sort_ratio`, not `WRatio`), rejects `< FUZZY_THRESHOLD` (85) and candidates `< 8` normalised chars. Disabled entirely when `GAMEUPC_API_KEY` unset.
+- `_try_name_path` — BGG Search + same `_name_match_score` / threshold 85. **This path has no name cross-validation beyond the fuzzy score** and carries an explicit `TODO(korpus BGG)` noting PL↔EN string similarity is weak. Prime suspect for Task 1 if contamination is still being produced.
+- `_upsert_game` — `INSERT ... ON CONFLICT (bgg_id) DO UPDATE SET updated_at = now() RETURNING id`. A wrong `bgg_id` from either path merges the product onto an existing unrelated `games` row. No `created_at` on `games` in this insert — Task 1.1's "predate 2.2b" check will need `products.created_at` / `price_history.scraped_at`, not a `games` timestamp.
+
+**`scraper/scripts/cleanup_gameupc_contamination.py`** — the exact pattern to mirror for Task 3. Reusable pieces: `--execute`/`--force` argparse, `_log_target(conn)` (logs host+dbname), `find_affected_rows` → `log_affected_rows` → `write_backup` (timestamped CSV) → `reset_affected_rows` (single txn, `conn.rollback()` + `RuntimeError` if `cur.rowcount != expected_rows`, then `INSERT INTO data_retention_log (step, rows_affected)`), `unfinished_scrape_count` in-flight-scrape guard, best-effort `_revalidate_isr()` (`VERCEL_URL` + `REVALIDATION_SECRET`). 2.2c's version resets `game_id` (and `bgg_id` only if Task 1 shows it's the driver) to `NULL`; the `step` value should be a new one, e.g. `reset_gameid_contamination`.
+
+### Schema / items.py
+
+This story NULLs FK columns only — no `schema.ts` / `items.py` change, so the CLAUDE.md "schema.ts is source of truth, sync items.py in same PR" rule does not apply here. Confirm no migration is needed.
+
 ### Where to get `DATABASE_URL`
 
 Pull it from the **Neon dashboard**, not from Vercel's env var UI — a prior incident in this project involved a stale/pooled `DATABASE_URL` copied from Vercel breaking a prod build mid-fix.
+
+### Project Structure Notes
+
+- New scripts go in `scraper/scripts/` (siblings of `cleanup_gameupc_contamination.py`, `spike_flipper_margin_proxy.py`), run as `cd scraper && python -m scripts.<name>`. Tests in `scraper/tests/` (`test_cleanup_gameid_contamination.py`, mirroring `test_cleanup_gameupc_contamination.py`).
+- Python-side rules (CLAUDE.md): `logging.getLogger(__name__)` never `print()`; `datetime.now(timezone.utc)` never naive; prices are `NUMERIC` — not relevant here (no price parsing), but the detection query reads `price_history` for the verify step.
+- `consent_log` is append-only — not touched by this story, but a reminder that `data_retention_log` is the correct audit sink for the reset (as the 2.2b script already does).
+- No web/ files. No `epics.md` update (hotfix, not a planned epic story) — record the outcome in `docs/spike-results/flipper-margin-proxy.md`'s caveat section per AC 5.
 
 ### References
 
@@ -85,3 +105,4 @@ Pull it from the **Neon dashboard**, not from Vercel's env var UI — a prior in
 ## Change Log
 
 - 2026-08-22 — Story raised as a follow-up from Story 7.1's spike findings. Not yet started.
+- 2026-08-30 — bmad-create-story context pass: verified all referenced files exist @ a940cb1, added "Current state of the code you'll touch" / "Project Structure Notes" / schema-sync note, refreshed `baseline_commit`. Status backlog → ready-for-dev.
