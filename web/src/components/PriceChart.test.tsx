@@ -65,10 +65,13 @@ describe('PriceChart', () => {
   })
 
   // AC-5: legend shows one item per store
+  // NOTE: queries switched to getByRole('button', …) after Story 5.3b — the store
+  // name now also appears as plain text in the accessible fallback <table>, so a
+  // bare getByText('AlePlanszowki') matches multiple nodes.
   test('5. legend shows one button per store', () => {
     render(<PriceChart data={mockData} gameId={1} initialRange="1T" />)
-    expect(screen.getByText('AlePlanszowki')).toBeTruthy()
-    expect(screen.getByText('3Trolle')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'AlePlanszowki' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '3Trolle' })).toBeTruthy()
   })
 
   // AC-5: clicking legend item hides line
@@ -80,10 +83,10 @@ describe('PriceChart', () => {
     expect(container.querySelectorAll('path[stroke]').length).toBe(2)
 
     // Click AlePlanszowki legend button
-    fireEvent.click(screen.getByText('AlePlanszowki').closest('button')!)
+    const btn = screen.getByRole('button', { name: 'AlePlanszowki' }) as HTMLElement
+    fireEvent.click(btn)
 
     // Legend item should be dimmed (opacity 0.4)
-    const btn = screen.getByText('AlePlanszowki').closest('button')! as HTMLElement
     expect(btn.style.opacity).toBe('0.4')
   })
 
@@ -92,10 +95,10 @@ describe('PriceChart', () => {
     render(<PriceChart data={mockData} gameId={1} initialRange="1T" />)
 
     // Hide 3Trolle first
-    fireEvent.click(screen.getByText('3Trolle').closest('button')!)
+    fireEvent.click(screen.getByRole('button', { name: '3Trolle' }))
 
     // Now AlePlanszowki is the last visible — clicking it should not change opacity
-    const aleBtn = screen.getByText('AlePlanszowki').closest('button')! as HTMLElement
+    const aleBtn = screen.getByRole('button', { name: 'AlePlanszowki' }) as HTMLElement
     expect(aleBtn.style.cursor).toBe('not-allowed')
 
     fireEvent.click(aleBtn)
@@ -207,7 +210,7 @@ describe('PriceChart', () => {
     })
 
     // Previous data (legend) still rendered — no crash, nothing wiped out
-    expect(screen.getByText('AlePlanszowki')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'AlePlanszowki' })).toBeTruthy()
     consoleErrorSpy.mockRestore()
   })
 
@@ -223,5 +226,46 @@ describe('PriceChart', () => {
     expect(sixMonthBtn).toBeTruthy()
     expect(sixMonthBtn.disabled).toBe(false)
     expect(sixMonthBtn.style.cursor).toBe('pointer')
+  })
+
+  // Story 5.3b / UX-DR12: accessible table fallback
+  // AC-2/AC-6: one <tbody> row per visible data point
+  test('16. accessible table has one row per visible data point', () => {
+    // initialRange="2T" (14d) → 3 in-window points per store (12/5/1 days ago) = 6 rows
+    const { container } = render(<PriceChart data={mockData} gameId={1} initialRange="2T" />)
+    expect(container.querySelectorAll('tbody tr').length).toBe(6)
+    // header columns present
+    const headers = Array.from(container.querySelectorAll('thead th')).map(th => th.textContent)
+    expect(headers).toEqual(['Data', 'Sklep', 'Cena'])
+  })
+
+  // AC-4: hiding a store via the legend removes its rows from the table (parity with the line)
+  test('17. hiding a store via legend removes its rows from the table', () => {
+    const { container } = render(<PriceChart data={mockData} gameId={1} initialRange="2T" />)
+    expect(container.querySelectorAll('tbody tr').length).toBe(6)
+
+    fireEvent.click(screen.getByRole('button', { name: 'AlePlanszowki' }))
+
+    const rows = Array.from(container.querySelectorAll('tbody tr'))
+    expect(rows.length).toBe(3) // only 3Trolle rows remain
+    expect(rows.every(r => r.textContent?.includes('3Trolle'))).toBe(true)
+  })
+
+  // AC-1/AC-6: dynamic <svg> aria-label carries current price + range; empty state describes itself
+  test('18. svg aria-label reflects current price and range, and the empty state', () => {
+    const { container } = render(<PriceChart data={mockData} gameId={1} initialRange="2T" />)
+    const label = container.querySelector('svg')!.getAttribute('aria-label')!
+    expect(label).toContain('aktualna cena')
+    expect(label).toContain('zł')
+    expect(label).toContain('zakres 2T')
+
+    const empty = render(<PriceChart data={[]} gameId={1} />)
+    expect(empty.container.querySelector('svg')!.getAttribute('aria-label')).toContain('brak danych')
+  })
+
+  // AC-5: empty state renders no <table>
+  test('19. data=[] → no table is rendered', () => {
+    const { container } = render(<PriceChart data={[]} gameId={1} />)
+    expect(container.querySelector('table')).toBeNull()
   })
 })

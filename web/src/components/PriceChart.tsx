@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, type CSSProperties } from 'react'
 import { formatPrice, formatDateMedium } from '@/lib/format'
 import { TimeRangeSelector } from './TimeRangeSelector'
 import { type Range, RANGE_DAYS, ALL_RANGES } from '@/lib/price-range'
@@ -20,6 +20,22 @@ export interface PriceChartProps {
 }
 
 const STORE_COLORS = ['#3D5C3A', '#C4622D', '#C07B18', '#6B5744', '#8B6C4F']
+
+// Visually-hidden but kept in the accessibility tree (UX-DR12 accessible table
+// fallback). NOT `display: none` / `visibility: hidden` — those drop the node
+// from the a11y tree. No sr-only utility exists in this project yet, so it's
+// defined locally here (Story 5.3b).
+const SR_ONLY_STYLE: CSSProperties = {
+  position: 'absolute',
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: 'hidden',
+  clipPath: 'inset(50%)',
+  whiteSpace: 'nowrap',
+  border: 0,
+}
 
 // SVG coordinate system: ViewBox 0 0 860 280, plotting area x:60–820, y:20–220
 const PLOT_X_MIN = 60
@@ -304,6 +320,22 @@ export function PriceChart({ data, gameId, initialRange = '1T' }: PriceChartProp
     [chartData, selectedRange],
   )
 
+  // Accessible table fallback (UX-DR12): a parallel read of the same visible
+  // points, minus any store hidden via the legend (parity with the chart lines).
+  // ISO "YYYY-MM-DD" strings sort chronologically under lexical compare.
+  const tableRows = useMemo(
+    () =>
+      filteredData
+        .filter(d => !hiddenStores.has(d.storeId))
+        .slice()
+        .sort((a, b) =>
+          a.date === b.date
+            ? a.storeName.localeCompare(b.storeName, 'pl')
+            : a.date.localeCompare(b.date),
+        ),
+    [filteredData, hiddenStores],
+  )
+
   // Derived geometry — memoized so `storeGroups` keeps a stable identity across
   // renders. It's a dependency of the memoized `handleMouseMove`; recomputing it
   // every render gave it a new identity each time, defeating that memoization and
@@ -391,6 +423,12 @@ export function PriceChart({ data, gameId, initialRange = '1T' }: PriceChartProp
   const svgHeight = isMobile ? 220 : 280
   const isEmpty = filteredData.length === 0
 
+  // Dynamic aria-label carrying the current price + range (UX-DR12), replacing
+  // the previous static "Wykres historii cen". `stats` is null iff isEmpty.
+  const svgLabel = isEmpty
+    ? 'Wykres historii cen: brak danych dla wybranego zakresu'
+    : `Wykres historii cen: aktualna cena ${formatPrice(stats!.current)}, zakres ${selectedRange}`
+
   return (
     <div
       style={{
@@ -457,7 +495,7 @@ export function PriceChart({ data, gameId, initialRange = '1T' }: PriceChartProp
           onMouseMove={handleMouseMove}
           onMouseLeave={() => setTooltip(null)}
           style={{ display: 'block', overflow: 'visible' }}
-          aria-label="Wykres historii cen"
+          aria-label={svgLabel}
           role="img"
         >
           {/* Chart background */}
@@ -579,6 +617,30 @@ export function PriceChart({ data, gameId, initialRange = '1T' }: PriceChartProp
             />
           )}
         </svg>
+
+        {/* Accessible table fallback (UX-DR12) — visually hidden, screen-reader only.
+            Not rendered in the empty state: the in-SVG message is already readable. */}
+        {!isEmpty && (
+          <table style={SR_ONLY_STYLE}>
+            <caption>{`Historia cen — zakres ${selectedRange}`}</caption>
+            <thead>
+              <tr>
+                <th scope="col">Data</th>
+                <th scope="col">Sklep</th>
+                <th scope="col">Cena</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tableRows.map((row, i) => (
+                <tr key={`${row.storeName}-${row.date}-${i}`}>
+                  <td>{formatDateMedium(row.date)}</td>
+                  <td>{row.storeName}</td>
+                  <td>{formatPrice(row.price)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
 
         {/* Loading overlay — shown only while re-fetching a wider range (AC-2); TimeRangeSelector/legend stay outside this and remain interactive */}
         {loading && (

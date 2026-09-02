@@ -37,7 +37,7 @@
 #   fully completed story or fix (see CLAUDE.md "Sprint status" section)
 
 generated: 2026-07-20
-last_updated: 2026-08-30  # 2-2c story contexted → ready-for-dev (bmad-create-story)
+last_updated: 2026-09-02  # 5-3b implemented → review (bmad-dev-story)
 project: board_games_app
 project_key: NOKEY
 tracking_system: file-system
@@ -65,7 +65,7 @@ development_status:
   2-2b-gameupc-key-hardening-data-cleanup: done
   2-7-bgg-corpus-title-matching: done  # Part 1 (spike) only — Part 2 is a future story, gated on this one's result
   2-8-gameupc-crowdsource-vote-back: done  # goodwill addition, sourced from GameUPC maintainer email
-  2-2c-dedup-game-id-contamination-cleanup: ready-for-dev  # follow-up bug, sourced from Story 7.1 spike findings
+  2-2c-dedup-game-id-contamination-cleanup: ready-for-dev  # follow-up bug; dev-story paused — blocked on DATABASE_URL (Neon)
   epic-2-retrospective: optional
 
   epic-3: done
@@ -91,7 +91,7 @@ development_status:
   5-1-price-history-db-query: done
   5-2-pricechart-component-visual-shell: done
   5-3-pricechart-connected-to-real-data: done
-  5-3b-pricechart-accessible-table-fallback: backlog
+  5-3b-pricechart-accessible-table-fallback: review  # split from Story 5.3 UX-DR12 scope gap; implemented 2026-09-02
   5-4-seo-meta-tags-open-graph-canonical: done
   5-5-json-ld-structured-data: done
   5-6-sitemap-robots-txt: done
