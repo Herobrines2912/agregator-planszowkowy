@@ -4,7 +4,9 @@ baseline_commit: a940cb1
 
 # Story 2.2c: game_id Dedup Contamination — Detection & Cleanup
 
-Status: ready-for-dev
+Status: in-progress
+
+> **Note:** Task 5 (live `--execute` cleanup run + spike re-verification against real production data) is deliberately left for the operator — resetting 200+ games' FKs is an irreversible, high-blast-radius write to shared infra (same category of decision as Story 8.2's Task 8.4). See Task 5 and Dev Agent Record for exact commands. Do not treat this story as complete until Task 5 is done.
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -34,18 +36,16 @@ Measured impact: 89 of 830 "sensible" margin-proxy rows (11%) and 13 of the top 
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Root-cause investigation** (AC: 4)
-  - [ ] 1.1 Pull a sample of the 208 contaminated `game_id`s (start from Story 7.1's spike query) and check whether they predate Story 2.2b's fix (compare `products.created_at`/`price_history.scraped_at` against the 2.2b ship date) or are still being produced by current code.
-  - [ ] 1.2 If still being produced: identify which path — `_try_ean_path` (should be hardened by 2.2b already) or `_try_name_path` (fuzzy threshold too loose?) — is responsible, with a concrete repro example.
-- [ ] **Task 2 — Detection script** (AC: 1)
-  - [ ] 2.1 Build/refine the contamination-detection query, validated against known-good large clusters (Catan, Warhammer: The Old World, etc. — must NOT flag these).
-- [ ] **Task 3 — Cleanup script** (AC: 2, 3)
-  - [ ] 3.1 Dry-run/`--execute` script mirroring `scraper/scripts/cleanup_gameupc_contamination.py`'s shape (psycopg2, `logging.getLogger(__name__)`, transactional `--execute`, rowcount logging).
-  - [ ] 3.2 Tests mirroring `test_cleanup_gameupc_contamination.py`.
-- [ ] **Task 4 — Pipeline fix (only if Task 1 finds an active bug)** (AC: 4)
-  - [ ] 4.1 Scope to be defined after Task 1's findings — may become its own story if large.
-- [ ] **Task 5 — Verify against Story 7.1's spike** (AC: 5)
-  - [ ] 5.1 Re-run `scraper/scripts/spike_flipper_margin_proxy.py` after `--execute` and confirm the contamination caveat numbers shrink.
+- [x] **Task 1 — Root-cause investigation** (AC: 4)
+  - [x] 1.1 Pulled the full 208-cluster candidate set (query reproduces Story 7.1's spike exactly) and checked `products.created_at` against the 2.2b ship date (2026-07-21/23, commit `993c139`). **206 of 208 clusters have every member product's `created_at` before that date.** The 2 exceptions (`game_id=714` "Star Wars: Legion — Clone Wars Core Set", `game_id=46` "Sylaby: Nauka czytania") were manually inspected product-by-product: `714`'s later-added product is a genuine same-family Legion expansion (not contamination — a false positive of the count heuristic, see Task 2); `46`'s later-added product ("Sylaby. Nauka czytania") is a legitimate re-listing of the same literacy game already in the cluster, not a new bad merge (the one genuinely bad entry in that cluster, "Mnożenie dzielenie: Nauka liczenia", predates 2.2b). **No cluster shows a NEW wrong merge created after 2.2b shipped.**
+  - [x] 1.2 **Conclusion: fully explained as residual pre-2.2b data — the pipeline is not still producing this.** Root cause matches 2.2b's own diagnosis exactly (GameUPC demo-key + zero name cross-validation on the EAN path, active before 2.2b's fix): e.g. `game_id=736` ("Smart", `bgg_id=3215`) has 66 completely unrelated "Smart Games - <puzzle name>" products merged onto one bgg_id — the demo key's canned/limited answer pool being accepted without any name check. 2.2b's fix (name cross-validation + `token_sort_ratio` + 8-char minimum) already prevents this going forward; 2.2b's own cleanup script just only manually confirmed 2 of the many affected `bgg_id`s at the time. **Task 4 is therefore N/A — no further pipeline fix needed.**
+- [x] **Task 2 — Detection script** (AC: 1)
+  - [x] 2.1 Built `scraper/scripts/detect_gameid_contamination.py` — same `COUNT(DISTINCT name) >= 4` heuristic as the spike, verified to reproduce 208/4159 exactly against production. **Investigated a fuzzy-similarity refinement per AC-1 and rejected it**: manually verified two large legitimate clusters — `game_id=12` "Warhammer: The Old World" (35 real miniature-line SKUs) and `game_id=714` "Star Wars: Legion — Clone Wars Core Set" (4 real expansion SKUs) — both show mutual product-name similarity just as low as genuinely contaminated clusters (a Warhammer battalion name shares no tokens with another Warhammer battalion name, same as two unrelated contaminated products). No automated similarity metric tried discriminated the two classes; see Dev Notes. The two verified clusters are hardcoded as `KNOWN_LEGITIMATE_CLUSTERS` and pre-excluded from the script's output; the remaining 206 are surfaced for operator review via `--detail GAME_ID`.
+- [x] **Task 3 — Cleanup script** (AC: 2, 3)
+  - [x] 3.1 Built `scraper/scripts/cleanup_gameid_contamination.py` mirroring `cleanup_gameupc_contamination.py`'s shape (psycopg2, `logging.getLogger(__name__)`, dry-run default, transactional `--execute`, pre-state CSV backup, `data_retention_log` audit row, in-flight-scrape guard, rowcount-divergence rollback, ISR revalidation). Takes an explicit `--game-ids` list rather than a hardcoded constant (208 candidates is too many to hand-verify one-by-one within this story, unlike 2.2b's 2) — mirrors 2.2b's "curated, human-confirmed list, not an automatic sweep" precedent, generalized to a variable-length operator-supplied list. Dry-run verified against production for `game_id=736` (confirmed 66 affected rows, zero writes).
+  - [x] 3.2 `scraper/tests/test_detect_gameid_contamination.py` (7 tests) + `scraper/tests/test_cleanup_gameid_contamination.py` (10 tests), mirroring `test_cleanup_gameupc_contamination.py`'s mock style. All pass.
+- [x] **Task 4 — Pipeline fix** (AC: 4) — **N/A, per Task 1.2's finding.** No pipeline code change made; 2.2b's existing hardening already prevents new contamination.
+- [ ] **Task 5 — Verify against Story 7.1's spike** (AC: 5) — **Blocked on an operator decision, not yet done.** Requires: (a) operator reviews the 206 candidates (`detect_gameid_contamination.py`, optionally `--detail GAME_ID` per candidate), (b) operator runs `cleanup_gameid_contamination.py --game-ids <confirmed list> --execute`, (c) re-run `scraper/scripts/spike_flipper_margin_proxy.py` to confirm the contamination caveat numbers shrink toward zero. Not run by this session — resetting 200+ production games' FKs is an irreversible, high-blast-radius write to shared infra; the same category of decision Story 8.2's Task 8.4 left to the operator rather than an AI agent's unilateral judgment call on a candidate list this large.
 
 ## Dev Notes
 
@@ -96,13 +96,31 @@ Pull it from the **Neon dashboard**, not from Vercel's env var UI — a prior in
 
 ### Agent Model Used
 
+Claude Sonnet 5 (bmad-dev-story)
+
 ### Debug Log References
+
+- `./.venv/Scripts/python.exe -m pytest` used directly (same environment quirk noted in Story 8.2 — `uv run` fails on this machine's space-containing path).
+- Live read queries run directly against the production Neon DB (`DATABASE_URL` from `scraper/.env`, user-confirmed as the correct Neon dashboard value) to reproduce and investigate the spike's 208-cluster finding — see Task 1 notes for the queries and findings. No writes were made to the database during this session.
+- `detect_gameid_contamination.py` and `cleanup_gameid_contamination.py --game-ids 736` (dry-run only) were both run against production to verify they work against real data — see Task 2/3 notes for output.
 
 ### Completion Notes List
 
+- **Root cause fully identified (Task 1):** contamination is residual pre-2.2b data, not an active bug. 206/208 candidate clusters have every member product created before 2.2b shipped; the 2 exceptions were manually verified to be legitimate same-family additions, not new bad merges. Mechanism matches 2.2b's own diagnosis (GameUPC demo-key + no name cross-validation), just discovered at a larger scale (208 affected `bgg_id`s vs. 2.2b's 2 manually-confirmed ones). No pipeline code was changed — Task 4 is N/A.
+- **AC-1's fuzzy-similarity investigation had a negative but useful result:** manually verified that two large legitimate clusters (Warhammer: The Old World id=12, Star Wars: Legion — Clone Wars Core Set id=714) have product-name mutual similarity just as low as genuinely contaminated clusters. No similarity-based heuristic tried during this investigation could discriminate the two classes — this validates 2.2b's own caution against a blind auto-detection sweep, now confirmed empirically rather than just by analogy. The two verified-legitimate clusters are hardcoded as exclusions in the detection script; the remaining 206 need human review, same as 2.2b's approach, just at a larger scale.
+- **Cleanup script design deviates from 2.2b's exact shape in one place, deliberately:** takes an operator-supplied `--game-ids` list instead of a hardcoded constant, because 208 candidates is too many to individually hand-verify within this story's scope (2.2b's 2 were both manually confirmed before the script was written). The script itself (dry-run default, `--execute` gate, backup, audit log, rollback-on-divergence) otherwise mirrors `cleanup_gameupc_contamination.py` exactly.
+- **AC-5 (verify against the spike) is intentionally left incomplete.** Actually resetting 200+ production games' FKs is an irreversible, high-blast-radius write to shared infra. Following this project's own established pattern (Story 8.2's Task 8.4 — a live write against real Neon DB left for the operator, not run unilaterally by the AI agent), Task 5 requires the operator to: review candidates via `detect_gameid_contamination.py --detail <game_id>`, decide the confirmed list, run `cleanup_gameid_contamination.py --game-ids <list> --execute`, then re-run `spike_flipper_margin_proxy.py` to confirm the caveat numbers shrink. Status is kept `in-progress` (not `review`) until that's done — see this story's own Prerequisite-style note below, mirroring the status-consistency fix just applied to Story 8.2's own code review.
+- Full scraper suite: 331 passed, 2 pre-existing unrelated failures (same local `.env`-leak issue noted in Story 8.2, files untouched by this story).
+
 ### File List
+
+- `scraper/scripts/detect_gameid_contamination.py` (CREATE)
+- `scraper/scripts/cleanup_gameid_contamination.py` (CREATE)
+- `scraper/tests/test_detect_gameid_contamination.py` (CREATE, 7 tests)
+- `scraper/tests/test_cleanup_gameid_contamination.py` (CREATE, 10 tests)
 
 ## Change Log
 
 - 2026-08-22 — Story raised as a follow-up from Story 7.1's spike findings. Not yet started.
 - 2026-08-30 — bmad-create-story context pass: verified all referenced files exist @ a940cb1, added "Current state of the code you'll touch" / "Project Structure Notes" / schema-sync note, refreshed `baseline_commit`. Status backlog → ready-for-dev.
+- 2026-09-05 — bmad-dev-story: DATABASE_URL confirmed available, dev-story started. Task 1 (root-cause investigation) complete: contamination confirmed as residual pre-2.2b data, no active pipeline bug — Task 4 marked N/A. Task 2 (detection script) and Task 3 (cleanup script + tests) complete and verified against real production data (read-only / dry-run only, zero writes). Task 5 (live `--execute` + spike re-verification) intentionally left for the operator — same pattern as Story 8.2's Task 8.4. Status stays `in-progress`, not `review`, until Task 5 is done.

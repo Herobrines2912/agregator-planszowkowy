@@ -37,7 +37,7 @@
 #   fully completed story or fix (see CLAUDE.md "Sprint status" section)
 
 generated: 2026-07-20
-last_updated: 2026-09-02  # 5-3b implemented → review (bmad-dev-story)
+last_updated: 2026-09-05  # 2-2c: root cause found (residual pre-2.2b), tooling built; Task 5 (live execute) left for operator
 project: board_games_app
 project_key: NOKEY
 tracking_system: file-system
@@ -65,7 +65,7 @@ development_status:
   2-2b-gameupc-key-hardening-data-cleanup: done
   2-7-bgg-corpus-title-matching: done  # Part 1 (spike) only — Part 2 is a future story, gated on this one's result
   2-8-gameupc-crowdsource-vote-back: done  # goodwill addition, sourced from GameUPC maintainer email
-  2-2c-dedup-game-id-contamination-cleanup: ready-for-dev  # follow-up bug; dev-story paused — blocked on DATABASE_URL (Neon)
+  2-2c-dedup-game-id-contamination-cleanup: in-progress  # detection+cleanup scripts built & verified; Task 5 (live --execute + spike re-verify) left for operator, same pattern as 8.2 Task 8.4
   epic-2-retrospective: optional
 
   epic-3: done
@@ -120,7 +120,7 @@ development_status:
 
   epic-8: in-progress
   8-1-spike-walidacja-zrodla-danych-premier: done  # PASSED — see docs/spike-results/preorder-source-validation.md
-  8-2-upcoming-releases-spider-pipeline: review  # Task 8.4 (live spider run) left for user before merge
+  8-2-upcoming-releases-spider-pipeline: in-progress  # code review 2026-09-05: 13 patch findings fixed, 3 decisions resolved; reverted from review — Task 8.4 (live spider run) still blocking merge
   8-3-availability-trigger-alert-engine: backlog
   8-4-nadchodzace-page-shell-upcomingcard: backlog
   8-5-powiadom-gdy-dostepna-formularz-api: backlog
