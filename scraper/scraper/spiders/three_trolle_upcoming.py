@@ -36,11 +36,19 @@ class ThreeTrolleUpcomingSpider(scrapy.Spider):
         if next_page:
             yield response.follow(next_page, callback=self.parse)
 
+    # No stable selector wraps the "PRZEDSPRZEDAŻ:" banner itself (inline style=""
+    # only, per Story 8.1's finding), so we can't scope to it directly. `#main` is
+    # PrestaShop's standard main-content wrapper (this store's platform, same as the
+    # `article.product-miniature` selector already confirmed in Task 3/4) — scoping
+    # to it excludes the theme's shared header/footer/nav chrome, which is the most
+    # likely source of an unrelated "ok. <date>" match elsewhere on the page. Falls
+    # back to the full body if #main isn't present, rather than finding nothing.
+    _MAIN_CONTENT_SELECTOR = "#main"
+
     def parse_product(self, response):
         name, cover_image_url, raw_price = self._extract_jsonld_product(response)
-        # No stable CSS class wraps the "PRZEDSPRZEDAŻ:" banner (inline style="" only,
-        # per Story 8.1's finding) — search the full page text instead of a selector.
-        page_text = " ".join(response.css("body *::text").getall())
+        search_scope = response.css(self._MAIN_CONTENT_SELECTOR) or response
+        page_text = " ".join(search_scope.css("*::text").getall())
         _, release_date_text = parse_release_date(page_text)
 
         yield {
@@ -48,7 +56,10 @@ class ThreeTrolleUpcomingSpider(scrapy.Spider):
             "name": name or "",
             "pre_order_url": response.url,
             "cover_image_url": cover_image_url,
-            "pre_order_price": parse_price(raw_price) if raw_price else None,
+            # str() cast: see ale_planszowki_upcoming.py's comment on this same line —
+            # parse_price() expects a string and a bare JSON-LD numeric `0` would
+            # otherwise be treated as "missing" by its own falsy check.
+            "pre_order_price": parse_price(str(raw_price)) if raw_price not in (None, "") else None,
             "expected_release_date": None,
             "expected_release_date_text": release_date_text,
         }
@@ -62,10 +73,17 @@ class ThreeTrolleUpcomingSpider(scrapy.Spider):
                 continue
             items = data if isinstance(data, list) else [data]
             for item in items:
-                if item.get("@type") == "Product":
-                    name = item.get("name") or ""
-                    image = item.get("image")
-                    offers = item.get("offers") or {}
-                    price = offers.get("price")
-                    return name, image, price
+                if not isinstance(item, dict) or item.get("@type") != "Product":
+                    continue
+                name = item.get("name") or ""
+                # schema.org permits `image`/`offers` as either a single object or
+                # an array (multi-image/multi-offer products) — take the first entry.
+                image = item.get("image")
+                if isinstance(image, list):
+                    image = image[0] if image else None
+                offers = item.get("offers") or {}
+                if isinstance(offers, list):
+                    offers = offers[0] if offers else {}
+                price = offers.get("price") if isinstance(offers, dict) else None
+                return name, image, price
         return None, None, None

@@ -41,6 +41,18 @@ class TestParseReleaseDate:
         assert exact is None
         assert approx == "ok. 25 września 2026r."
 
+    def test_day_month_year_with_trailing_comma_instead_of_period(self):
+        text = "Przewidywana data dostawy to ok. 9 października 2026, ale termin może się zmienić."
+        exact, approx = parse_release_date(text)
+        assert exact is None
+        assert approx == "ok. 9 października 2026,"
+
+    def test_day_month_year_with_no_trailing_punctuation(self):
+        text = "Data premiery ok. 9 października 2026 do potwierdzenia"
+        exact, approx = parse_release_date(text)
+        assert exact is None
+        assert approx == "ok. 9 października 2026"
+
     def test_no_match_returns_none_none(self):
         text = "Ten produkt jest dostępny od ręki, wysyłka w 24 godziny."
         assert parse_release_date(text) == (None, None)

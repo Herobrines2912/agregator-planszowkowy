@@ -46,7 +46,11 @@ class AlePlanszowkiUpcomingSpider(scrapy.Spider):
             "name": name or "",
             "pre_order_url": response.url,
             "cover_image_url": cover_image_url,
-            "pre_order_price": parse_price(raw_price) if raw_price else None,
+            # str() cast: JSON-LD price may come through as a JSON number (e.g. `0`
+            # for a free promo pre-order) — parse_price() expects a string and would
+            # otherwise treat a bare `0`/`0.0` the same as "missing" via its own
+            # falsy check.
+            "pre_order_price": parse_price(str(raw_price)) if raw_price not in (None, "") else None,
             "expected_release_date": None,
             "expected_release_date_text": release_date_text,
         }
@@ -60,10 +64,17 @@ class AlePlanszowkiUpcomingSpider(scrapy.Spider):
                 continue
             items = data if isinstance(data, list) else [data]
             for item in items:
-                if item.get("@type") == "Product":
-                    name = item.get("name") or ""
-                    image = item.get("image")
-                    offers = item.get("offers") or {}
-                    price = offers.get("price")
-                    return name, image, price
+                if not isinstance(item, dict) or item.get("@type") != "Product":
+                    continue
+                name = item.get("name") or ""
+                # schema.org permits `image`/`offers` as either a single object or
+                # an array (multi-image/multi-offer products) — take the first entry.
+                image = item.get("image")
+                if isinstance(image, list):
+                    image = image[0] if image else None
+                offers = item.get("offers") or {}
+                if isinstance(offers, list):
+                    offers = offers[0] if offers else {}
+                price = offers.get("price") if isinstance(offers, dict) else None
+                return name, image, price
         return None, None, None

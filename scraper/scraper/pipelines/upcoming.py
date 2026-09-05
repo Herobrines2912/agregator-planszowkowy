@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 
@@ -8,7 +9,10 @@ import httpx
 import psycopg2
 import psycopg2.pool
 from dotenv import load_dotenv
+from pydantic import ValidationError
 from rapidfuzz import fuzz
+
+from scraper.items import UpcomingGame
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +20,12 @@ BGG_SEARCH_URL = "https://boardgamegeek.com/xmlapi2/search"
 # Same threshold as DeduplicationPipeline — kept identical so name-match confidence
 # is consistent between the two pipelines rather than an independently-tuned value.
 FUZZY_THRESHOLD = 85
+# Scrapy's AUTOTHROTTLE_ENABLED (see upcoming.yml) only paces the spider's own HTTP
+# requests to the store pages — it has no effect on this synchronous side-channel
+# call to BGG's API. A fixed delay keeps a full run's worth of BGG lookups (~475
+# items at Story 8.1's spike-time page counts) well under the workflow's 60-minute
+# timeout even under BGG-side slowness, and avoids hammering a third-party API.
+BGG_REQUEST_DELAY_SECONDS = 0.5
 
 _EDITION_PATTERNS = [
     r"\s*\(edycja polska\)",
@@ -73,10 +83,30 @@ class UpcomingPipeline:
         self._http = httpx.Client(timeout=10.0)
 
     def process_item(self, item, spider):
+        name = item.get("name") or ""
+        if not name:
+            logger.warning(
+                "Skipping upcoming-game item with missing/blank name (JSON-LD "
+                "extraction likely failed) — url=%s",
+                item.get("pre_order_url"),
+            )
+            return item
+
+        pydantic_fields = {k: v for k, v in item.items() if k in UpcomingGame.model_fields}
         try:
-            game_id = self._resolve_game_id(item.get("name", ""))
+            UpcomingGame(**pydantic_fields)
+        except ValidationError as exc:
+            logger.error(
+                "Pydantic validation failed for upcoming-game item %s: %s",
+                item.get("pre_order_url"),
+                exc,
+            )
+            return item
+
+        try:
+            game_id = self._resolve_game_id(name)
             self._upsert_upcoming_game(item, game_id)
-            self._maybe_mark_available(item.get("store_id"), item.get("name", ""))
+            self._maybe_mark_available(item.get("store_id"), name)
         except Exception as exc:
             logger.error(
                 "UpcomingPipeline failed for item %s from %s: %s",
@@ -89,11 +119,14 @@ class UpcomingPipeline:
 
     def close_spider(self, spider) -> None:
         try:
-            if self._http:
-                self._http.close()
+            self._reconcile_available(getattr(spider, "store_id", None))
         finally:
-            if self.pool:
-                self.pool.closeall()
+            try:
+                if self._http:
+                    self._http.close()
+            finally:
+                if self.pool:
+                    self.pool.closeall()
 
     # -------------------------------------------------------------------------
     # Private helpers
@@ -117,6 +150,8 @@ class UpcomingPipeline:
         except Exception as exc:
             logger.warning("BGG Search failed for %r: %s", name, exc)
             return None
+        finally:
+            time.sleep(BGG_REQUEST_DELAY_SECONDS)
 
         if len(response.content) > 2_000_000:
             logger.warning("BGG Search response too large for %r (%d bytes)", name, len(response.content))
@@ -200,32 +235,83 @@ class UpcomingPipeline:
                     ),
                 )
             conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
         finally:
             self.pool.putconn(conn)
 
+    @staticmethod
+    def _in_stock_product_names(cur, store_id: int) -> set[str]:
+        cur.execute(
+            "SELECT name FROM products WHERE store_id = %s AND in_stock = true",
+            (store_id,),
+        )
+        return {_normalise_name(row[0]) for row in cur.fetchall()}
+
     def _maybe_mark_available(self, store_id: int | None, name: str) -> None:
         """AC-4: if the daily scraper.yml spiders have already found this game for
-        sale (a matching in-stock `products` row for the same store/name), flip
+        sale (a matching in-stock `products` row for the same store, compared via
+        the same `_normalise_name` used for BGG matching — edition suffixes/diacritics
+        must not block this the way raw string equality would), flip
         `upcoming_games.status` to 'available'. Idempotent: only fires while status
-        is still 'upcoming', so available_since is never overwritten on re-runs."""
+        is still 'upcoming', so available_since is never overwritten on re-runs.
+
+        Only catches games this run's spider still yielded (see `_reconcile_available`
+        in `close_spider` for games that already dropped off the store's listing)."""
         if not store_id or not name:
             return
-        available_since = datetime.now(timezone.utc)
+        conn = self.pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                if _normalise_name(name) not in self._in_stock_product_names(cur, store_id):
+                    return
+                available_since = datetime.now(timezone.utc)
+                cur.execute(
+                    """UPDATE upcoming_games
+                       SET status = 'available', available_since = %s
+                       WHERE store_id = %s AND name = %s AND status = 'upcoming'""",
+                    (available_since, store_id, name),
+                )
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            self.pool.putconn(conn)
+
+    def _reconcile_available(self, store_id: int | None) -> None:
+        """AC-4 follow-up: a game that ships is expected to drop off the store's
+        `/przedsprzedaz` preorder listing entirely, so `_maybe_mark_available` never
+        runs again for it once that happens — it would never see the item and the
+        row would stay 'upcoming' forever. Runs once per spider close: re-checks
+        every still-'upcoming' row for this store against `products`, independent
+        of what this run's spider yielded."""
+        if not store_id or not self.pool:
+            return
         conn = self.pool.getconn()
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    """UPDATE upcoming_games
-                       SET status = 'available', available_since = %s
-                       WHERE store_id = %s AND name = %s AND status = 'upcoming'
-                         AND EXISTS (
-                             SELECT 1 FROM products p
-                             WHERE p.store_id = upcoming_games.store_id
-                               AND p.name = upcoming_games.name
-                               AND p.in_stock = true
-                         )""",
-                    (available_since, store_id, name),
+                    "SELECT name FROM upcoming_games WHERE store_id = %s AND status = 'upcoming'",
+                    (store_id,),
                 )
+                upcoming_names = [row[0] for row in cur.fetchall()]
+                if not upcoming_names:
+                    return
+                in_stock = self._in_stock_product_names(cur, store_id)
+                available_since = datetime.now(timezone.utc)
+                for name in upcoming_names:
+                    if _normalise_name(name) in in_stock:
+                        cur.execute(
+                            """UPDATE upcoming_games
+                               SET status = 'available', available_since = %s
+                               WHERE store_id = %s AND name = %s AND status = 'upcoming'""",
+                            (available_since, store_id, name),
+                        )
             conn.commit()
+        except Exception:
+            conn.rollback()
+            logger.error("Reconciliation pass failed for store_id=%s", store_id, exc_info=True)
         finally:
             self.pool.putconn(conn)

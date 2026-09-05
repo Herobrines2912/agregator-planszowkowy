@@ -25,9 +25,10 @@ def _make_pool_mock(game_id: int = 7) -> MagicMock:
     return mock_pool, mock_conn, mock_cursor
 
 
-def _make_spider(name="ale_planszowki_upcoming"):
+def _make_spider(name="ale_planszowki_upcoming", store_id=2):
     spider = MagicMock()
     spider.name = name
+    spider.store_id = store_id
     return spider
 
 
@@ -170,6 +171,27 @@ class TestUpsert:
         # Should not raise
         pipeline.process_item(_item(), _make_spider())
 
+    def test_upsert_rolls_back_on_execute_failure(self):
+        """A failed INSERT/UPDATE must not leave the pooled connection in an
+        aborted-transaction state for the next item in the same run."""
+        mock_pool, mock_conn, mock_cursor = _make_pool_mock()
+        pipeline = _open_pipeline(mock_pool, bgg_token=None)
+        mock_cursor.execute.side_effect = Exception("constraint violation")
+        pipeline.process_item(_item(), _make_spider())
+        mock_conn.rollback.assert_called()
+
+    def test_blank_name_is_skipped(self):
+        mock_pool, mock_conn, mock_cursor = _make_pool_mock()
+        pipeline = _open_pipeline(mock_pool, bgg_token=None)
+        pipeline.process_item(_item(name=""), _make_spider())
+        mock_pool.getconn.assert_not_called()
+
+    def test_invalid_item_fails_validation_and_is_skipped(self):
+        mock_pool, mock_conn, mock_cursor = _make_pool_mock()
+        pipeline = _open_pipeline(mock_pool, bgg_token=None)
+        pipeline.process_item(_item(pre_order_url=None), _make_spider())
+        mock_pool.getconn.assert_not_called()
+
 
 # ---------------------------------------------------------------------------
 # Availability transition (AC-4)
@@ -178,21 +200,44 @@ class TestUpsert:
 class TestAvailabilityTransition:
     def test_marks_available_when_matching_product_exists(self):
         mock_pool, mock_conn, mock_cursor = _make_pool_mock()
+        item = _item()
+        # Name-normalized match (see _normalise_name) — the products lookup is
+        # compared post-normalisation, so an exact-string match trivially matches too.
+        mock_cursor.fetchall.return_value = [(item["name"],)]
         pipeline = _open_pipeline(mock_pool, bgg_token=None)
-        pipeline.process_item(_item(), _make_spider())
+        pipeline.process_item(item, _make_spider())
         update_calls = [str(c) for c in mock_cursor.execute.call_args_list if "UPDATE upcoming_games" in str(c)]
         assert len(update_calls) == 1
         assert "status = 'available'" in update_calls[0]
         assert "AND status = 'upcoming'" in update_calls[0]
 
+    def test_no_update_when_no_matching_product(self):
+        mock_pool, mock_conn, mock_cursor = _make_pool_mock()
+        mock_cursor.fetchall.return_value = []
+        pipeline = _open_pipeline(mock_pool, bgg_token=None)
+        pipeline.process_item(_item(), _make_spider())
+        update_calls = [str(c) for c in mock_cursor.execute.call_args_list if "UPDATE upcoming_games" in str(c)]
+        assert update_calls == []
+
     def test_idempotent_guard_only_updates_upcoming_status(self):
         """The UPDATE's own WHERE clause guards status='upcoming' — verifies the
         idempotency guard is present in the SQL, not just that UPDATE ran once."""
         mock_pool, mock_conn, mock_cursor = _make_pool_mock()
+        mock_cursor.fetchall.return_value = [("Some Game",)]
         pipeline = _open_pipeline(mock_pool, bgg_token=None)
         pipeline._maybe_mark_available(2, "Some Game")
-        call_sql = str(mock_cursor.execute.call_args_list[0])
-        assert "AND status = 'upcoming'" in call_sql
+        update_call = next(c for c in mock_cursor.execute.call_args_list if "UPDATE upcoming_games" in str(c))
+        assert "AND status = 'upcoming'" in str(update_call)
+
+    def test_uses_normalised_name_match_not_raw_equality(self):
+        """AC-4 fix: matching must go through _normalise_name like the BGG-match
+        path, so an edition-suffix/diacritic mismatch doesn't silently block it."""
+        mock_pool, mock_conn, mock_cursor = _make_pool_mock()
+        mock_cursor.fetchall.return_value = [("Brass: Birmingham (edycja polska)",)]
+        pipeline = _open_pipeline(mock_pool, bgg_token=None)
+        pipeline._maybe_mark_available(2, "Brass: Birmingham")
+        update_calls = [str(c) for c in mock_cursor.execute.call_args_list if "UPDATE upcoming_games" in str(c)]
+        assert len(update_calls) == 1
 
     def test_noop_when_store_id_or_name_missing(self):
         mock_pool, mock_conn, mock_cursor = _make_pool_mock()
@@ -219,3 +264,29 @@ class TestOpenClose:
         pipeline = _open_pipeline(mock_pool, bgg_token=None)
         pipeline.close_spider(_make_spider())
         mock_pool.closeall.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Reconciliation pass (AC-4 follow-up — catches games dropped from the listing)
+# ---------------------------------------------------------------------------
+
+class TestReconciliation:
+    def test_marks_stale_upcoming_rows_available_on_close(self):
+        mock_pool, mock_conn, mock_cursor = _make_pool_mock()
+        pipeline = _open_pipeline(mock_pool, bgg_token=None)
+        # 1st fetchall: still-'upcoming' rows for this store. 2nd: in-stock products.
+        mock_cursor.fetchall.side_effect = [
+            [("Some Shipped Game",)],
+            [("Some Shipped Game",)],
+        ]
+        pipeline.close_spider(_make_spider(store_id=2))
+        update_calls = [str(c) for c in mock_cursor.execute.call_args_list if "UPDATE upcoming_games" in str(c)]
+        assert len(update_calls) == 1
+
+    def test_noop_when_no_upcoming_rows(self):
+        mock_pool, mock_conn, mock_cursor = _make_pool_mock()
+        pipeline = _open_pipeline(mock_pool, bgg_token=None)
+        mock_cursor.fetchall.return_value = []
+        pipeline.close_spider(_make_spider(store_id=2))
+        update_calls = [str(c) for c in mock_cursor.execute.call_args_list if "UPDATE upcoming_games" in str(c)]
+        assert update_calls == []

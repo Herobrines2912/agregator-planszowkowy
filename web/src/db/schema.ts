@@ -1,6 +1,8 @@
+import { sql } from 'drizzle-orm'
 import {
   type AnyPgColumn,
   boolean,
+  check,
   date,
   index,
   integer,
@@ -241,5 +243,8 @@ export const upcomingGames = pgTable(
     created_at: timestamptz('created_at').defaultNow(),
     updated_at: timestamptz('updated_at').defaultNow(),
   },
-  (t) => [unique('uq_upcoming_games_store_name').on(t.store_id, t.name)],
+  (t) => [
+    unique('uq_upcoming_games_store_name').on(t.store_id, t.name),
+    check('ck_upcoming_games_status', sql`${t.status} IN ('upcoming', 'available')`),
+  ],
 )

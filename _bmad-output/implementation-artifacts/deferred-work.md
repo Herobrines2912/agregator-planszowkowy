@@ -1,3 +1,8 @@
+## Deferred from: code review of story-8.2 (2026-09-05)
+
+- CI suppresses per-spider failure as a warning, not a job failure [.github/workflows/upcoming.yml:52] — `|| echo "::warning::..."` intentionally mirrors `scraper.yml`'s existing convention per this story's own Dev Notes; a persistently broken spider would only surface as an easy-to-miss annotation, but fixing it is a cross-cutting change to an existing pattern, not scoped to this story.
+- Migration journal drift (`db/migrations/meta/_journal.json`) is now larger, not just noted [db/migrations/0009_upcoming_games.sql] — `drizzle-kit generate` still doesn't know about 0007/0008 (pre-existing per Story 8.2's own Task 1.2), and this story adds a third hand-authored, unregistered migration on top. Real but explicitly out-of-scope per the story's own Completion Notes; revisit by repairing the journal/snapshot state directly.
+
 ## Deferred from: code review of story-8.1 (2026-08-26)
 
 - Brak zarchiwizowanego surowego HTML jako dowodu reprodukowalności [docs/spike-results/preorder-source-validation.md] — nice-to-have, nie wymagane przez Task 5 tej story; liczby są odtwarzalne przez podane URL-e dopóki strony nie zmienią treści.

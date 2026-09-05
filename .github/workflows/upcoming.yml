@@ -33,14 +33,13 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           BGG_API_TOKEN: ${{ secrets.BGG_API_TOKEN }}
-          # AutoThrottle: each store's dedicated preorder page is paginated (~15
-          # pages for AlePlanszowki, ~11 for 3Trolle at Story 8.1's spike time) —
-          # scoped here rather than in scraper/scraper/settings.py's global
-          # defaults, since the daily scraper.yml spiders don't need it at their
-          # much smaller per-run page count.
-          SCRAPY_AUTOTHROTTLE_ENABLED: 'True'
         run: |
           cd scraper
+          # AutoThrottle passed via -s: each store's dedicated preorder page is
+          # paginated (~15 pages for AlePlanszowki, ~11 for 3Trolle at Story 8.1's
+          # spike time) — scoped to this workflow's runs, not settings.py's global
+          # defaults, since the daily scraper.yml spiders don't need it at their
+          # much smaller per-run page count.
           for spider in ale_planszowki_upcoming three_trolle_upcoming; do
             echo "--- Running spider: $spider ---"
             uv run scrapy crawl "$spider" -s AUTOTHROTTLE_ENABLED=True || echo "::warning::Spider $spider exited with non-zero code"

@@ -81,3 +81,48 @@ class TestAlePlanszowkiUpcomingSpiderProduct:
         item = self._parse_product()
         assert item["expected_release_date_text"] == "ok. 9 października 2026r."
         assert item["expected_release_date"] is None
+
+
+class TestJsonLdEdgeCases:
+    """Schema.org allows `offers`/`image` as arrays and JSON-LD payloads that aren't
+    a single Product object — real store pages can legally take either shape."""
+
+    def setup_method(self):
+        self.spider = AlePlanszowkiUpcomingSpider()
+
+    @staticmethod
+    def _response(jsonld_body: str) -> HtmlResponse:
+        html = f"""<html><body>
+        <script type="application/ld+json">{jsonld_body}</script>
+        </body></html>""".encode()
+        return HtmlResponse(url="https://aleplanszowki.pl/x.html", body=html)
+
+    def test_offers_as_array_uses_first_offer(self):
+        response = self._response(
+            '{"@type": "Product", "name": "Test Game", "image": "img.jpg", '
+            '"offers": [{"price": "99.00"}, {"price": "199.00"}]}'
+        )
+        item = list(self.spider.parse_product(response))[0]
+        assert item["pre_order_price"] == Decimal("99.00")
+
+    def test_image_as_array_uses_first_image(self):
+        response = self._response(
+            '{"@type": "Product", "name": "Test Game", "image": ["a.jpg", "b.jpg"], '
+            '"offers": {"price": "99.00"}}'
+        )
+        item = list(self.spider.parse_product(response))[0]
+        assert item["cover_image_url"] == "a.jpg"
+
+    def test_non_dict_jsonld_item_does_not_crash(self):
+        response = self._response('["not", "a", "product", "object"]')
+        item = list(self.spider.parse_product(response))[0]
+        assert item["name"] == ""
+        assert item["pre_order_price"] is None
+
+    def test_zero_price_is_not_treated_as_missing(self):
+        response = self._response(
+            '{"@type": "Product", "name": "Free Promo Game", "image": "img.jpg", '
+            '"offers": {"price": 0}}'
+        )
+        item = list(self.spider.parse_product(response))[0]
+        assert item["pre_order_price"] == Decimal("0")

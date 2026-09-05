@@ -8,12 +8,14 @@ from datetime import date
 # `approximate_text`, even the numeric DD.MM.YYYY form (which is unambiguous on its
 # own but still carries the same "ok." qualifier as the others).
 _PATTERNS = [
-    # "ok. 25 września 2026r." / "ok. 9 października 2026r."  — day + genitive month + year
-    re.compile(r"ok\.\s*\d{1,2}\s+[a-ząćęłńóśźż]+\s+\d{4}r?\.", re.IGNORECASE),
+    # "ok. 25 września 2026r." / "ok. 9 października 2026r." / "ok. 9 października 2026,"
+    # — day + genitive month + year, trailing punctuation (period/comma) optional so a
+    # comma-terminated sentence or mid-sentence phrasing still matches.
+    re.compile(r"ok\.\s*\d{1,2}\s+[a-ząćęłńóśźż]+\s+\d{4}r?[.,]?", re.IGNORECASE),
     # "ok. 16.09.2026" — numeric DD.MM.YYYY
     re.compile(r"ok\.\s*\d{1,2}\.\d{1,2}\.\d{4}"),
     # "ok. październik 2026r." / "ok. wrzesień 2026" — nominative month + year, no day
-    re.compile(r"ok\.\s*[a-ząćęłńóśźż]+\s+\d{4}r?\.?", re.IGNORECASE),
+    re.compile(r"ok\.\s*[a-ząćęłńóśźż]+\s+\d{4}r?[.,]?", re.IGNORECASE),
 ]
 
 
